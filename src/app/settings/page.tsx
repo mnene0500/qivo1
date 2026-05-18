@@ -1,105 +1,214 @@
+
 "use client"
 
+import { useAuth, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
+import { errorEmitter } from "@/firebase/error-emitter"
+import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors"
+import { deleteUser, signOut } from "firebase/auth"
+import { doc, deleteDoc } from "firebase/firestore"
 import { useRouter } from "next/navigation"
-import { useAuth, useUser } from "@/firebase"
 import { Button } from "@/components/ui/button"
-import { 
-  ChevronLeft, 
-  User, 
-  Shield, 
-  Ban, 
-  LogOut, 
-  ChevronRight, 
-  HelpCircle,
-  Info,
-  Lock
-} from "lucide-react"
-import { signOut } from "firebase/auth"
+import { ChevronLeft, ChevronRight, ShieldAlert, Link as LinkIcon, Info, RefreshCw, CreditCard, Ban } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
+interface UserProfile {
+  isAdmin?: boolean
+}
+
+interface SettingItemProps {
+  label: string
+  onClick?: () => void
+  href?: string
+  icon?: React.ReactNode
+}
+
+function SettingItem({ label, onClick, href, icon }: SettingItemProps) {
+  const content = (
+    <div className="flex items-center justify-between py-5 px-6 border-b border-gray-50 active:bg-gray-50 transition-colors cursor-pointer bg-white">
+      <div className="flex items-center gap-4">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-gray-50">
+          {icon}
+        </div>
+        <span className="text-[15px] font-bold text-black">{label}</span>
+      </div>
+      <ChevronRight className="w-5 h-5 text-gray-300" />
+    </div>
+  )
+
+  if (href) {
+    return <Link href={href}>{content}</Link>
+  }
+
+  return <div onClick={onClick}>{content}</div>
+}
 
 export default function SettingsPage() {
   const router = useRouter()
-  const auth = useAuth()
-  const { user } = useUser()
   const { toast } = useToast()
+  const auth = useAuth()
+  const db = useFirestore()
+  const { user } = useUser()
 
-  const handleLogout = async () => {
+  const profileRef = useMemoFirebase(() => user?.uid ? doc(db, "users", user.uid) : null, [db, user?.uid])
+  const { data: profile } = useDoc<UserProfile>(profileRef)
+
+  const handleSignOut = async () => {
     try {
       await signOut(auth)
-      toast({ title: "Logged out", description: "See you soon!" })
-      router.push("/auth")
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to log out" })
+      window.location.replace("/auth")
+    } catch (error) {
+      // Handled by Firebase
     }
   }
 
-  const sections = [
-    {
-      title: "Account Settings",
-      items: [
-        { label: "Edit Profile", icon: User, path: "/edit-profile", color: "bg-blue-50 text-blue-600" },
-        { label: "Secure Account", icon: Lock, path: "/bind-account", color: "bg-indigo-50 text-indigo-600" },
-      ]
-    },
-    {
-      title: "Privacy & Privacy",
-      items: [
-        { label: "Blocked Users", icon: Ban, path: "/blocked-list", color: "bg-red-50 text-red-600" },
-        { label: "Privacy Policy", icon: Shield, path: "/privacy", color: "bg-green-50 text-green-600" },
-      ]
-    },
-    {
-      title: "Support",
-      items: [
-        { label: "About MatchFlow", icon: Info, path: "/about", color: "bg-gray-50 text-gray-600" },
-      ]
+  const handleClearCache = async () => {
+    try {
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        for (const registration of registrations) {
+          await registration.unregister()
+        }
+      }
+
+      toast({ 
+        title: "App Reset", 
+        description: "Cache cleared and service worker reset. Reloading..." 
+      })
+
+      setTimeout(() => {
+        window.location.href = window.location.origin + '?v=' + Date.now()
+      }, 1500)
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error resettting app" })
     }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!user) return
+
+    try {
+      const uid = user.uid
+      const userRef = doc(db, "users", uid)
+      
+      // Pattern 1: Non-blocking mutation with contextual error emitter
+      deleteDoc(userRef)
+        .catch(async () => {
+          const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'delete',
+          } satisfies SecurityRuleContext)
+          errorEmitter.emit('permission-error', permissionError)
+        })
+
+      await deleteUser(user)
+      
+      toast({
+        title: "Account deleted",
+        description: "Your account and data have been removed.",
+      })
+      window.location.replace("/auth")
+    } catch (error: any) {
+      const description = error.code === 'auth/requires-recent-login' 
+        ? "For security reasons, please sign out and sign back in before deleting your account." 
+        : error.message || "Failed to delete account."
+        
+      toast({
+        variant: "destructive",
+        title: "Deletion failed",
+        description: description,
+      })
+    }
+  }
+
+  const settingsList = [
+    { label: "Charge settings", href: "/recharge", icon: <CreditCard className="w-4 h-4 text-blue-500" /> },
+    { label: "Blocked List", href: "/blocked-list", icon: <Ban className="w-4 h-4 text-red-400" /> },
+    { label: "About MatchFlow", href: "/about", icon: <Info className="w-4 h-4 text-gray-500" /> },
+    { label: "Hard Reset (Clear Cache)", onClick: handleClearCache, icon: <RefreshCw className="w-4 h-4 text-orange-500" /> },
   ]
 
   return (
-    <div className="flex-1 bg-white min-h-screen flex flex-col select-none">
-      <header className="px-4 h-16 flex items-center border-b sticky top-0 bg-white z-50">
+    <div className="flex-1 bg-[#F9FAFB] flex flex-col min-h-screen select-none">
+      <header className="flex items-center justify-between px-4 h-16 bg-white sticky top-0 z-50 border-b">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
           <ChevronLeft className="w-6 h-6 text-black" />
         </Button>
-        <h1 className="text-base font-black text-black ml-2 uppercase tracking-tight">App Settings</h1>
+        <h1 className="text-base font-black text-black uppercase tracking-widest">Settings</h1>
+        <div className="w-10" />
       </header>
 
-      <main className="flex-1 p-6 space-y-8">
-        {sections.map((section, idx) => (
-          <div key={idx} className="space-y-3">
-            <h2 className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">{section.title}</h2>
-            <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-              {section.items.map((item, i) => (
-                <Link key={i} href={item.path} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors border-b last:border-none border-gray-50">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-2xl ${item.color} flex items-center justify-center`}>
-                      <item.icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-sm font-bold text-black">{item.label}</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300" />
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        <div className="pt-4">
-          <Button 
-            variant="outline" 
-            onClick={handleLogout}
-            className="w-full h-16 rounded-3xl border-2 border-red-50 text-red-500 font-black uppercase tracking-widest text-[10px] gap-2 hover:bg-red-50 hover:border-red-100"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out of Account
-          </Button>
+      <main className="flex-1">
+        <div className="flex flex-col mt-4">
+          {user?.isAnonymous && (
+            <SettingItem 
+              label="Secure Account" 
+              href="/bind-account" 
+              icon={<LinkIcon className="w-4 h-4 text-[#00A2FF]" />} 
+            />
+          )}
+          
+          {settingsList.map((item, idx) => (
+            <SettingItem key={idx} {...item} />
+          ))}
+          
+          <SettingItem label="Sign Out" onClick={handleSignOut} />
         </div>
       </main>
 
-      <footer className="p-10 text-center opacity-30">
-        <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">MatchFlow Kenya • v1.2.1</p>
+      <footer className="pb-10 pt-20 px-6">
+        <div className="flex items-center justify-center gap-4 text-[10px] text-gray-400 font-black uppercase tracking-[0.2em]">
+          <Link href="/privacy" className="hover:text-black">Privacy</Link>
+          <span className="opacity-20">•</span>
+          <Link href="/terms" className="hover:text-black">Terms</Link>
+          {!profile?.isAdmin && (
+            <>
+              <span className="opacity-20">•</span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button className="hover:text-red-500 transition-colors">Delete Account</button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none">
+                  <AlertDialogHeader className="items-center text-center">
+                    <AlertDialogTitle className="text-xl font-bold flex flex-col items-center gap-4">
+                      <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
+                        <ShieldAlert className="w-8 h-8 text-red-500" />
+                      </div>
+                      Permanent Deletion
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed">
+                      This action cannot be undone. All your coins, diamonds, and messages will be permanently lost.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="flex-row gap-3 mt-6">
+                    <AlertDialogCancel className="flex-1 h-14 rounded-full border-none bg-gray-100 font-bold uppercase tracking-widest text-[10px]">Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      className="flex-1 h-14 rounded-full bg-red-500 hover:bg-red-600 font-bold uppercase tracking-widest text-[10px]"
+                      onClick={handleDeleteAccount}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+        </div>
+        <p className="text-center text-[9px] text-gray-300 font-bold mt-8 uppercase tracking-[0.3em]">MatchFlow Kenya v1.2.1</p>
       </footer>
     </div>
   )
