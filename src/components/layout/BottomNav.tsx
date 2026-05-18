@@ -8,7 +8,7 @@ export function BottomNav() {
   const pathname = usePathname()
 
   const navItems = [
-    { icon: Home, label: "Home", path: "/" },
+    { icon: Home, label: "Home", path: "/home" },
     { icon: Compass, label: "Explore", path: "/explore" },
     { icon: MessageSquare, label: "Chats", path: "/chats" },
     { icon: User, label: "Profile", path: "/profile" },

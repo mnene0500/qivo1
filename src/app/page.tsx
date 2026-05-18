@@ -1,28 +1,43 @@
-
 "use client"
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useUser } from "@/firebase"
-import { Loader2 } from "lucide-react"
+import { doc, getDoc } from "firebase/firestore"
+import { useUser, useFirestore } from "@/firebase"
 
 /**
- * Entry point redirect logic.
- * Routes authenticated users to Home and guests to Welcome.
+ * Root Redirector with Splash Screen.
+ * Immediately determines destination once auth state is resolved.
+ * Uses black screen to prevent flashing of unauthenticated UI.
  */
-export default function RootEntry() {
+export default function RootPage() {
   const router = useRouter()
   const { user, loading, isInitialized } = useUser()
+  const db = useFirestore()
 
   useEffect(() => {
     if (isInitialized && !loading) {
-      if (user) {
-        router.replace("/home")
-      } else {
-        router.replace("/welcome")
+      const checkDestination = async () => {
+        if (user) {
+          try {
+            const userRef = doc(db, "users", user.uid)
+            const snap = await getDoc(userRef)
+            if (snap.exists() && snap.data().onboardingComplete) {
+              router.replace("/home")
+            } else {
+              router.replace("/onboarding")
+            }
+          } catch (e) {
+            router.replace("/onboarding")
+          }
+        } else {
+          router.replace("/welcome")
+        }
       }
+
+      checkDestination()
     }
-  }, [user, loading, isInitialized, router])
+  }, [user, loading, isInitialized, router, db])
 
   return (
     <div className="flex-1 bg-black min-h-screen flex flex-col items-center justify-center">
@@ -30,9 +45,6 @@ export default function RootEntry() {
         <div className="w-20 h-20 border-4 border-white/5 rounded-full" />
         <div className="w-20 h-20 border-4 border-[#00A2FF] border-t-transparent rounded-full animate-spin absolute inset-0" />
       </div>
-      <p className="mt-8 text-[10px] font-black text-white/40 uppercase tracking-[0.4em] animate-pulse">
-        Synchronising Flow...
-      </p>
     </div>
   )
 }
