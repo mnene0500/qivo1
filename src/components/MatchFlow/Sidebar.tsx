@@ -1,12 +1,9 @@
-
 "use client";
 
 import { useState } from "react";
 import { 
   LayoutDashboard, 
   MessageSquare, 
-  Hash, 
-  Compass, 
   Settings, 
   Plus, 
   ChevronLeft, 
@@ -73,7 +70,6 @@ export function Sidebar({ className }: { className?: string }) {
           <div className="space-y-1">
             <NavItem icon={<LayoutDashboard />} label="Dashboard" active />
             <NavItem icon={<MessageSquare />} label="Threads" />
-            <NavItem icon={<Compass />} label="Explore" />
           </div>
 
           <Separator className="bg-sidebar-border" />
@@ -86,7 +82,7 @@ export function Sidebar({ className }: { className?: string }) {
               </div>
             )}
             {CHANNELS.map(c => (
-              <NavItem key={c} icon={<Hash />} label={c} isCompact={isCollapsed} />
+              <NavItem key={c} icon={<HashIcon />} label={c} isCompact={isCollapsed} />
             ))}
           </div>
 
@@ -114,6 +110,28 @@ export function Sidebar({ className }: { className?: string }) {
         <NavItem icon={<Settings />} label="Settings" isCompact={isCollapsed} />
       </div>
     </aside>
+  );
+}
+
+function HashIcon() {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width="24" 
+      height="24" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className="w-4 h-4"
+    >
+      <line x1="4" x2="20" y1="9" y2="9" />
+      <line x1="4" x2="20" y1="15" y2="15" />
+      <line x1="10" x2="8" y1="3" y2="21" />
+      <line x1="16" x2="14" y1="3" y2="21" />
+    </svg>
   );
 }
 

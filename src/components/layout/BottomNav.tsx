@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, MessageSquare, User, Compass } from "lucide-react"
+import { Home, MessageSquare, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { ref, onValue, off } from "firebase/database"
@@ -36,7 +36,6 @@ export function BottomNav() {
 
   const navItems = [
     { label: "Home", icon: Home, href: "/home" },
-    { label: "Explore", icon: Compass, href: "/explore" },
     { label: "Chat", icon: MessageSquare, href: "/chats", badge: totalUnread },
     { label: "Me", icon: User, href: "/profile" },
   ]
