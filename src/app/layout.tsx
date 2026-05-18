@@ -1,11 +1,40 @@
-
-import type {Metadata} from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { Inter, Pacifico } from 'next/font/google';
+import { Providers } from '@/components/providers';
+import Script from 'next/script';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+const pacifico = Pacifico({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-pacifico',
+});
 
 export const metadata: Metadata = {
-  title: 'MatchFlow | Seamless Digital Connectivity',
-  description: 'Experience real-time threading and flow intelligence.',
+  title: 'MatchFlow',
+  description: 'Connect with Heart',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'MatchFlow',
+  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#00A2FF',
 };
 
 export default function RootLayout({
@@ -14,15 +43,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className="font-body antialiased bg-background text-foreground">
-        <FirebaseErrorListener />
-        {children}
+    <html 
+      lang="en" 
+      className={`${inter.variable} ${pacifico.variable}`}
+      data-scroll-behavior="smooth"
+    >
+      <body className="font-body antialiased bg-background min-h-screen flex flex-col">
+        <Providers>
+          {children}
+        </Providers>
+        <Script id="register-sw" strategy="afterInteractive">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(
+                  function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                  },
+                  function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                  }
+                );
+              });
+            }
+          `}
+        </Script>
       </body>
     </html>
   );
