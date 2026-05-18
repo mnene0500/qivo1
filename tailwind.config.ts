@@ -1,4 +1,3 @@
-
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -14,6 +13,7 @@ export default {
         body: ['Inter', 'sans-serif'],
         headline: ['Space Grotesk', 'sans-serif'],
         code: ['monospace'],
+        logo: ['Space Grotesk', 'sans-serif'],
       },
       colors: {
         background: 'hsl(var(--background))',
@@ -85,11 +85,16 @@ export default {
           '0%, 100%': { transform: 'scale(1)', opacity: '1' },
           '50%': { transform: 'scale(1.2)', opacity: '0.8' },
         },
+        'pulse-slow': {
+          '0%, 100%': { opacity: '0.7', transform: 'scale(1.05)' },
+          '50%': { opacity: '0.8', transform: 'scale(1.1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'pulse-presence': 'pulse-presence 2s infinite ease-in-out',
+        'pulse-slow': 'pulse-slow 8s infinite ease-in-out',
       },
     },
   },
