@@ -66,7 +66,8 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     try {
       await signOut(auth)
-      window.location.replace("/auth")
+      // Redirect to cinematic welcome screen
+      window.location.replace("/welcome")
     } catch (error) {
       // Handled by Firebase
     }
@@ -119,7 +120,8 @@ export default function SettingsPage() {
         title: "Account deleted",
         description: "Your account and data have been removed.",
       })
-      window.location.replace("/auth")
+      // Redirect to cinematic welcome screen
+      window.location.replace("/welcome")
     } catch (error: any) {
       const description = error.code === 'auth/requires-recent-login' 
         ? "For security reasons, please sign out and sign back in before deleting your account." 
