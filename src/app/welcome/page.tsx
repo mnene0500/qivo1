@@ -12,7 +12,6 @@ import Link from "next/link"
 
 /**
  * @fileOverview Welcome / Auth Entry Page.
- * Strictly remains invisible (blank) if any session is detected to prevent flickering.
  */
 export default function WelcomePage() {
   const [mounted, setMounted] = useState(false)
@@ -26,7 +25,6 @@ export default function WelcomePage() {
     setMounted(true)
   }, [])
 
-  // Guard: If user lands here but is already logged in, redirect away silently
   useEffect(() => {
     if (isInitialized && user) {
       const checkRedirect = async () => {
@@ -36,10 +34,14 @@ export default function WelcomePage() {
           if (snap.exists() && snap.data().onboardingComplete) {
             router.replace("/home")
           } else {
-            router.replace("/onboarding")
+            if (user.isAnonymous) {
+              router.replace("/fastonboard")
+            } else {
+              router.replace("/onboarding")
+            }
           }
         } catch (e) {
-          // If check fails, stay blank until router processes next move
+          router.replace("/onboarding")
         }
       }
       checkRedirect()
@@ -47,29 +49,26 @@ export default function WelcomePage() {
   }, [user, isInitialized, router, db])
 
   const handleFastLogin = async () => {
-    if (auth.currentUser) {
-      router.push("/onboarding?fast=true")
+    if (auth.currentUser && auth.currentUser.isAnonymous) {
+      router.push("/fastonboard")
       return
     }
 
     setLoading(true)
     try {
       await signInAnonymously(auth)
-      router.push("/onboarding?fast=true")
+      router.push("/fastonboard")
     } catch (error) {
       setLoading(false)
     }
   }
 
-  // CRITICAL: If auth is loading, or we have a user (redirecting), 
-  // or the session isn't confirmed as "empty" yet, show nothing.
   if (!mounted || authLoading || !isInitialized || user) {
     return <div className="flex-1 bg-black min-h-screen" />
   }
 
   return (
     <div className="relative flex-1 flex flex-col min-h-screen bg-black overflow-hidden select-none">
-      {/* Cinematic Background */}
       <div className="absolute inset-0 z-0 scale-105 animate-pulse-slow">
         <Image 
           src="https://picsum.photos/seed/matchlove/1000/1500" 

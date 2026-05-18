@@ -7,8 +7,6 @@ import { useUser, useFirestore } from "@/firebase"
 
 /**
  * Root Redirector with Splash Screen.
- * Immediately determines destination once auth state is resolved.
- * Uses black screen to prevent flashing of unauthenticated UI.
  */
 export default function RootPage() {
   const router = useRouter()
@@ -25,10 +23,15 @@ export default function RootPage() {
             if (snap.exists() && snap.data().onboardingComplete) {
               router.replace("/home")
             } else {
-              router.replace("/onboarding")
+              // Separate onboarding routes based on auth method
+              if (user.isAnonymous) {
+                router.replace("/fastonboard")
+              } else {
+                router.replace("/onboarding")
+              }
             }
           } catch (e) {
-            router.replace("/onboarding")
+            router.replace("/welcome")
           }
         } else {
           router.replace("/welcome")
