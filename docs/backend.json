@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -6,12 +5,16 @@
       "description": "User profile with roles and agency status",
       "type": "object",
       "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
         "matchFlowId": { "type": "string" },
+        "onboardingComplete": { "type": "boolean" },
         "isAdmin": { "type": "boolean" },
         "isCoinSeller": { "type": "boolean" },
         "isAgent": { "type": "boolean" },
         "agencyId": { "type": "string" },
         "agencyStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
