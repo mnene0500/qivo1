@@ -86,7 +86,7 @@ export default function WelcomePage() {
       <div className="relative z-10 flex-1 flex flex-col px-8 pt-48 pb-16 justify-between items-center text-center">
         <div className="flex flex-col items-center space-y-6 animate-in slide-in-from-top-10 duration-1000">
           <div className="space-y-3">
-            <h1 className="text-5xl font-headline font-black text-white drop-shadow-2xl tracking-tight">
+            <h1 className="text-5xl font-logo font-black text-white drop-shadow-2xl tracking-tight">
               MatchFlow
             </h1>
             <div className="flex items-center justify-center gap-2">
