@@ -55,7 +55,7 @@ export default function RootPage() {
   }, [user, loading, isInitialized, router, db])
 
   return (
-    <div className="flex-1 bg-black min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden">
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#00A2FF]/20 rounded-full blur-[100px] animate-pulse-slow" />
       

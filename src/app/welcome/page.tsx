@@ -73,11 +73,11 @@ export default function WelcomePage() {
   }
 
   if (!mounted || authLoading || !isInitialized || user) {
-    return <div className="flex-1 bg-black min-h-screen" />
+    return <div className="fixed inset-0 bg-black" />
   }
 
   return (
-    <div className="relative flex-1 flex flex-col min-h-screen bg-black overflow-hidden select-none">
+    <div className="fixed inset-0 bg-black overflow-hidden select-none">
       <div className="absolute inset-0 z-0 overflow-hidden">
         <video
           autoPlay
@@ -92,10 +92,10 @@ export default function WelcomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent" />
       </div>
 
-      <div className="relative z-10 flex-1 flex flex-col px-8 pt-48 pb-16 justify-between items-center text-center">
-        <div className="flex flex-col items-center space-y-6">
+      <div className="relative z-10 h-full flex flex-col px-8 pt-24 pb-16 justify-between items-center text-center">
+        <div className="flex flex-col items-center space-y-6 pt-20">
           <div className="space-y-3">
-            <h1 className="text-6xl font-logo font-black text-white drop-shadow-2xl tracking-tight">
+            <h1 className="text-7xl font-logo font-black text-white drop-shadow-2xl tracking-tight">
               QIVO
             </h1>
           </div>
