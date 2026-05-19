@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, Suspense, useEffect } from "react"
@@ -13,7 +14,8 @@ import {
   History, 
   Users, 
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -54,6 +56,7 @@ function RechargeContent() {
   const [loading, setLoading] = useState(false)
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
   const [isFulfilling, setIsFulfilling] = useState(false)
+  const [fulfillmentError, setFulfillmentError] = useState<string | null>(null)
   
   const [currentCoins, setCurrentCoins] = useState(0)
 
@@ -62,25 +65,30 @@ function RechargeContent() {
 
   // Handle instant fulfillment if redirected back from PesaPal
   useEffect(() => {
-    const orderId = searchParams.get("OrderTrackingId");
-    const merchantRef = searchParams.get("OrderMerchantReference");
+    const orderId = searchParams.get("OrderTrackingId") || searchParams.get("orderTrackingId");
+    const merchantRef = searchParams.get("OrderMerchantReference") || searchParams.get("orderMerchantReference");
     
     if (orderId && merchantRef) {
       const runFulfillment = async () => {
         setIsFulfilling(true);
+        console.log(`[Recharge UI] Fulfillment starting for ${orderId}`);
         try {
           const res = await fulfillPaymentAction(orderId, merchantRef);
           if (res.success) {
             toast({ 
-              title: "Payment Successful", 
-              description: `Successfully credited ${res.coins || ''} coins!`,
+              title: "Success!", 
+              description: `Added ${res.coins || ''} coins to your wallet.`,
             });
+            // Brief delay to show success icon before redirect
             setTimeout(() => router.replace("/profile"), 2000);
           } else {
-            router.replace("/profile");
+            setFulfillmentError(res.error || "Verification pending...");
+            setTimeout(() => router.replace("/profile"), 3000);
           }
-        } catch (e) {
-          router.replace("/profile");
+        } catch (e: any) {
+          console.error("[Recharge UI] Fulfillment Exception:", e.message);
+          setFulfillmentError("Connection error during verification.");
+          setTimeout(() => router.replace("/profile"), 3000);
         } finally {
           setIsFulfilling(false);
         }
@@ -121,31 +129,41 @@ function RechargeContent() {
         toast({ 
           variant: "destructive", 
           title: "Payment Error", 
-          description: result.error || "Could not initiate payment. Check server logs." 
+          description: result.error || "Could not initiate payment." 
         })
       }
     } catch (err: any) {
       toast({ 
         variant: "destructive", 
         title: "System Error", 
-        description: "Failed to connect to payment server. Please try again." 
+        description: "Failed to connect to payment server." 
       })
     } finally {
       setLoading(false)
     }
   }
 
-  if (isFulfilling) {
+  if (isFulfilling || fulfillmentError) {
     return (
-      <div className="flex-1 bg-white min-h-screen flex flex-col items-center justify-center p-8 space-y-8">
+      <div className="flex-1 bg-white min-h-screen flex flex-col items-center justify-center p-8 space-y-8 animate-in fade-in duration-500">
         <div className="relative">
           <div className="w-24 h-24 border-4 border-blue-50 rounded-full" />
-          <div className="w-24 h-24 border-4 border-[#00A2FF] border-t-transparent rounded-full animate-spin absolute inset-0" />
-          <CheckCircle2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-[#00A2FF] opacity-20" />
+          {!fulfillmentError ? (
+            <div className="w-24 h-24 border-4 border-[#00A2FF] border-t-transparent rounded-full animate-spin absolute inset-0" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-amber-500">
+              <AlertCircle className="w-12 h-12" />
+            </div>
+          )}
+          <CheckCircle2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-[#00A2FF] opacity-10" />
         </div>
         <div className="text-center space-y-2">
-          <h2 className="text-2xl font-black text-black uppercase tracking-tighter">Confirming...</h2>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] animate-pulse">Syncing with PesaPal Secure API</p>
+          <h2 className="text-2xl font-black text-black uppercase tracking-tighter">
+            {fulfillmentError ? "Hold on..." : "Confirming..."}
+          </h2>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] leading-relaxed max-w-[200px] mx-auto">
+            {fulfillmentError || "Syncing with PesaPal Secure API. Don't close the app."}
+          </p>
         </div>
       </div>
     )

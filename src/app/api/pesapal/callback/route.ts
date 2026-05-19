@@ -9,36 +9,38 @@ import { fulfillPaymentAction } from '@/app/actions/payment-actions';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   
-  // Handle both possible PesaPal parameter casings
+  // Log the entire raw request for debugging in Vercel Console
+  console.log("🔥 [PesaPal IPN] Webhook Received!");
+  console.log(`[PesaPal IPN] Raw Query: ${searchParams.toString()}`);
+
+  // PesaPal typically sends: OrderTrackingId, OrderMerchantReference, OrderNotificationType
   const orderTrackingId = searchParams.get('OrderTrackingId') || searchParams.get('orderTrackingId');
   const merchantReference = searchParams.get('OrderMerchantReference') || searchParams.get('orderMerchantReference');
 
-  console.log("🔥 [PesaPal IPN] Webhook Hit Received");
-  console.log(`[PesaPal IPN] Tracking ID: ${orderTrackingId}`);
-  console.log(`[PesaPal IPN] Merchant Ref: ${merchantReference}`);
-
   if (!orderTrackingId || !merchantReference) {
-    console.error("[PesaPal IPN] Error: Missing required parameters in callback.");
+    console.error("[PesaPal IPN] ERROR: Missing required parameters (TrackingId or MerchantRef).");
     return NextResponse.json({ status: 'Error', message: 'Missing parameters' }, { status: 400 });
   }
 
   try {
+    console.log(`[PesaPal IPN] Calling Fulfillment Action for Ref: ${merchantReference}`);
     const result = await fulfillPaymentAction(orderTrackingId, merchantReference);
     
     if (result.success) {
-      console.log(`✅ [PesaPal IPN] Fulfillment Success for ${merchantReference}`);
+      console.log(`✅ [PesaPal IPN] SUCCESS. Coins awarded for ${merchantReference}`);
     } else {
-      console.warn(`⚠️ [PesaPal IPN] Fulfillment logic declined: ${result.error}`);
+      console.warn(`⚠️ [PesaPal IPN] LOGIC DECLINED: ${result.error}`);
     }
 
     // Required: Respond with OK so PesaPal stops retrying the IPN
     return NextResponse.json({
       OrderTrackingId: orderTrackingId,
       status: 'OK',
-      processed: result.success
+      processed: result.success,
+      reason: result.error || 'Success'
     });
   } catch (error: any) {
-    console.error("[PesaPal IPN] CRITICAL FAILURE:", error.message);
+    console.error("[PesaPal IPN] CRITICAL ERROR in Callback Route:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

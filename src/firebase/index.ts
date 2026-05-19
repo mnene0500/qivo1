@@ -16,11 +16,15 @@ import { useMemo } from 'react';
  * Returns null for services if the configuration is missing to prevent hard crashes.
  */
 export function initializeFirebase() {
-  const isConfigValid = !!(firebaseConfig.apiKey && firebaseConfig.apiKey !== 'undefined');
+  // Check for the absolute minimum required key
+  const apiKey = firebaseConfig.apiKey || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const isConfigValid = !!(apiKey && apiKey !== 'undefined');
   
   if (!isConfigValid) {
     if (typeof window !== 'undefined') {
-      console.warn("QIVO: Firebase configuration is missing. Please set your NEXT_PUBLIC_FIREBASE_* environment variables in Vercel.");
+      console.warn("QIVO: Firebase configuration is missing or invalid. Check Vercel Env Vars.");
+    } else {
+      console.error("[Firebase Server] API Key missing. Service actions will fail.");
     }
     return { 
       firebaseApp: null as unknown as FirebaseApp, 
@@ -31,17 +35,27 @@ export function initializeFirebase() {
   }
 
   let app: FirebaseApp;
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApp();
-  }
-  
-  const firestore = getFirestore(app);
-  const auth = getAuth(app);
-  const database = getDatabase(app);
+  try {
+    if (getApps().length === 0) {
+      app = initializeApp(firebaseConfig);
+    } else {
+      app = getApp();
+    }
+    
+    const firestore = getFirestore(app);
+    const auth = getAuth(app);
+    const database = getDatabase(app);
 
-  return { firebaseApp: app, firestore, auth, database };
+    return { firebaseApp: app, firestore, auth, database };
+  } catch (err: any) {
+    console.error("[Firebase Init Error]:", err.message);
+    return { 
+      firebaseApp: null as unknown as FirebaseApp, 
+      firestore: null as unknown as Firestore, 
+      auth: null as unknown as Auth, 
+      database: null as unknown as Database 
+    };
+  }
 }
 
 // Re-export provider and hooks
