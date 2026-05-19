@@ -7,7 +7,7 @@ import { ref, update, increment, push, set, get } from 'firebase/database';
 
 /**
  * @fileOverview PesaPal integration actions for API v3.
- * Handles token retrieval, order initiation, and secure fulfillment.
+ * Optimized for secure fulfillment and clear logging.
  */
 
 export interface TransactionStatusResponse {
@@ -25,7 +25,7 @@ export async function getAccessToken(): Promise<string> {
   const consumerSecret = process.env.PESAPAL_CONSUMER_SECRET;
 
   if (!consumerKey || !consumerSecret) {
-    console.error("[PesaPal] CRITICAL: Consumer Key or Secret is missing in Environment Variables.");
+    console.error("[PesaPal] ERROR: PESAPAL_CONSUMER_KEY or SECRET missing in environment.");
     throw new Error('PesaPal Configuration Error: Missing Keys');
   }
 
@@ -61,12 +61,11 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
       console.error("[PesaPal] initiatePesaPalPayment failed: PESAPAL_IPN_ID is missing.");
       return { 
         success: false, 
-        error: "System Configuration Error: PESAPAL_IPN_ID is missing. Please contact an Administrator to run diagnostics at /pesapal-admin." 
+        error: "Configuration Error: IPN ID is missing. Go to /pesapal-admin to register your domain." 
       };
     }
 
     const token = await getAccessToken();
-    // Reference format: QV_{uid}_{timestamp}
     const merchantReference = `QV_${user.uid}_${Date.now()}`;
     
     const payload = {
@@ -104,7 +103,7 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
     if (!response.ok) {
       const errorData = await response.json();
       console.error("[PesaPal] SubmitOrderRequest rejected:", errorData);
-      return { success: false, error: errorData.message || 'PesaPal rejected the order request.' };
+      return { success: false, error: errorData.message || 'PesaPal rejected the order.' };
     }
 
     const data = await response.json();
@@ -153,35 +152,35 @@ export async function getTransactionStatus(orderTrackingId: string): Promise<Tra
 
 /**
  * Securely fulfills a payment by checking status and updating RTDB.
+ * This is the SINGLE SOURCE OF TRUTH for awarding coins.
  */
 export async function fulfillPaymentAction(orderTrackingId: string, merchantReference: string) {
-  console.log(`[PesaPal Fulfillment] Tracking: ${orderTrackingId}, Ref: ${merchantReference}`);
+  console.log(`[PesaPal Fulfillment] Start for Order: ${orderTrackingId}`);
   
   try {
     const status = await getTransactionStatus(orderTrackingId);
     
-    // Status Code 1 = Completed/Success in PesaPal v3
-    if (status && (Number(status.status_code) === 1)) {
+    if (status && status.status_code === 1) {
       const { database: rtdb } = initializeFirebase();
       
-      // Extract UID from Reference Format: QV_{uid}_{timestamp}
-      const match = merchantReference.match(/^QV_([^_]+)_/);
-      const uid = match ? match[1] : merchantReference.split('_')[1];
+      // Extraction: QV_{uid}_{timestamp}
+      const parts = merchantReference.split('_');
+      const uid = parts[1];
 
       if (!uid) {
-        console.error("[PesaPal Fulfillment] Error: Could not extract UID from reference:", merchantReference);
-        return { success: false, error: "Invalid Reference Format" };
+        console.error("[PesaPal Fulfillment] CRITICAL: Could not find UID in reference:", merchantReference);
+        return { success: false, error: "Invalid Reference" };
       }
 
-      // Idempotency Check
+      // Idempotency: Prevent double-award
       const processedRef = ref(rtdb, `processed_payments/${orderTrackingId}`);
       const snap = await get(processedRef);
       if (snap.exists()) {
-        console.log(`[PesaPal Fulfillment] Already processed tracking ID: ${orderTrackingId}`);
-        return { success: true, message: "Already fulfilled", coins: snap.val().coins };
+        console.log(`[PesaPal Fulfillment] ID ${orderTrackingId} already processed.`);
+        return { success: true, message: "Already awarded", coins: snap.val().coins };
       }
 
-      // Map Paid Amount to Coin Packages
+      // Coin Tier Mapping
       const amount = Number(status.amount);
       let coinsToAward = 0;
       
@@ -191,7 +190,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
       else if (amount >= 230) coinsToAward = 2000;
       else if (amount >= 120) coinsToAward = 1000;
       else if (amount >= 80) coinsToAward = 500;
-      else if (amount >= 1) coinsToAward = 200; // Includes test payments at KES 1
+      else if (amount >= 1) coinsToAward = 200; 
 
       if (coinsToAward > 0) {
         const timestamp = Date.now();
@@ -206,30 +205,29 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
           coins: coinsToAward,
           timestamp,
           merchantReference,
-          payment_method: status.payment_method || 'pesapal'
+          payment_method: status.payment_method
         };
 
         await update(ref(rtdb), updates);
 
+        // Record history
         const historyRef = push(ref(rtdb, `coin_history/${uid}`));
         await set(historyRef, {
           amount: coinsToAward,
           type: 'recharge',
-          description: `PesaPal Recharge: KES ${amount}`,
+          description: `PesaPal: KES ${amount}`,
           timestamp
         });
 
-        console.log(`[PesaPal Fulfillment] SUCCESS: Awarded ${coinsToAward} coins to user ${uid}`);
+        console.log(`[PesaPal Fulfillment] SUCCESS: Awarded ${coinsToAward} coins to ${uid}`);
         return { success: true, coins: coinsToAward };
-      } else {
-        console.error("[PesaPal Fulfillment] Error: No matching coin package for amount:", amount);
-        return { success: false, error: "No matching package found" };
       }
     }
     
-    return { success: false, error: "Payment not completed" };
+    console.warn(`[PesaPal Fulfillment] Payment not successful or status pending.`);
+    return { success: false, error: "Payment verification failed" };
   } catch (err: any) {
-    console.error("[PesaPal Fulfillment] Critical Exception:", err.message);
+    console.error("[PesaPal Fulfillment] Exception:", err.message);
     return { success: false, error: err.message };
   }
 }
