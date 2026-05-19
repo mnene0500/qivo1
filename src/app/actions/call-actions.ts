@@ -8,6 +8,8 @@ import { ref, update, increment as rtdbIncrement, push, set, get } from 'firebas
  */
 export async function deductCallCoinsAction(uid: string, type: 'video' | 'voice', partnerName: string) {
   const { database: rtdb } = initializeFirebase();
+  if (!rtdb) return { success: false, error: "Database not available." };
+
   const cost = type === 'video' ? 150 : 70;
 
   try {
@@ -37,5 +39,27 @@ export async function deductCallCoinsAction(uid: string, type: 'video' | 'voice'
     return { success: true, newBalance: currentBalance - cost };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Checks if a user has enough coins to start a call.
+ */
+export async function checkCallBalanceAction(uid: string, type: 'video' | 'voice') {
+  const { database: rtdb } = initializeFirebase();
+  if (!rtdb) return { success: false, error: "Database not available." };
+  
+  const minRequired = type === 'video' ? 150 : 70;
+  
+  try {
+    const balanceSnap = await get(ref(rtdb, `balances/${uid}`));
+    const currentBalance = balanceSnap.val()?.coins || 0;
+    
+    if (currentBalance < minRequired) {
+      return { success: false, error: `You need at least ${minRequired} coins for a 1-minute call.` };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: "Failed to verify balance." };
   }
 }

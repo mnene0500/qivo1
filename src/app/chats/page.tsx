@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useMemo, useRef } from "react"
@@ -40,6 +39,7 @@ import {
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useUserPresence } from "@/hooks/use-presence"
+import { checkCallBalanceAction } from "@/app/actions/call-actions"
 
 interface Message {
   id: string
@@ -301,20 +301,24 @@ function ChatsContent() {
   }
 
   const handleStartCall = async (type: 'video' | 'voice') => {
-    if (!currentUser?.uid || !startWithId || !chatId || isCalling || !rtdb) return
+    if (!currentUser?.uid || !startWithId || !chatId || isCalling || !rtdb) {
+      if (!rtdb) toast({ variant: "destructive", title: "Offline", description: "Service configuration pending." });
+      return
+    }
     if (isBlocked) {
       toast({ variant: "destructive", title: "Cannot Call", description: "You cannot call this user." })
       return
     }
     
-    const minRequired = type === 'video' ? 150 : 70;
-    if (userBalances.coins < minRequired && !currentUserProfile?.isAdmin) {
-      toast({ variant: "destructive", title: "Insufficient Coins", description: `You need at least ${minRequired} coins for a 1-minute call.` });
-      return;
-    }
-
     setIsCalling(true)
     try {
+      const balCheck = await checkCallBalanceAction(currentUser.uid, type);
+      if (!balCheck.success && !currentUserProfile?.isAdmin) {
+        toast({ variant: "destructive", title: "Insufficient Balance", description: balCheck.error });
+        setIsCalling(false);
+        return;
+      }
+
       const callData = {
         callerId: currentUser.uid,
         callerName: currentUserProfile?.name || "Someone",
@@ -328,7 +332,7 @@ function ChatsContent() {
       await set(ref(rtdb, `calls/${startWithId}`), callData)
       
       // Redirect to call room
-      router.push(`/call/${chatId}?type=${type}&caller=true&partner=${partnerProfile?.name || 'Partner'}`)
+      router.push(`/call/${chatId}?type=${type}&caller=true&partner=${encodeURIComponent(partnerProfile?.name || 'Partner')}`)
     } catch (err: any) {
       toast({ variant: "destructive", title: "Calling Error", description: "Could not start call. Try again." })
       setIsCalling(false)

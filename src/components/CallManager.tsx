@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, useRef } from "react"
@@ -7,11 +6,11 @@ import { ref, onValue, set, off } from "firebase/database"
 import { useUser, useDatabase } from "@/firebase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Phone, PhoneOff, Video, X, Minus, Maximize2 } from "lucide-react"
+import { Phone, PhoneOff, Video, X, Minus, GripHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
- * @fileOverview Global listener for incoming calls with auto-decline and minimize functionality.
+ * @fileOverview Global listener for incoming calls with auto-decline and draggable minimize functionality.
  */
 export function CallManager() {
   const router = useRouter()
@@ -23,14 +22,14 @@ export function CallManager() {
   const [timeLeft, setTimeLeft] = useState(40)
   
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const ringtoneRef = useRef<HTMLAudioElement | null>(null)
-
-  // DRAG LOGIC FOR MINIMIZED BUBBLE
-  const [position, setPosition] = useState({ x: 20, y: 80 })
-  const isDragging = useRef(false)
+  
+  // DRAG LOGIC
+  const [position, setPosition] = useState({ x: 20, y: 100 })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragOffset = useRef({ x: 0, y: 0 })
 
   useEffect(() => {
-    if (!user?.uid) return
+    if (!user?.uid || !rtdb) return
 
     const callRef = ref(rtdb, `calls/${user.uid}`)
     const unsubscribe = onValue(callRef, (snap) => {
@@ -64,20 +63,58 @@ export function CallManager() {
   }, [user?.uid, rtdb])
 
   const handleAccept = async () => {
-    if (!incomingCall || !user?.uid) return
-    const { chatId, type } = incomingCall
+    if (!incomingCall || !user?.uid || !rtdb) return
+    const { chatId, type, callerName } = incomingCall
     
     if (timerRef.current) clearInterval(timerRef.current)
     await set(ref(rtdb, `calls/${user.uid}`), null)
-    router.push(`/call/${chatId}?type=${type}`)
+    router.push(`/call/${chatId}?type=${type}&partner=${encodeURIComponent(callerName)}`)
   }
 
   const handleReject = async () => {
-    if (!user?.uid) return
+    if (!user?.uid || !rtdb) return
     if (timerRef.current) clearInterval(timerRef.current)
     await set(ref(rtdb, `calls/${user.uid}`), null)
     setIncomingCall(null)
   }
+
+  // MOUSE/TOUCH DRAG HANDLERS
+  const startDrag = (e: React.MouseEvent | React.TouchEvent) => {
+    setIsDragging(true)
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    dragOffset.current = {
+      x: window.innerWidth - clientX - position.x,
+      y: window.innerHeight - clientY - position.y
+    }
+  }
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDragging) return
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY
+      
+      setPosition({
+        x: Math.max(10, Math.min(window.innerWidth - 100, window.innerWidth - clientX - dragOffset.current.x)),
+        y: Math.max(10, Math.min(window.innerHeight - 100, window.innerHeight - clientY - dragOffset.current.y))
+      })
+    }
+    const stopDrag = () => setIsDragging(false)
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMove)
+      window.addEventListener('mouseup', stopDrag)
+      window.addEventListener('touchmove', handleMove)
+      window.addEventListener('touchend', stopDrag)
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', stopDrag)
+      window.removeEventListener('touchmove', handleMove)
+      window.removeEventListener('touchend', stopDrag)
+    }
+  }, [isDragging])
 
   if (!incomingCall) return null
 
@@ -150,21 +187,28 @@ export function CallManager() {
     )
   }
 
-  // MINIMIZED FLOATING BUBBLE
+  // MINIMIZED FLOATING BUBBLE (DRAGGABLE)
   return (
     <div 
-      className="fixed z-[9999] cursor-pointer group"
+      className={cn(
+        "fixed z-[9999] cursor-pointer select-none touch-none active:scale-105 transition-transform",
+        isDragging && "scale-110"
+      )}
       style={{ right: position.x, bottom: position.y }}
-      onClick={() => setIsMinimized(false)}
+      onMouseDown={startDrag}
+      onTouchStart={startDrag}
     >
-      <div className="relative">
+      <div className="relative group">
         <div className="absolute inset-0 rounded-full bg-[#00A2FF] animate-ping opacity-20" />
         <div className="bg-black/80 backdrop-blur-xl border-2 border-[#00A2FF] rounded-2xl p-2 flex items-center gap-3 shadow-2xl animate-in slide-in-from-right-10">
-          <Avatar className="w-10 h-10 border border-white/10">
+          <div className="absolute -left-3 top-1/2 -translate-y-1/2 opacity-40">
+             <GripHorizontal className="w-3 h-3 text-white" />
+          </div>
+          <Avatar className="w-10 h-10 border border-white/10" onClick={() => setIsMinimized(false)}>
             <AvatarImage src={incomingCall.callerPhoto} className="object-cover" />
             <AvatarFallback className="bg-blue-600 text-white font-bold">{incomingCall.callerName?.[0]}</AvatarFallback>
           </Avatar>
-          <div className="pr-2">
+          <div className="pr-2" onClick={() => setIsMinimized(false)}>
             <p className="text-[10px] font-black text-white uppercase tracking-tight truncate max-w-[80px]">{incomingCall.callerName}</p>
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
@@ -180,7 +224,10 @@ export function CallManager() {
             <Phone className="w-4 h-4 fill-current" />
           </Button>
         </div>
-        <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleReject(); }}>
+        <div 
+          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" 
+          onClick={(e) => { e.stopPropagation(); handleReject(); }}
+        >
           <X className="w-3 h-3" />
         </div>
       </div>

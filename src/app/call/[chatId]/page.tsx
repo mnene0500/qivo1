@@ -1,17 +1,17 @@
-
 "use client"
 
 import { useEffect, useRef, use, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useUser, useDoc, useFirestore } from "@/firebase"
+import { useUser, useDoc, useFirestore, useDatabase } from "@/firebase"
 import { doc } from "firebase/firestore"
+import { ref, update, onValue, off } from "firebase/database"
 import { Loader2, Coins, AlertCircle } from "lucide-react"
 import { deductCallCoinsAction } from "@/app/actions/call-actions"
 import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
 
 /**
  * @fileOverview One-on-one Video/Voice call interface with per-minute billing.
- * Uses ZegoCloud credentials from Vercel Environment Variables.
  */
 export default function CallPage({ params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = use(params)
@@ -19,6 +19,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   const searchParams = useSearchParams()
   const { user } = useUser()
   const db = useFirestore()
+  const rtdb = useDatabase()
   const { toast } = useToast()
   
   const containerRef = useRef<HTMLDivElement>(null)
@@ -32,6 +33,17 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   const { data: profile } = useDoc<any>(user?.uid ? doc(db, "users", user.uid) : null)
   const [isJoined, setIsJoined] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentBalance, setCurrentBalance] = useState<number>(0)
+
+  // Real-time balance listener for UI display
+  useEffect(() => {
+    if (!user?.uid || !rtdb) return
+    const balRef = ref(rtdb, `balances/${user.uid}/coins`)
+    const unsubscribe = onValue(balRef, (snap) => {
+      setCurrentBalance(snap.val() || 0)
+    })
+    return () => off(balRef, 'value', unsubscribe)
+  }, [user?.uid, rtdb])
 
   const handleDeduction = async () => {
     if (!user || !isCaller) return true;
@@ -40,10 +52,8 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     const result = await deductCallCoinsAction(user.uid, type, partnerName);
     
     if (!result.success) {
-      toast({ variant: "destructive", title: "Balance Depleted", description: result.error });
-      if (zpRef.current) {
-        zpRef.current.leaveRoom();
-      }
+      toast({ variant: "destructive", title: "Call Terminated", description: result.error });
+      if (zpRef.current) zpRef.current.leaveRoom();
       router.replace("/chats");
       return false;
     }
@@ -61,7 +71,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         const serverSecret = process.env.NEXT_PUBLIC_ZEGO_SERVER_SECRET
         
         if (!appID || !serverSecret) {
-          setError("Call System Error: Zego App ID or Server Secret is missing in Vercel settings.")
+          setError("Call System Error: Missing configuration in Vercel settings.")
           return
         }
 
@@ -84,7 +94,8 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
             mode: isVideo ? ZegoUIKitPrebuilt.VideoCall : ZegoUIKitPrebuilt.VoiceCall,
           },
           onUserJoin: async (users) => {
-            // BILLING TRIGGER: Start charging when the partner joins
+            // BILLING TRIGGER: Start charging the CALLER only when the OTHER user joins
+            // In a 1:1 call, if more than 1 user is present, it means the partner joined.
             if (isCaller && !billingIntervalRef.current) {
                const success = await handleDeduction();
                if (success) {
@@ -93,9 +104,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
             }
           },
           onLeaveRoom: () => {
-            if (billingIntervalRef.current) {
-              clearInterval(billingIntervalRef.current);
-            }
+            if (billingIntervalRef.current) clearInterval(billingIntervalRef.current);
             router.replace("/chats")
           },
         })
@@ -109,9 +118,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     initCall()
 
     return () => {
-      if (billingIntervalRef.current) {
-        clearInterval(billingIntervalRef.current);
-      }
+      if (billingIntervalRef.current) clearInterval(billingIntervalRef.current);
     }
   }, [user, profile, chatId, isVideo, router, isCaller])
 
@@ -138,14 +145,19 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     <div className="w-full h-screen bg-black overflow-hidden relative">
       <div ref={containerRef} className="w-full h-full" />
       
-      {isCaller && isJoined && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2">
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
+        <div className="bg-black/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2">
            <Coins className="w-3.5 h-3.5 text-yellow-500" />
            <span className="text-[10px] font-black text-white uppercase tracking-widest">
              {isVideo ? '150' : '70'} coins / min
            </span>
         </div>
-      )}
+        {isCaller && (
+          <div className="text-[9px] font-bold text-white/50 uppercase tracking-widest">
+            Balance: {currentBalance} Coins
+          </div>
+        )}
+      </div>
     </div>
   )
 }
