@@ -23,20 +23,21 @@ export async function GET(request: Request) {
   try {
     const status = await getTransactionStatus(orderTrackingId);
     
-    // Status Code 1 = Completed/Success
+    // Status Code 1 = Completed/Success in PesaPal v3
     if (status && (Number(status.status_code) === 1)) {
       const { database: rtdb } = initializeFirebase();
       
       // Reference format: QV_{uid}_{timestamp}
       const parts = merchantReference.split('_');
       const uid = parts[1];
-      const amount = Number(status.amount); // Ensure numeric comparison
+      const amount = Number(status.amount); 
 
       if (!uid) {
         console.error(`[PesaPal IPN] Failed to extract UID from reference: ${merchantReference}`);
-        throw new Error("Could not extract UID from reference");
+        return NextResponse.json({ status: 'Error', message: 'Invalid reference' }, { status: 400 });
       }
 
+      // 1. Check if already processed (Idempotency)
       const processedRef = ref(rtdb, `processed_payments/${orderTrackingId}`);
       const alreadyProcessed = await get(processedRef);
       
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ OrderTrackingId: orderTrackingId, status: 'Already Processed' });
       }
 
-      // Coin Award Thresholds (Matching Recharge Page Packages)
+      // 2. Map amount to coin packages (Matching src/app/recharge/page.tsx)
       let coinsToAward = 0;
       if (amount >= 1800) coinsToAward = 20000;
       else if (amount >= 1000) coinsToAward = 10000;
@@ -58,38 +59,39 @@ export async function GET(request: Request) {
       if (coinsToAward > 0) {
         const timestamp = Date.now();
         
-        // Atomically update user balance
-        await update(ref(rtdb, `balances/${uid}`), {
-          coins: increment(coinsToAward),
-          updatedAt: timestamp
-        });
-
-        // Log to user's coin history
-        await set(push(ref(rtdb, `coin_history/${uid}`)), {
-          amount: coinsToAward,
-          type: 'recharge',
-          description: `PesaPal: KES ${amount}`,
-          timestamp
-        });
-
-        // Mark as processed to prevent double-spend
-        await set(processedRef, {
+        // Atomically award coins and log history
+        const updates: any = {};
+        updates[`balances/${uid}/coins`] = increment(coinsToAward);
+        updates[`balances/${uid}/updatedAt`] = timestamp;
+        
+        // Mark as processed immediately to prevent race conditions
+        updates[`processed_payments/${orderTrackingId}`] = {
           uid,
           amount,
           coins: coinsToAward,
           timestamp,
-          payment_method: status.payment_method || 'unknown'
+          payment_method: status.payment_method || 'pesapal'
+        };
+
+        await update(ref(rtdb), updates);
+
+        // Log to history separately for clarity
+        await set(push(ref(rtdb, `coin_history/${uid}`)), {
+          amount: coinsToAward,
+          type: 'recharge',
+          description: `PesaPal Recharge: KES ${amount}`,
+          timestamp
         });
 
         console.log(`[PesaPal IPN] SUCCESS: Fulfilled ${coinsToAward} coins for user ${uid}`);
       } else {
-        console.warn(`[PesaPal IPN] Transaction status was success but amount ${amount} did not meet any coin package threshold.`);
+        console.warn(`[PesaPal IPN] SUCCESS status but amount ${amount} didn't match a package.`);
       }
     } else {
-      console.log(`[PesaPal IPN] Transaction ${orderTrackingId} status is not completed (Status: ${status?.status_code})`);
+      console.log(`[PesaPal IPN] Transaction ${orderTrackingId} is not in a completed state (Status: ${status?.status_code})`);
     }
 
-    // Always respond with 200 OK to PesaPal to acknowledge receipt
+    // Always respond with the structure PesaPal expects to acknowledge the IPN
     return NextResponse.json({
       OrderTrackingId: orderTrackingId,
       status: 'OK'

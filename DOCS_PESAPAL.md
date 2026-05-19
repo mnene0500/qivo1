@@ -23,5 +23,37 @@ Once you have added the first 5 variables and redeployed:
 5. Copy that ID and add it to Vercel as `PESAPAL_IPN_ID`.
 6. **Redeploy one last time.**
 
-## 3. Deployment Check
-Ensure your merchant reference prefix is set to `QV_` in `payment-actions.ts` (Already done). This helps identify QIVO transactions in your PesaPal dashboard.
+## 3. Realtime Database (RTDB) Rules
+For fulfillment to work, you MUST update your RTDB rules in the Firebase Console to allow the background fulfillment process. Copy and paste the following:
+
+```json
+{
+  "rules": {
+    "balances": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null" 
+      }
+    },
+    "coin_history": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null"
+      }
+    },
+    "processed_payments": {
+      ".read": "auth != null",
+      ".write": true 
+    },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}
+```
+
+## 4. Deployment Check
+Ensure your merchant reference prefix is set to `QV_` in `payment-actions.ts`. This helps identify QIVO transactions in your PesaPal dashboard.
