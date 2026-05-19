@@ -23,7 +23,8 @@ import {
   Briefcase,
   UserPlus,
   Wallet,
-  Shield
+  Shield,
+  User
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -231,7 +232,13 @@ export default function MePage() {
           </div>
           <div className="relative mb-4">
             <div className="relative w-28 h-28 rounded-full shadow-2xl overflow-hidden bg-muted">
-              {profile?.photoURL && <Image src={profile.photoURL} alt={profile.name || "User"} fill className="object-cover" priority />}
+              {profile?.photoURL ? (
+                <Image src={profile.photoURL} alt={profile.name || "User"} fill className="object-cover" priority />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                  <User className="w-12 h-12 text-gray-300" />
+                </div>
+              )}
             </div>
             <button className="absolute bottom-1 right-1 bg-white p-3 rounded-full shadow-xl border border-black/5" onClick={() => router.push('/edit-profile')}>
               <Pencil className="w-4 h-4 text-[#00A2FF]" />
