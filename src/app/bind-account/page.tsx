@@ -61,6 +61,15 @@ export default function BindAccountPage() {
       return
     }
 
+    if (!db) {
+      toast({
+        variant: "destructive",
+        title: "Service Unavailable",
+        description: "Configuration missing."
+      })
+      return;
+    }
+
     setLoading(true)
     try {
       const credential = EmailAuthProvider.credential(email, password)

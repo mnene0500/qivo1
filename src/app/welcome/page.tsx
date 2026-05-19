@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Mail, Loader2 } from "lucide-react"
+import { Mail, Loader2, AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
@@ -28,7 +28,7 @@ export default function WelcomePage() {
   }, [])
 
   useEffect(() => {
-    if (isInitialized && user) {
+    if (isInitialized && user && db) {
       const checkRedirect = async () => {
         try {
           const userRef = doc(db, "users", user.uid)
@@ -47,6 +47,15 @@ export default function WelcomePage() {
   }, [user, isInitialized, router, db])
 
   const handleGoogleLogin = async () => {
+    if (!auth) {
+      toast({
+        variant: "destructive",
+        title: "Configuration Error",
+        description: "Firebase service is not initialized. Please add environment variables in Vercel."
+      });
+      return;
+    }
+
     setLoading(true)
     try {
       const provider = new GoogleAuthProvider()
@@ -58,7 +67,7 @@ export default function WelcomePage() {
         toast({
           variant: "destructive",
           title: "Network Error",
-          description: "Please ensure 'qivo-gamma.vercel.app' is added to Authorized Domains in Firebase Console Settings."
+          description: "Please ensure your domain is added to Authorized Domains in Firebase Console Settings."
         })
       } else {
         console.error("Google Sign-In Error:", error)
@@ -102,6 +111,16 @@ export default function WelcomePage() {
         </div>
 
         <div className="w-full max-w-sm space-y-4">
+          {!auth && (
+            <div className="mb-6 p-4 bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl flex flex-col items-center gap-2">
+              <AlertCircle className="w-6 h-6 text-[#00A2FF]" />
+              <p className="text-[10px] font-bold text-white uppercase tracking-widest">Initialization Pending</p>
+              <p className="text-[9px] text-white/50 leading-relaxed">
+                Connect your Firebase Environment Variables in Vercel to activate Login.
+              </p>
+            </div>
+          )}
+
           <Button 
             onClick={() => router.push("/auth")}
             className="w-full h-16 rounded-3xl bg-white text-black hover:bg-white/90 font-bold text-sm tracking-widest uppercase shadow-2xl active:scale-95 transition-all"

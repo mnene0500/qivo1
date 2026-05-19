@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { ChevronLeft, Mail, UserPlus, Loader2, ShieldCheck, ShieldAlert } from "lucide-react"
+import { ChevronLeft, Mail, UserPlus, Loader2, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { Progress } from "@/components/ui/progress"
 
@@ -51,13 +51,15 @@ export default function UnifiedAuthPage() {
   }
 
   const handleAuthError = (error: any, type: 'Login' | 'Registration') => {
-    console.error(`[${type} Error]:`, error.code, error.message);
+    console.error(`[${type} Error]:`, error?.code, error?.message);
     
-    let description = error.message;
-    if (error.code === 'auth/network-request-failed') {
+    let description = error?.message || "An unexpected error occurred.";
+    if (error?.code === 'auth/network-request-failed') {
       description = "Network error. Please ensure this domain is added to 'Authorized Domains' in Firebase Console Settings.";
-    } else if (error.code === 'auth/operation-not-allowed') {
+    } else if (error?.code === 'auth/operation-not-allowed') {
       description = "Email/Password sign-in is not enabled in your Firebase Console.";
+    } else if (!error?.code && description.includes('null')) {
+      description = "Auth service not available. Please configure your Vercel Environment Variables.";
     }
 
     toast({
@@ -70,10 +72,18 @@ export default function UnifiedAuthPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) return
+    
+    if (!auth) {
+      handleAuthError({ message: "Firebase Auth is not initialized. Please set NEXT_PUBLIC_FIREBASE_* variables in Vercel." }, 'Login');
+      return;
+    }
+
     setLoading(true)
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
+      
+      if (!db) throw new Error("Firestore not initialized.");
       
       const userRef = doc(db, "users", user.uid)
       const userSnap = await getDoc(userRef)
@@ -100,6 +110,11 @@ export default function UnifiedAuthPage() {
       return
     }
 
+    if (!auth || !db) {
+      handleAuthError({ message: "Services not initialized. Check your environment variables." }, 'Registration');
+      return;
+    }
+
     setLoading(true)
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
@@ -108,7 +123,7 @@ export default function UnifiedAuthPage() {
       const userData = {
         uid: user.uid,
         email: user.email,
-        matchFlowId: generateQivoId(), // Stored as matchFlowId for schema compatibility
+        matchFlowId: generateQivoId(),
         onboardingComplete: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -133,6 +148,18 @@ export default function UnifiedAuthPage() {
       </header>
 
       <div className="flex-1 flex flex-col justify-center space-y-8 max-w-sm mx-auto w-full">
+        {!auth && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-amber-900">Configuration Required</p>
+              <p className="text-[10px] text-amber-700 leading-relaxed">
+                Authentication is disabled. Please add your <span className="font-bold">Firebase Environment Variables</span> in Vercel to enable Login.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-black text-black tracking-tight">Welcome</h1>
           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Login or Join QIVO</p>
@@ -178,7 +205,7 @@ export default function UnifiedAuthPage() {
           <div className="space-y-4 pt-4">
             <Button 
               type="submit" 
-              disabled={loading} 
+              disabled={loading || !auth} 
               className="w-full rounded-full h-14 text-base font-bold bg-[#00A2FF] hover:bg-[#0081CC] shadow-xl shadow-blue-100 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Mail className="w-5 h-5" /> Login</>}
@@ -193,7 +220,7 @@ export default function UnifiedAuthPage() {
             <Button 
               type="button"
               variant="outline"
-              disabled={loading} 
+              disabled={loading || !auth} 
               onClick={handleRegister}
               className="w-full rounded-full h-14 text-base font-bold border-2 border-gray-100 text-black hover:bg-gray-50 flex items-center justify-center gap-2"
             >
