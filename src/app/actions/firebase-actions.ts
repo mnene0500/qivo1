@@ -27,6 +27,7 @@ import {
  */
 export async function awardCoinsAction(callerUid: string, targetMatchFlowId: string, amount: number) {
   const { firestore: db, database: rtdb } = initializeFirebase();
+  if (!db || !rtdb) return { success: false, error: "Database not available." };
 
   if (amount < 500) return { success: false, error: "Minimum award amount is 500 coins." };
   if (amount > 50000) return { success: false, error: "Maximum single award limit is 50,000 coins." };
@@ -95,6 +96,8 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
  */
 export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId: string, role: 'isCoinSeller' | 'isAgent', value: boolean) {
   const { firestore: db } = initializeFirebase();
+  if (!db) return { success: false, error: "Database not available." };
+
   try {
     const callerSnap = await getDoc(doc(db, "users", callerUid));
     if (!callerSnap.exists() || !callerSnap.data()?.isAdmin) {
@@ -122,6 +125,8 @@ export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId:
  */
 export async function createAgencyAction(agentUid: string, agencyName: string) {
   const { firestore: db } = initializeFirebase();
+  if (!db) return { success: false, error: "Database not available." };
+
   try {
     const agentRef = doc(db, "users", agentUid);
     const agentSnap = await getDoc(agentRef);
@@ -157,6 +162,8 @@ export async function createAgencyAction(agentUid: string, agencyName: string) {
  */
 export async function requestWithdrawalAction(uid: string, diamonds: number, amountKes: number, agencyId: string) {
   const { firestore: db, database: rtdb } = initializeFirebase();
+  if (!db || !rtdb) return { success: false, error: "Database not available." };
+
   try {
     const userRef = doc(db, "users", uid);
     const userSnap = await getDoc(userRef);
@@ -189,6 +196,8 @@ export async function requestWithdrawalAction(uid: string, diamonds: number, amo
  */
 export async function updateWithdrawalStatusAction(agentUid: string, agencyId: string, withdrawalId: string, status: 'paid' | 'rejected') {
   const { firestore: db, database: rtdb } = initializeFirebase();
+  if (!db || !rtdb) return { success: false, error: "Database not available." };
+
   try {
     const withdrawalRef = doc(db, "agencies", agencyId, "withdrawals", withdrawalId);
     const withdrawalSnap = await getDoc(withdrawalRef);
@@ -219,6 +228,8 @@ export async function updateWithdrawalStatusAction(agentUid: string, agencyId: s
  */
 export async function joinAgencyAction(userUid: string, agencyCode: string) {
   const { firestore: db } = initializeFirebase();
+  if (!db) return { success: false, error: "Database not available." };
+
   try {
     const userRef = doc(db, "users", userUid);
     const userSnap = await getDoc(userRef);
@@ -242,6 +253,8 @@ export async function joinAgencyAction(userUid: string, agencyCode: string) {
  */
 export async function reviewRecruitmentAction(agentUid: string, targetUid: string, status: 'approved' | 'rejected') {
   const { firestore: db } = initializeFirebase();
+  if (!db) return { success: false, error: "Database not available." };
+
   try {
     if (status === 'approved') {
       const agentSnap = await getDoc(doc(db, "users", agentUid));

@@ -47,6 +47,9 @@ export default function RootPage() {
           const elapsedTime = Date.now() - startTime;
           const remainingTime = Math.max(0, 1500 - elapsedTime);
           setTimeout(() => router.replace("/welcome"), remainingTime);
+        } else if (user && !db) {
+           // Case where auth exists but config for DB is missing or failing
+           router.replace("/welcome")
         }
       }
 

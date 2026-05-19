@@ -40,11 +40,11 @@ export default function AgencyManagePage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [memberLimit, setMemberLimit] = useState(20)
   
-  const userRef = useMemo(() => user?.uid ? doc(db, "users", user.uid) : null, [db, user?.uid])
+  const userRef = useMemo(() => user?.uid && db ? doc(db, "users", user.uid) : null, [db, user?.uid])
   const { data: profile } = useDoc<UserProfile>(userRef)
   
   const applicantsQuery = useMemo(() => {
-    if (!profile?.agencyId) return null
+    if (!db || !profile?.agencyId) return null
     return query(
       collection(db, "users"), 
       where("agencyId", "==", profile.agencyId), 
@@ -54,7 +54,7 @@ export default function AgencyManagePage() {
   }, [db, profile?.agencyId])
 
   const membersQuery = useMemo(() => {
-    if (!profile?.agencyId) return null
+    if (!db || !profile?.agencyId) return null
     return query(
       collection(db, "users"), 
       where("agencyId", "==", profile.agencyId), 
@@ -64,7 +64,7 @@ export default function AgencyManagePage() {
   }, [db, profile?.agencyId])
 
   const withdrawalsQuery = useMemo(() => {
-    if (!profile?.agencyId) return null
+    if (!db || !profile?.agencyId) return null
     return query(
       collection(db, "agencies", profile.agencyId, "withdrawals"), 
       where("status", "==", "pending"),

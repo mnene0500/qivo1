@@ -37,6 +37,7 @@ export function initializeFirebase() {
       app = getApp();
     }
     
+    // Lazy-initialize services only when requested
     const firestore = getFirestore(app);
     const auth = getAuth(app);
     const database = getDatabase(app);
