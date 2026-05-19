@@ -159,6 +159,7 @@ function ChatsContent() {
   const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null)
   const [activeDeletedAt, setActiveDeletedAt] = useState<number>(0)
   const [metadataLoading, setMetadataLoading] = useState(false)
+  const [isCalling, setIsCalling] = useState(false)
 
   const isBlocked = useMemo(() => {
     if (!startWithId || !currentUserProfile || !partnerProfile) return false
@@ -189,10 +190,7 @@ function ChatsContent() {
   useEffect(() => {
     if (chatId && currentUser?.uid) {
       setMetadataLoading(true)
-      // Reset unread count when opening chat
       update(ref(rtdb, `user_chats/${currentUser.uid}/${chatId}`), { unreadCount: 0 })
-      
-      // Fetch the last deletion timestamp for this specific user's view of the chat
       get(ref(rtdb, `user_chats/${currentUser.uid}/${chatId}/deletedAt`)).then((snap) => {
         setActiveDeletedAt(snap.val() || 0)
         setMetadataLoading(false)
@@ -255,7 +253,6 @@ function ChatsContent() {
 
     const timestamp = Date.now()
 
-    // Deduct coins if male
     if (currentUserProfile?.gender === 'male' && !currentUserProfile?.isAdmin) {
       if (userBalances.coins < 15) {
         toast({ variant: "destructive", title: "Insufficient Coins" })
@@ -281,27 +278,22 @@ function ChatsContent() {
       timestamp 
     }
     
-    // Save the message
     await set(push(ref(rtdb, `chat_messages/${chatId}`)), msgData)
 
-    // Update summaries for both users
     const updates: any = {}
-    
-    // My side
-    updates[`user_chats/${currentUser.uid}/${chatId}/partnerId`] = partnerProfile.uid || ""
+    updates[`user_chats/${currentUser.uid}/${chatId}/partnerId`] = partnerProfile.uid || startWithId
     updates[`user_chats/${currentUser.uid}/${chatId}/partnerName`] = partnerProfile.name || "Unknown"
     updates[`user_chats/${currentUser.uid}/${chatId}/partnerPhoto`] = partnerProfile.photoURL || ""
     updates[`user_chats/${currentUser.uid}/${chatId}/lastMessage`] = sentText
     updates[`user_chats/${currentUser.uid}/${chatId}/lastMessageAt`] = timestamp
     updates[`user_chats/${currentUser.uid}/${chatId}/unreadCount`] = 0
 
-    // Partner side
-    updates[`user_chats/${partnerProfile.uid}/${chatId}/partnerId`] = currentUser.uid || ""
-    updates[`user_chats/${partnerProfile.uid}/${chatId}/partnerName`] = currentUserProfile?.name || "User"
-    updates[`user_chats/${partnerProfile.uid}/${chatId}/partnerPhoto`] = currentUserProfile?.photoURL || ""
-    updates[`user_chats/${partnerProfile.uid}/${chatId}/lastMessage`] = sentText
-    updates[`user_chats/${partnerProfile.uid}/${chatId}/lastMessageAt`] = timestamp
-    updates[`user_chats/${partnerProfile.uid}/${chatId}/unreadCount`] = rtdbIncrement(1)
+    updates[`user_chats/${partnerProfile.uid || startWithId}/${chatId}/partnerId`] = currentUser.uid || ""
+    updates[`user_chats/${partnerProfile.uid || startWithId}/${chatId}/partnerName`] = currentUserProfile?.name || "User"
+    updates[`user_chats/${partnerProfile.uid || startWithId}/${chatId}/partnerPhoto`] = currentUserProfile?.photoURL || ""
+    updates[`user_chats/${partnerProfile.uid || startWithId}/${chatId}/lastMessage`] = sentText
+    updates[`user_chats/${partnerProfile.uid || startWithId}/${chatId}/lastMessageAt`] = timestamp
+    updates[`user_chats/${partnerProfile.uid || startWithId}/${chatId}/unreadCount`] = rtdbIncrement(1)
 
     await update(ref(rtdb), updates).catch(err => {
       console.error("[Chat Update Error]:", err);
@@ -309,25 +301,38 @@ function ChatsContent() {
   }
 
   const handleStartCall = async (type: 'video' | 'voice') => {
-    if (!currentUser || !partnerProfile || !chatId || isBlocked) return
+    if (!currentUser?.uid || !startWithId || !chatId || isCalling) return
+    if (isBlocked) {
+      toast({ variant: "destructive", title: "Cannot Call", description: "You cannot call this user." })
+      return
+    }
     
     const minRequired = type === 'video' ? 150 : 70;
-    if (userBalances.coins < minRequired) {
-      toast({ variant: "destructive", title: "Insufficient Coins", description: `You need at least ${minRequired} coins to start this call.` });
+    if (userBalances.coins < minRequired && !currentUserProfile?.isAdmin) {
+      toast({ variant: "destructive", title: "Insufficient Coins", description: `You need at least ${minRequired} coins for a 1-minute call.` });
       return;
     }
 
-    const callData = {
-      callerId: currentUser.uid,
-      callerName: currentUserProfile?.name || "Someone",
-      callerPhoto: currentUserProfile?.photoURL || "",
-      type,
-      chatId,
-      timestamp: Date.now()
-    }
+    setIsCalling(true)
+    try {
+      const callData = {
+        callerId: currentUser.uid,
+        callerName: currentUserProfile?.name || "Someone",
+        callerPhoto: currentUserProfile?.photoURL || "",
+        type,
+        chatId,
+        timestamp: Date.now()
+      }
 
-    await set(ref(rtdb, `calls/${partnerProfile.uid}`), callData)
-    router.push(`/call/${chatId}?type=${type}&caller=true&partner=${partnerProfile.name}`)
+      // Signal the recipient
+      await set(ref(rtdb, `calls/${startWithId}`), callData)
+      
+      // Redirect to call room
+      router.push(`/call/${chatId}?type=${type}&caller=true&partner=${partnerProfile?.name || 'Partner'}`)
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Calling Error", description: "Could not start call. Try again." })
+      setIsCalling(false)
+    }
   }
 
   const handleSendGift = async (gift: any) => {
@@ -443,8 +448,12 @@ function ChatsContent() {
         </div>
         
         <div className="flex items-center gap-1 mr-2">
-           <Button variant="ghost" size="icon" className="text-[#00A2FF]" onClick={() => handleStartCall('voice')}><Phone className="w-5 h-5" /></Button>
-           <Button variant="ghost" size="icon" className="text-[#00A2FF]" onClick={() => handleStartCall('video')}><Video className="w-5 h-5" /></Button>
+           <Button variant="ghost" size="icon" className="text-[#00A2FF]" disabled={isCalling} onClick={() => handleStartCall('voice')}>
+             {isCalling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-5 h-5" />}
+           </Button>
+           <Button variant="ghost" size="icon" className="text-[#00A2FF]" disabled={isCalling} onClick={() => handleStartCall('video')}>
+             {isCalling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-5 h-5" />}
+           </Button>
         </div>
 
         <Avatar className="w-8 h-8 cursor-pointer" onClick={() => router.push(`/users/${startWithId}`)}>
