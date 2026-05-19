@@ -5,12 +5,12 @@ import { ref, update, increment, push, set, get } from 'firebase/database';
 
 /**
  * @fileOverview Webhook for PesaPal payment notifications.
- * Automatically fulfills coin orders upon successful payment verification.
+ * Automatically fulfills coin orders upon successful payment verification in Realtime.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   
-  // PesaPal v3 parameters can be case-variant depending on the specific notification type
+  // PesaPal v3 parameters can be case-variant depending on the notification type
   const orderTrackingId = searchParams.get('OrderTrackingId') || searchParams.get('orderTrackingId');
   const merchantReference = searchParams.get('OrderMerchantReference') || searchParams.get('orderMerchantReference');
 
@@ -38,11 +38,17 @@ export async function GET(request: Request) {
       }
 
       // 1. Check if already processed (Idempotency)
-      // Note: This requires .read: true in RTDB rules for processed_payments
       const processedRef = ref(rtdb, `processed_payments/${orderTrackingId}`);
-      const alreadyProcessed = await get(processedRef);
+      let alreadyProcessed = false;
       
-      if (alreadyProcessed.exists()) {
+      try {
+        const snap = await get(processedRef);
+        alreadyProcessed = snap.exists();
+      } catch (ruleErr) {
+        console.warn(`[PesaPal IPN] Warning: Could not read processed_payments. Check RTDB rules. Error: ${ruleErr}`);
+      }
+      
+      if (alreadyProcessed) {
         console.log(`[PesaPal IPN] Transaction ${orderTrackingId} already processed. Skipping.`);
         return NextResponse.json({ OrderTrackingId: orderTrackingId, status: 'Already Processed' });
       }
@@ -60,7 +66,7 @@ export async function GET(request: Request) {
       if (coinsToAward > 0) {
         const timestamp = Date.now();
         
-        // Prepare atomic updates
+        // Prepare atomic updates for balance and idempotency
         const updates: any = {};
         updates[`balances/${uid}/coins`] = increment(coinsToAward);
         updates[`balances/${uid}/updatedAt`] = timestamp;
@@ -74,11 +80,11 @@ export async function GET(request: Request) {
           payment_method: status.payment_method || 'pesapal'
         };
 
-        // Attempt write
+        // Attempt fulfillment in Realtime Database
         try {
           await update(ref(rtdb), updates);
 
-          // Log to history separately for clarity
+          // Log to history separately for clarity and persistence
           await set(push(ref(rtdb, `coin_history/${uid}`)), {
             amount: coinsToAward,
             type: 'recharge',
