@@ -24,7 +24,7 @@ Once you have added the first 5 variables and redeployed:
 6. **Redeploy one last time.**
 
 ## 3. Realtime Database (RTDB) Rules
-**IMPORTANT:** For coins to be awarded automatically, your RTDB rules MUST allow the background fulfillment process to write to user balances. Copy and paste the following into your Firebase Console:
+**CRITICAL:** For coins to be awarded automatically, your RTDB rules MUST allow the background fulfillment process (which is unauthenticated) to check and write balances. Copy and paste this into your Firebase Console:
 
 ```json
 {
@@ -42,7 +42,7 @@ Once you have added the first 5 variables and redeployed:
       }
     },
     "processed_payments": {
-      ".read": "auth != null",
+      ".read": "true",
       ".write": "true" 
     },
     "presence": {

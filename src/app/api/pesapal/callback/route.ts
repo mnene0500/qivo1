@@ -38,6 +38,7 @@ export async function GET(request: Request) {
       }
 
       // 1. Check if already processed (Idempotency)
+      // Note: This requires .read: true in RTDB rules for processed_payments
       const processedRef = ref(rtdb, `processed_payments/${orderTrackingId}`);
       const alreadyProcessed = await get(processedRef);
       
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
       else if (amount >= 230) coinsToAward = 2000;
       else if (amount >= 120) coinsToAward = 1000;
       else if (amount >= 80) coinsToAward = 500;
-      else if (amount >= 1) coinsToAward = 200; // Test Package (KES 1)
+      else if (amount >= 0.5) coinsToAward = 200; // Captures KES 1 test package robustly
 
       if (coinsToAward > 0) {
         const timestamp = Date.now();
@@ -88,7 +89,7 @@ export async function GET(request: Request) {
           console.log(`[PesaPal IPN] SUCCESS: Fulfilled ${coinsToAward} coins for user ${uid}`);
         } catch (dbError: any) {
           console.error(`[PesaPal IPN] DATABASE ERROR: ${dbError.message}. Ensure RTDB rules allow writes to balances/ and processed_payments/ for unauthenticated users.`);
-          throw dbError; // Re-throw to trigger 500 and possible PesaPal retry
+          throw dbError; 
         }
       } else {
         console.warn(`[PesaPal IPN] SUCCESS status but amount ${amount} didn't match a package.`);
