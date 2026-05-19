@@ -10,7 +10,7 @@ import { ref, update, increment, push, set, get } from 'firebase/database';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   
-  // PesaPal v3 can use mixed casing or specific casing depending on configuration
+  // PesaPal v3 parameters can be case-variant depending on the specific notification type
   const orderTrackingId = searchParams.get('OrderTrackingId') || searchParams.get('orderTrackingId');
   const merchantReference = searchParams.get('OrderMerchantReference') || searchParams.get('orderMerchantReference');
 
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       if (coinsToAward > 0) {
         const timestamp = Date.now();
         
-        // Atomically award coins and log history
+        // Prepare atomic updates
         const updates: any = {};
         updates[`balances/${uid}/coins`] = increment(coinsToAward);
         updates[`balances/${uid}/updatedAt`] = timestamp;
@@ -73,22 +73,28 @@ export async function GET(request: Request) {
           payment_method: status.payment_method || 'pesapal'
         };
 
-        await update(ref(rtdb), updates);
+        // Attempt write
+        try {
+          await update(ref(rtdb), updates);
 
-        // Log to history separately for clarity
-        await set(push(ref(rtdb, `coin_history/${uid}`)), {
-          amount: coinsToAward,
-          type: 'recharge',
-          description: `PesaPal Recharge: KES ${amount}`,
-          timestamp
-        });
+          // Log to history separately for clarity
+          await set(push(ref(rtdb, `coin_history/${uid}`)), {
+            amount: coinsToAward,
+            type: 'recharge',
+            description: `PesaPal Recharge: KES ${amount}`,
+            timestamp
+          });
 
-        console.log(`[PesaPal IPN] SUCCESS: Fulfilled ${coinsToAward} coins for user ${uid}`);
+          console.log(`[PesaPal IPN] SUCCESS: Fulfilled ${coinsToAward} coins for user ${uid}`);
+        } catch (dbError: any) {
+          console.error(`[PesaPal IPN] DATABASE ERROR: ${dbError.message}. Ensure RTDB rules allow writes to balances/ and processed_payments/ for unauthenticated users.`);
+          throw dbError; // Re-throw to trigger 500 and possible PesaPal retry
+        }
       } else {
         console.warn(`[PesaPal IPN] SUCCESS status but amount ${amount} didn't match a package.`);
       }
     } else {
-      console.log(`[PesaPal IPN] Transaction ${orderTrackingId} is not in a completed state (Status: ${status?.status_code})`);
+      console.log(`[PesaPal IPN] Transaction ${orderTrackingId} is not in a completed state (Status Code: ${status?.status_code})`);
     }
 
     // Always respond with the structure PesaPal expects to acknowledge the IPN
@@ -97,7 +103,7 @@ export async function GET(request: Request) {
       status: 'OK'
     });
   } catch (error: any) {
-    console.error("[PesaPal IPN Error]:", error.message);
+    console.error("[PesaPal IPN Critical Failure]:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
