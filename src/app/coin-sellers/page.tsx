@@ -19,10 +19,9 @@ export default function CoinSellersPage() {
   const router = useRouter()
   const db = useFirestore()
 
-  // Fetch users with the isCoinSeller role
+  // Guard: Ensure db exists before creating collection/query
   const sellersQuery = useMemo(() => {
-    // CRITICAL: Guard against null db instance during build/render
-    if (!db || typeof db !== 'object') return null
+    if (!db) return null
     return query(
       collection(db, "users"),
       where("isCoinSeller", "==", true),

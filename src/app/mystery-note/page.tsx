@@ -26,11 +26,11 @@ export default function MysteryNotePage() {
   const [isSending, setIsSending] = useState(false)
   const [userCoins, setUserCoins] = useState(0)
 
-  const userRef = useMemo(() => user?.uid ? doc(db, "users", user.uid) : null, [db, user?.uid])
+  const userRef = useMemo(() => user?.uid && db ? doc(db, "users", user.uid) : null, [db, user?.uid])
   const { data: profile } = useDoc<any>(userRef)
 
   useEffect(() => {
-    if (!user?.uid) return
+    if (!user?.uid || !rtdb) return
     const balRef = ref(rtdb, `balances/${user.uid}/coins`)
     get(balRef).then(snap => {
       if (snap.exists()) setUserCoins(snap.val())
@@ -40,7 +40,7 @@ export default function MysteryNotePage() {
   const totalCost = recipientCount * COST_PER_PERSON
 
   const handleSend = async () => {
-    if (!user || !profile || !message.trim()) return
+    if (!user || !profile || !message.trim() || !db || !rtdb) return
     if (userCoins < totalCost) {
       toast({ variant: "destructive", title: "Insufficient Coins", description: `You need ${totalCost} coins to send this note.` })
       return
@@ -48,13 +48,12 @@ export default function MysteryNotePage() {
 
     setIsSending(true)
     try {
-      // 1. Fetch opposite gender users randomly
       const targetGender = profile.gender === 'male' ? 'female' : 'male'
       const q = query(
         collection(db, "users"),
         where("gender", "==", targetGender),
         where("onboardingComplete", "==", true),
-        limit(50) // Fetch a pool to randomize from
+        limit(50)
       )
       const snap = await getDocs(q)
       const allTargets = snap.docs
@@ -71,7 +70,6 @@ export default function MysteryNotePage() {
 
       const timestamp = Date.now()
       
-      // 2. Deduct coins and log history
       await update(ref(rtdb, `balances/${user.uid}`), {
         coins: rtdbIncrement(-totalCost),
         updatedAt: timestamp
@@ -83,7 +81,6 @@ export default function MysteryNotePage() {
         timestamp
       })
 
-      // 3. Send messages to each target
       for (const target of allTargets) {
         const ids = [user.uid, target.uid].sort()
         const chatId = `direct_${ids[0]}_${ids[1]}`
@@ -94,12 +91,9 @@ export default function MysteryNotePage() {
           timestamp
         }
         
-        // Push message to thread
         await set(push(ref(rtdb, `chat_messages/${chatId}`)), msgData)
 
-        // Update chat summaries for both
         const updates: any = {}
-        // My summary
         updates[`user_chats/${user.uid}/${chatId}`] = {
           partnerId: target.uid,
           partnerName: target.name || "Unknown",
@@ -108,7 +102,6 @@ export default function MysteryNotePage() {
           lastMessageAt: timestamp,
           unreadCount: 0
         }
-        // Their summary
         updates[`user_chats/${target.uid}/${chatId}`] = {
           partnerId: user.uid,
           partnerName: profile.name || "User",
@@ -131,7 +124,6 @@ export default function MysteryNotePage() {
 
   return (
     <div className="flex-1 bg-[#FF6B00] min-h-screen flex flex-col select-none relative overflow-hidden">
-      {/* Visual background element: Bow */}
       <div className="absolute -top-10 -right-20 w-80 h-80 opacity-40 pointer-events-none">
         <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M100 80C140 30 190 50 190 100C190 150 140 170 100 120C60 170 10 150 10 100C10 50 60 30 100 80Z" fill="white" fillOpacity="0.2"/>
@@ -151,7 +143,6 @@ export default function MysteryNotePage() {
           <p className="text-lg font-bold text-white/80">Check others messages</p>
         </div>
 
-        {/* Fake "Others Messages" bubbles for vibe */}
         <div className="space-y-3">
           {["Hello. I'm not here for money, I just want to chat", "💕💕 nice to meet you here 💗", "hi honey I'm alone, so maybe we can do sth nice together???"].map((t, i) => (
             <div key={i} className={cn(

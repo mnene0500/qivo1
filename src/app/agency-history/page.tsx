@@ -29,7 +29,6 @@ export default function AgencyHistoryPage() {
 
   const { data: profile } = useDoc<UserProfile>(user?.uid && db ? doc(db, "users", user.uid) : null)
 
-  // Economical Query: Only fetch the user's latest 50 withdrawals for their specific agency
   const withdrawalsQuery = useMemo(() => {
     if (!db || !user?.uid || !profile?.agencyId) return null
     return query(
