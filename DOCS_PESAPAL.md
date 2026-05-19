@@ -3,7 +3,13 @@
 
 This guide is specific to your production domain: **qivo-gamma.vercel.app**.
 
-## 1. Environment Variables (Vercel Settings)
+## 1. PesaPal Dashboard Settings
+In your PesaPal Live Dashboard, configure your IPN settings as follows:
+
+- **Merchant IPN Listener URL**: `https://qivo-gamma.vercel.app/api/pesapal/callback`
+- **IPN Notification Type**: `GET`
+
+## 2. Environment Variables (Vercel Settings)
 Add the following variables exactly as shown to your Vercel project environment:
 
 | Variable | Value | 
@@ -13,9 +19,9 @@ Add the following variables exactly as shown to your Vercel project environment:
 | `PESAPAL_API_BASE_URL` | `https://pay.pesapal.com/v3` |
 | `PESAPAL_IPN_URL` | `https://qivo-gamma.vercel.app/api/pesapal/callback` |
 | `PESAPAL_CALLBACK_URL` | `https://qivo-gamma.vercel.app/recharge` |
-| `PESAPAL_IPN_ID` | *Retrieved in Step 2* |
+| `PESAPAL_IPN_ID` | *Retrieved in Step 3* |
 
-## 2. Registering your Live IPN (The "IPN ID")
+## 3. Registering your Live IPN (The "IPN ID")
 Once you have added the first 5 variables and redeployed:
 1. Log in to QIVO as an **Admin**.
 2. Go to `https://qivo-gamma.vercel.app/pesapal-admin`.
@@ -24,7 +30,7 @@ Once you have added the first 5 variables and redeployed:
 5. Copy that ID and add it to Vercel as `PESAPAL_IPN_ID`.
 6. **Redeploy one last time.**
 
-## 3. Realtime Database (RTDB) Rules
+## 4. Realtime Database (RTDB) Rules
 **CRITICAL:** For chats, calls, and payments to work correctly, your RTDB rules MUST allow both authenticated users and the background fulfillment process to write data. Copy and paste this into your Firebase Console:
 
 ```json
@@ -80,5 +86,8 @@ Once you have added the first 5 variables and redeployed:
 }
 ```
 
-## 4. Deployment Check
-Ensure your merchant reference prefix is set to `QV_` in `payment-actions.ts`. This helps identify QIVO transactions in your PesaPal dashboard.
+## 5. Troubleshooting
+If coins are not being awarded:
+1. Check Vercel logs for `🔥 IPN HIT RECEIVED`.
+2. Ensure `PESAPAL_IPN_ID` matches the one shown in your dashboard.
+3. Verify that your Merchant Reference prefix in `payment-actions.ts` is `QV_`.
