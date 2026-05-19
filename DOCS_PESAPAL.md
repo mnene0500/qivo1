@@ -9,6 +9,8 @@ In your PesaPal Live Dashboard, configure your IPN settings as follows:
 - **Merchant IPN Listener URL**: `https://qivo-gamma.vercel.app/api/pesapal/callback`
 - **IPN Notification Type**: `GET`
 
+*Note: Ensure the URL ends in `/callback` exactly as shown above.*
+
 ## 2. Environment Variables (Vercel Settings)
 Add these EXACT variables to your Vercel project:
 

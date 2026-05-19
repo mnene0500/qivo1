@@ -15,7 +15,10 @@ import {
   Users, 
   ArrowRight,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  ShieldCheck,
+  Star
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -28,20 +31,19 @@ import {
 
 function CoinIcon({ className }: { className?: string }) {
   return (
-    <div className={cn("w-10 h-10 rounded-full bg-[#FFD600] flex items-center justify-center shadow-sm", className)}>
-      <span className="text-white font-bold text-xl italic drop-shadow-sm">S</span>
+    <div className={cn("w-10 h-10 rounded-full bg-gradient-to-tr from-[#FFD600] to-[#FFF500] flex items-center justify-center shadow-lg", className)}>
+      <span className="text-white font-black text-xl italic drop-shadow-[0_2px_2px_rgba(0,0,0,0.2)]">S</span>
     </div>
   )
 }
 
 const PACKAGES = [
-  { amount: 200, price: 1.0 }, 
-  { amount: 500, price: 80.0 },
-  { amount: 1000, price: 120.0 },
-  { amount: 2000, price: 230.0 },
-  { amount: 5000, price: 550.0 },
-  { amount: 10000, price: 1000.0 },
-  { amount: 20000, price: 1800.0 },
+  { amount: 500, price: 80.0, label: "Starter" },
+  { amount: 1000, price: 120.0, label: "Basic" },
+  { amount: 2000, price: 230.0, label: "Popular", badge: "Hot" },
+  { amount: 5000, price: 550.0, label: "Pro" },
+  { amount: 10000, price: 1000.0, label: "Elite", badge: "Best Value" },
+  { amount: 20000, price: 1800.0, label: "VVIP" },
 ]
 
 function RechargeContent() {
@@ -52,7 +54,7 @@ function RechargeContent() {
   const rtdb = useDatabase()
   const { toast } = useToast()
   
-  const [selectedPackage, setSelectedPackage] = useState<number | null>(null)
+  const [selectedPackage, setSelectedPackage] = useState<number | null>(2000)
   const [loading, setLoading] = useState(false)
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
   const [isFulfilling, setIsFulfilling] = useState(false)
@@ -60,10 +62,9 @@ function RechargeContent() {
   
   const [currentCoins, setCurrentCoins] = useState(0)
 
-  const userRef = useMemoFirebase(() => user?.uid ? doc(db, "users", user.uid) : null, [db, user?.uid])
+  const userRef = useMemoFirebase(() => (user?.uid && db) ? doc(db, "users", user.uid) : null, [db, user?.uid])
   const { data: profile } = useDoc<any>(userRef)
 
-  // Handle instant fulfillment if redirected back from PesaPal
   useEffect(() => {
     const orderId = searchParams.get("OrderTrackingId") || searchParams.get("orderTrackingId");
     const merchantRef = searchParams.get("OrderMerchantReference") || searchParams.get("orderMerchantReference");
@@ -71,7 +72,6 @@ function RechargeContent() {
     if (orderId && merchantRef) {
       const runFulfillment = async () => {
         setIsFulfilling(true);
-        console.log(`[Recharge UI] Fulfillment starting for ${orderId}`);
         try {
           const res = await fulfillPaymentAction(orderId, merchantRef);
           if (res.success) {
@@ -79,14 +79,12 @@ function RechargeContent() {
               title: "Success!", 
               description: `Added ${res.coins || ''} coins to your wallet.`,
             });
-            // Brief delay to show success icon before redirect
             setTimeout(() => router.replace("/profile"), 2000);
           } else {
             setFulfillmentError(res.error || "Verification pending...");
             setTimeout(() => router.replace("/profile"), 3000);
           }
         } catch (e: any) {
-          console.error("[Recharge UI] Fulfillment Exception:", e.message);
           setFulfillmentError("Connection error during verification.");
           setTimeout(() => router.replace("/profile"), 3000);
         } finally {
@@ -97,7 +95,6 @@ function RechargeContent() {
     }
   }, [searchParams, router, toast]);
 
-  // Real-time listener for coin balance
   useEffect(() => {
     if (!user?.uid || !rtdb) return
     
@@ -161,7 +158,7 @@ function RechargeContent() {
           <h2 className="text-2xl font-black text-black uppercase tracking-tighter">
             {fulfillmentError ? "Hold on..." : "Confirming..."}
           </h2>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] leading-relaxed max-w-[200px] mx-auto">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] leading-relaxed max-w-[200px] mx-auto text-center">
             {fulfillmentError || "Syncing with PesaPal Secure API. Don't close the app."}
           </p>
         </div>
@@ -170,84 +167,131 @@ function RechargeContent() {
   }
 
   return (
-    <div className="flex-1 bg-white min-h-screen flex flex-col select-none">
-      <header className="px-4 h-16 flex items-center justify-between border-b bg-white sticky top-0 z-50">
+    <div className="flex-1 bg-[#F9FAFB] min-h-screen flex flex-col select-none">
+      <header className="px-4 h-16 flex items-center justify-between bg-white border-b sticky top-0 z-50">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
           <ChevronLeft className="w-6 h-6 text-black" />
         </Button>
-        <h1 className="text-base font-black text-black uppercase tracking-widest">My Wallet</h1>
+        <h1 className="text-sm font-black text-black uppercase tracking-widest">My Wallet</h1>
         <Button variant="ghost" size="icon" onClick={() => router.push("/coin-history")} className="rounded-full">
           <History className="w-5 h-5 text-black" />
         </Button>
       </header>
 
-      <main className="flex-1 px-6 pt-8 pb-32">
-        <div className="space-y-10">
-          <div className="space-y-1">
-             <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Available Coins</h2>
-             <div className="flex items-center gap-4 py-6 bg-gray-50/80 rounded-[2.5rem] px-8 border border-gray-100 shadow-inner">
-                <CoinIcon className="w-16 h-14" />
-                <span className="text-6xl font-black text-black tracking-tighter">
-                  {currentCoins}
-                </span>
-             </div>
+      <main className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="px-6 pt-8 pb-32 space-y-10">
+          <div className="bg-gradient-to-br from-[#00A2FF] to-[#0066CC] rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden text-white">
+            <div className="absolute -right-6 -bottom-6 opacity-10 rotate-12">
+               <CoinIcon className="w-40 h-40" />
+            </div>
+            <div className="relative z-10 space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-70">Current Balance</p>
+              <div className="flex items-center gap-4">
+                <span className="text-6xl font-black tracking-tighter">{currentCoins}</span>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold opacity-60">QIVO</span>
+                  <span className="text-xs font-bold opacity-60 uppercase tracking-widest">Coins</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-8 flex gap-3">
+              <div className="bg-white/15 backdrop-blur-md border border-white/10 px-4 py-2 rounded-2xl flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
+                <span className="text-[9px] font-bold uppercase tracking-widest">Secure Wallet</span>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Select Package</h2>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Select Package</h2>
+              <div className="flex items-center gap-1 text-[#00A2FF]">
+                 <Star className="w-3 h-3 fill-current" />
+                 <span className="text-[9px] font-black uppercase tracking-widest">Premium Rewards</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               {PACKAGES.map((p) => (
                 <div 
                   key={p.amount} 
                   onClick={() => setSelectedPackage(p.amount)} 
                   className={cn(
-                    "rounded-[2.5rem] border-2 h-32 flex flex-col items-center justify-center p-4 relative transition-all active:scale-95 cursor-pointer shadow-sm", 
-                    selectedPackage === p.amount ? "border-[#00AEFF] bg-blue-50/50" : "border-gray-50 bg-white"
+                    "relative rounded-[2rem] h-36 flex flex-col items-center justify-center p-4 transition-all duration-300 active:scale-95 cursor-pointer border-2", 
+                    selectedPackage === p.amount 
+                      ? "bg-white border-[#00A2FF] shadow-[0_15px_30px_-5px_rgba(0,162,255,0.15)] ring-4 ring-blue-50" 
+                      : "bg-white border-transparent shadow-sm hover:border-gray-200"
                   )}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <CoinIcon className="w-6 h-6" />
-                    <span className={cn("text-xl font-black", selectedPackage === p.amount ? "text-[#00AEFF]" : "text-black")}>{p.amount}</span>
+                  {p.badge && (
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#FFD600] text-black px-3 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest whitespace-nowrap shadow-sm border border-white">
+                      {p.badge}
+                    </div>
+                  )}
+                  <CoinIcon className="w-8 h-8 mb-2" />
+                  <span className="text-2xl font-black text-black tracking-tighter">{p.amount}</span>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{p.label}</p>
+                  <div className="bg-gray-50 px-3 py-1 rounded-full border border-gray-100 mt-1">
+                    <span className="text-[10px] font-black text-[#00A2FF]">KES {p.price}</span>
                   </div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">KES {p.price}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-2">
             <Button 
               variant="outline" 
               onClick={() => router.push('/coin-sellers')}
-              className="w-full h-20 rounded-[2rem] border-dashed border-2 border-blue-100 bg-blue-50/20 text-blue-600 font-bold uppercase tracking-[0.15em] text-[10px] gap-3 group"
+              className="w-full h-20 rounded-[2rem] border-dashed border-2 border-blue-200 bg-blue-50/30 text-[#00A2FF] font-black uppercase tracking-[0.15em] text-[10px] gap-4 group hover:bg-blue-50"
             >
-              <Users className="w-5 h-5" /> 
-              Certified Coin Sellers
-              <ArrowRight className="w-4 h-4 ml-auto opacity-40 group-hover:translate-x-1 transition-transform" />
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                <Users className="w-5 h-5" /> 
+              </div>
+              <div className="flex-1 text-left">
+                <p className="leading-none">Certified Sellers</p>
+                <p className="text-[8px] opacity-60 font-bold mt-1">Buy via M-Pesa Directly</p>
+              </div>
+              <ArrowRight className="w-4 h-4 mr-2 opacity-40 group-hover:translate-x-1 transition-transform" />
             </Button>
           </div>
         </div>
       </main>
 
-      <footer className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-lg p-6 border-t z-50">
-        <Button 
-          disabled={loading || !selectedPackage} 
-          className="w-full h-16 rounded-full bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black uppercase tracking-widest text-sm shadow-2xl shadow-blue-100 active:scale-95 transition-all" 
-          onClick={handlePayment}
-        >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              Pay KES {PACKAGES.find(p => p.amount === selectedPackage)?.price}
-            </div>
-          )}
-        </Button>
+      <footer className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-xl p-6 border-t z-50">
+        <div className="max-w-md mx-auto space-y-4">
+          <div className="flex items-center justify-center gap-2 text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+            <ShieldCheck className="w-3 h-3" />
+            PesaPal Secure 256-bit Encryption
+          </div>
+          <Button 
+            disabled={loading || !selectedPackage} 
+            className="w-full h-16 rounded-full bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-blue-200 active:scale-95 transition-all group" 
+            onClick={handlePayment}
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <span>Pay KES {PACKAGES.find(p => p.amount === selectedPackage)?.price}</span>
+              </div>
+            )}
+          </Button>
+        </div>
       </footer>
 
       <Dialog open={!!paymentUrl} onOpenChange={(open) => !open && setPaymentUrl(null)}>
         <DialogContent className="max-w-none w-full h-[100dvh] p-0 border-none bg-white rounded-none flex flex-col overflow-hidden z-[9999] [&>button]:hidden">
           <DialogTitle className="sr-only">Secure Payment Checkout</DialogTitle>
-          
+          <div className="h-14 bg-white border-b flex items-center px-4">
+             <Button variant="ghost" size="sm" onClick={() => setPaymentUrl(null)} className="rounded-full font-bold text-[10px] uppercase tracking-widest gap-2">
+               <ChevronLeft className="w-4 h-4" /> Cancel Payment
+             </Button>
+             <div className="flex-1 flex justify-center items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-green-500" />
+                <span className="text-[9px] font-black uppercase tracking-widest">Secure Checkout</span>
+             </div>
+             <div className="w-20" />
+          </div>
           <div className="flex-1 relative bg-gray-50">
             {paymentUrl && (
               <iframe 
@@ -263,7 +307,7 @@ function RechargeContent() {
                 <div className="w-20 h-20 border-4 border-blue-50 rounded-full" />
                 <div className="w-20 h-20 border-4 border-[#00A2FF] border-t-transparent rounded-full animate-spin absolute inset-0" />
               </div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] animate-pulse">Initialising Security...</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] animate-pulse">Establishing Secure Session...</p>
             </div>
           </div>
         </DialogContent>
@@ -274,7 +318,7 @@ function RechargeContent() {
 
 export default function RechargePage() { 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center h-screen bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>}>
       <RechargeContent />
     </Suspense>
   )
