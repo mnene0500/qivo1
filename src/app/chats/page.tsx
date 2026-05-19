@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useMemo, useRef } from "react"
@@ -298,13 +297,17 @@ function ChatsContent() {
   const handleStartCall = async (type: 'video' | 'voice') => {
     if (!currentUser || !partnerProfile || !chatId || isBlocked) return
     
-    // Check if partner is online (optional, but better UX)
+    const minRequired = type === 'video' ? 150 : 70;
+    if (userBalances.coins < minRequired) {
+      toast({ variant: "destructive", title: "Insufficient Coins", description: `You need at least ${minRequired} coins to start this call.` });
+      return;
+    }
+
     if (partnerPresence?.state !== 'online') {
       toast({ title: "User Offline", description: "This user isn't online right now." })
       return
     }
 
-    // Signaling: Write to partner's call node
     const callData = {
       callerId: currentUser.uid,
       callerName: currentUserProfile?.name || "Someone",
@@ -316,8 +319,7 @@ function ChatsContent() {
 
     await set(ref(rtdb, `calls/${partnerProfile.uid}`), callData)
     
-    // Redirect self to call room
-    router.push(`/call/${chatId}?type=${type}`)
+    router.push(`/call/${chatId}?type=${type}&caller=true&partner=${partnerProfile.name}`)
   }
 
   const handleSendGift = async (gift: any) => {
