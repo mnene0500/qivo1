@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useMemo, useState, useEffect, useCallback, useRef } from "react"
@@ -66,7 +67,7 @@ export default function HomePage() {
   const fetchUsers = useCallback(async (isManual = false) => {
     if (!db || !profile || !currentUser?.uid) return
     
-    // Prevent auto-refresh if we already have users and it's not a manual trigger
+    // STOP AUTO-REFRESH: Only fetch if we have no users OR it's a manual refresh
     if (!isManual && users.length > 0) {
       setInitialLoading(false)
       return
@@ -91,6 +92,7 @@ export default function HomePage() {
         return true
       })
 
+      // Randomize for fresh feel without new server roundtrip
       const sorted = filtered.sort(() => Math.random() - 0.5)
       setUsers(sorted)
     } catch (err) {

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react"
@@ -59,7 +60,7 @@ export default function UnifiedAuthPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
       
-      // Auto-generate name from email prefix
+      // AUTO-NAME FROM EMAIL: user@example.com -> User
       const emailPrefix = email.split('@')[0];
       const nameFromEmail = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).replace(/[._]/g, ' ');
       

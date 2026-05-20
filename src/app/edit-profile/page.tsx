@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -123,6 +124,7 @@ export default function EditProfilePage() {
       try {
         const croppedBase64 = await getCroppedImg(tempImage, croppedAreaPixels)
         if (targetPhotoIndex === 'profile') {
+          // If profile photo is changed, maybe add old one to gallery if there's space
           const newGallery = [...formData.additionalPhotos];
           if (newGallery.length < 4 && !newGallery.includes(croppedBase64)) {
              newGallery.unshift(croppedBase64);
@@ -155,12 +157,14 @@ export default function EditProfilePage() {
     try {
       const finalFormData = { ...formData };
       
+      // Upload profile photo if it's base64
       if (formData.photoURL.startsWith('data:image')) {
         const ext = formData.photoURL.includes('png') ? 'png' : 'jpg';
         const url = await uploadBase64Image(formData.photoURL, 'photos', `${user.uid}/profile_${Date.now()}.${ext}`);
         finalFormData.photoURL = url;
       }
 
+      // Upload gallery photos if they're base64
       const uploadedGallery = await Promise.all(
         formData.additionalPhotos.map(async (photo, idx) => {
           if (photo.startsWith('data:image')) {
@@ -205,6 +209,7 @@ export default function EditProfilePage() {
       </header>
 
       <main className="flex-1 p-6 space-y-8 overflow-y-auto">
+        {/* Profile Image Section */}
         <div className="flex flex-col items-center">
           <div className="relative group cursor-pointer" onClick={() => { setTargetPhotoIndex('profile'); fileInputRef.current?.click(); }}>
             <Avatar className="w-28 h-28 border-4 border-gray-50 shadow-xl">
@@ -218,6 +223,7 @@ export default function EditProfilePage() {
           <p className="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile Photo</p>
         </div>
 
+        {/* Gallery Section */}
         <div className="space-y-4">
           <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Additional Photos (Max 4)</Label>
           <div className="grid grid-cols-4 gap-3">
@@ -250,6 +256,7 @@ export default function EditProfilePage() {
           </div>
         </div>
 
+        {/* Input Fields */}
         <div className="space-y-6">
           <div className="space-y-2">
             <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Full Name</Label>

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, Suspense, useEffect } from "react"
@@ -60,7 +61,6 @@ function RechargeContent() {
   
   const [currentCoins, setCurrentCoins] = useState(0)
 
-  // Guard: Ensure db exists before creating document reference
   const userRef = useMemoFirebase(() => (user?.uid && db) ? doc(db, "users", user.uid) : null, [db, user?.uid])
   const { data: profile } = useDoc<any>(userRef)
 
@@ -238,21 +238,23 @@ function RechargeContent() {
             </div>
           </div>
 
-          <div className="pt-2">
-            <Button 
-              onClick={() => router.push('/coin-sellers')}
-              className="w-full h-20 bg-white hover:bg-gray-50 rounded-[2rem] border-none shadow-xl flex items-center justify-center gap-4 text-[#00A2FF] active:scale-95 transition-all group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shadow-sm group-hover:bg-white transition-colors">
-                <Users className="w-5 h-5" /> 
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-black uppercase tracking-widest text-black">Certified Sellers</span>
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Buy via M-Pesa Directly</span>
-              </div>
-              <ArrowRight className="w-4 h-4 ml-auto mr-2 opacity-40 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </div>
+          {profile?.country === 'Kenya' && (
+            <div className="pt-2">
+              <Button 
+                onClick={() => router.push('/coin-sellers')}
+                className="w-full h-20 bg-white hover:bg-gray-50 rounded-[2rem] border-none shadow-xl flex items-center justify-center gap-4 text-[#00A2FF] active:scale-95 transition-all group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shadow-sm group-hover:bg-white transition-colors">
+                  <Users className="w-5 h-5" /> 
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-black uppercase tracking-widest text-black">Certified Sellers</span>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Buy via M-Pesa Directly</span>
+                </div>
+                <ArrowRight className="w-4 h-4 ml-auto mr-2 opacity-40 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </div>
+          )}
         </div>
       </main>
 
@@ -299,7 +301,6 @@ function RechargeContent() {
                 allow="payment"
               />
             )}
-            
             <div className="absolute inset-0 -z-10 flex flex-col items-center justify-center bg-white space-y-6">
               <div className="relative">
                 <div className="w-20 h-20 border-4 border-blue-50 rounded-full" />
