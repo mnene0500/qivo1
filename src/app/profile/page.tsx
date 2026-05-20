@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, useEffect, useState } from "react"
@@ -56,6 +55,9 @@ interface UserProfile {
   agencyStatus?: string
 }
 
+// Global cache for the current user's profile to prevent navigation blinking
+let globalProfileCache: UserProfile | null = null;
+
 function JoinAgencyDialog({ userUid }: { userUid: string }) {
   const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
@@ -109,15 +111,21 @@ export default function MePage() {
   
   const [copied, setCopied] = useState(false)
   const [balances, setBalances] = useState({ coins: 0, diamonds: 0, isVerified: false })
-  const [isReady, setIsReady] = useState(false)
+  const [isReady, setIsReady] = useState(!!globalProfileCache)
 
   const profileRef = useMemo(() => (user && db) ? doc(db, "users", user.uid) : null, [db, user])
-  const { data: profile, loading: profileLoading } = useDoc<UserProfile>(profileRef)
+  const { data: profile } = useDoc<UserProfile>(profileRef)
 
   useEffect(() => {
     if (isInitialized && !authLoading && !user) router.replace("/welcome")
-    if (isInitialized && !authLoading && user && !profileLoading) setIsReady(true)
-  }, [user, authLoading, isInitialized, router, profileLoading])
+  }, [user, authLoading, isInitialized, router])
+
+  useEffect(() => {
+    if (profile) {
+      globalProfileCache = profile;
+      setIsReady(true);
+    }
+  }, [profile])
 
   useEffect(() => {
     if (!user?.uid || !rtdb) return
@@ -130,33 +138,37 @@ export default function MePage() {
   }, [rtdb, user?.uid])
 
   const handleCopyId = () => {
-    if (profile?.matchFlowId) { navigator.clipboard.writeText(profile.matchFlowId); setCopied(true); toast({ title: "Copied!" }); setTimeout(() => setCopied(false), 2000); }
+    const p = profile || globalProfileCache;
+    if (p?.matchFlowId) { navigator.clipboard.writeText(p.matchFlowId); setCopied(true); toast({ title: "Copied!" }); setTimeout(() => setCopied(false), 2000); }
   }
 
-  if (!isReady && (authLoading || !isInitialized)) return <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-[#F8F9FA]"><Loader2 className="w-8 h-8 animate-spin text-[#00A2FF]" /></div>
-  if (!user) return null
-  const isVerified = balances.isVerified || profile?.isVerified
+  if (!isReady && isInitialized && !authLoading) return <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-[#F8F9FA]"><Loader2 className="w-8 h-8 animate-spin text-[#00A2FF]" /></div>
+  
+  if (!user && isInitialized && !authLoading) return null;
+
+  const currentProfile = profile || globalProfileCache;
+  const isVerified = balances.isVerified || currentProfile?.isVerified
 
   return (
     <div className="flex-1 pb-24 bg-[#F8F9FA] min-h-screen relative select-none">
       <div className="absolute top-0 left-0 w-full h-[280px] bg-[#00A2FF] z-0" />
       <div className="relative z-10">
         <header className="relative pt-12 pb-10 px-6 flex flex-col items-center text-center">
-          <div className="absolute top-6 right-6"><div className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5"><span className="text-[9px] font-bold text-white uppercase">{profile?.isAdmin ? "ADMIN" : (profile?.isAgent ? "AGENT" : "USER")}</span></div></div>
-          <div className="relative mb-4"><div className="relative w-28 h-28 rounded-full shadow-2xl overflow-hidden bg-muted">{profile?.photoURL ? <Image src={profile.photoURL} alt={profile.name || "User"} fill className="object-cover" priority /> : <div className="w-full h-full flex items-center justify-center bg-gray-100"><User className="w-12 h-12 text-gray-300" /></div>}</div><button className="absolute bottom-1 right-1 bg-white p-3 rounded-full shadow-xl border border-black/5" onClick={() => router.push('/edit-profile')}><Pencil className="w-4 h-4 text-[#00A2FF]" /></button></div>
-          <div className="flex items-center justify-center gap-1.5 mb-1"><h2 className="text-xl font-bold text-white tracking-tight">{profile?.name || '...'}</h2>{(isVerified || profile?.isAdmin) && <BadgeCheck className="w-4 h-4 text-white fill-blue-500" />}</div>
-          <div className="inline-flex items-center gap-1.5 cursor-pointer" onClick={handleCopyId}><p className="text-white/70 font-semibold text-[9px] uppercase">ID: {profile?.matchFlowId}</p>{copied ? <Check className="w-2.5 h-2.5 text-green-300" /> : <Copy className="w-2.5 h-2.5 text-white/50" />}</div>
+          <div className="absolute top-6 right-6"><div className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5"><span className="text-[9px] font-bold text-white uppercase">{currentProfile?.isAdmin ? "ADMIN" : (currentProfile?.isAgent ? "AGENT" : "USER")}</span></div></div>
+          <div className="relative mb-4"><div className="relative w-28 h-28 rounded-full shadow-2xl overflow-hidden bg-muted">{currentProfile?.photoURL ? <Image src={currentProfile.photoURL} alt={currentProfile.name || "User"} fill className="object-cover" priority /> : <div className="w-full h-full flex items-center justify-center bg-gray-100"><User className="w-12 h-12 text-gray-300" /></div>}</div><button className="absolute bottom-1 right-1 bg-white p-3 rounded-full shadow-xl border border-black/5" onClick={() => router.push('/edit-profile')}><Pencil className="w-4 h-4 text-[#00A2FF]" /></button></div>
+          <div className="flex items-center justify-center gap-1.5 mb-1"><h2 className="text-xl font-bold text-white tracking-tight">{currentProfile?.name || '...'}</h2>{(isVerified || currentProfile?.isAdmin) && <BadgeCheck className="w-4 h-4 text-white fill-blue-500" />}</div>
+          <div className="inline-flex items-center gap-1.5 cursor-pointer" onClick={handleCopyId}><p className="text-white/70 font-semibold text-[9px] uppercase">ID: {currentProfile?.matchFlowId}</p>{copied ? <Check className="w-2.5 h-2.5 text-green-300" /> : <Copy className="w-2.5 h-2.5 text-white/50" />}</div>
         </header>
         <main className="px-6 space-y-6">
           <div className="grid grid-cols-2 gap-4 relative z-20 -mt-6">
             <Button className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-[#00A2FF]" onClick={() => router.push("/recharge")}><div className="flex items-center gap-1.5"><CircleDollarSign className="w-5 h-5" /><span className="text-sm font-bold">{balances.coins}</span></div><span className="text-[8px] font-bold uppercase opacity-60">Recharge</span></Button>
             <Button className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-black" onClick={() => router.push("/income")}><div className="flex items-center gap-1.5"><Gem className="w-5 h-5 text-[#4285F4]" /><span className="text-sm font-bold">{balances.diamonds.toFixed(0)}</span></div><span className="text-[8px] font-bold uppercase opacity-60">Income</span></Button>
-            {!isVerified && !profile?.isAdmin && <Button onClick={() => router.push("/verify-identity")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-indigo-600 col-span-2 mt-2"><div className="flex items-center gap-2"><Shield className="w-6 h-6" /><span className="text-sm font-bold uppercase tracking-widest">Verify Identity</span></div></Button>}
-            {profile?.isAdmin || profile?.isCoinSeller ? <Button onClick={() => router.push("/award-coins")} className="h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-white col-span-2 mt-4"><div className="flex items-center gap-2"><Trophy className="w-6 h-6" /><span className="text-sm font-bold uppercase tracking-widest">Award Coins</span></div></Button> : null}
-            {profile?.isAdmin && <Button onClick={() => router.push("/manage-roles")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-purple-600 col-span-2 mt-4"><div className="flex items-center gap-2"><Users className="w-6 h-6" /><span className="text-sm font-bold uppercase tracking-widest">Manage Roles</span></div></Button>}
-            {profile?.isAgent && profile && <AgencyDashboardDialog user={profile} />}
-            {profile?.gender === 'female' && profile?.agencyStatus !== 'approved' && !profile?.isAgent && !profile?.isAdmin && <JoinAgencyDialog userUid={user?.uid || ""} />}
-            {profile?.agencyStatus === 'approved' && (<Button onClick={() => router.push("/agency-wallet")} className="h-24 bg-gradient-to-br from-indigo-700 via-blue-600 to-blue-500 rounded-[2.2rem] shadow-2xl flex flex-col items-center justify-center text-white col-span-2 mt-4"><div className="flex items-center gap-4"><div className="bg-white/15 p-3 rounded-2xl"><Wallet className="w-7 h-7 text-white" /></div><span className="text-base font-black uppercase tracking-widest">Agency Wallet</span></div></Button>)}
+            {!isVerified && !currentProfile?.isAdmin && <Button onClick={() => router.push("/verify-identity")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-indigo-600 col-span-2 mt-2"><div className="flex items-center gap-2"><Shield className="w-6 h-6" /><span className="text-sm font-bold uppercase tracking-widest">Verify Identity</span></div></Button>}
+            {(currentProfile?.isAdmin || currentProfile?.isCoinSeller) && <Button onClick={() => router.push("/award-coins")} className="h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-white col-span-2 mt-4"><div className="flex items-center gap-2"><Trophy className="w-6 h-6" /><span className="text-sm font-bold uppercase tracking-widest">Award Coins</span></div></Button>}
+            {currentProfile?.isAdmin && <Button onClick={() => router.push("/manage-roles")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-purple-600 col-span-2 mt-4"><div className="flex items-center gap-2"><Users className="w-6 h-6" /><span className="text-sm font-bold uppercase tracking-widest">Manage Roles</span></div></Button>}
+            {currentProfile?.isAgent && currentProfile && <AgencyDashboardDialog user={currentProfile} />}
+            {currentProfile?.gender === 'female' && currentProfile?.agencyStatus !== 'approved' && !currentProfile?.isAgent && !currentProfile?.isAdmin && <JoinAgencyDialog userUid={user?.uid || ""} />}
+            {currentProfile?.agencyStatus === 'approved' && (<Button onClick={() => router.push("/agency-wallet")} className="h-24 bg-gradient-to-br from-indigo-700 via-blue-600 to-blue-500 rounded-[2.2rem] shadow-2xl flex flex-col items-center justify-center text-white col-span-2 mt-4"><div className="flex items-center gap-4"><div className="bg-white/15 p-3 rounded-2xl"><Wallet className="w-7 h-7 text-white" /></div><span className="text-base font-black uppercase tracking-widest">Agency Wallet</span></div></Button>)}
           </div>
           <div className="bg-white rounded-3xl p-2 shadow-sm border border-black/5 flex flex-col">
             <Button variant="ghost" className="h-16 justify-between px-5 rounded-none" asChild><Link href="/support"><div className="flex items-center gap-4"><div className="bg-blue-50 p-2.5 rounded-xl"><Headphones className="w-5 h-5 text-blue-600" /></div><span className="font-semibold text-xs text-black">Support Center</span></div><ChevronRight className="w-4 h-4 text-gray-300" /></Link></Button>

@@ -1,7 +1,6 @@
-
 "use client"
 
-import { useMemo, useState, useEffect, useCallback, useRef } from "react"
+import { useMemo, useState, useEffect, useCallback } from "react"
 import { collection, query, where, limit, doc, getDocs } from "firebase/firestore"
 import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
 import { useRouter } from "next/navigation"
@@ -69,14 +68,8 @@ export default function HomePage() {
   const fetchUsers = useCallback(async (isManual = false) => {
     if (!db || !profile || !currentUser?.uid) return
     
-    // Only fetch if it's a manual refresh or if the cache is empty
-    if (!isManual && users.length > 0) {
-      setInitialLoading(false)
-      return
-    }
-    
     if (isManual) setIsRefreshing(true)
-    else setInitialLoading(true)
+    else if (users.length === 0) setInitialLoading(true)
 
     try {
       const q = query(collection(db, "users"), where("onboardingComplete", "==", true), limit(40))
@@ -87,7 +80,7 @@ export default function HomePage() {
       
       const shuffled = filtered.sort(() => Math.random() - 0.5)
       setUsers(shuffled)
-      globalUserCache = shuffled; // Update cache
+      globalUserCache = shuffled;
     } catch (err) {
       console.error(err)
     } finally {
@@ -100,8 +93,6 @@ export default function HomePage() {
     if (isInitialized && !authLoading && db && currentUser && profile?.onboardingComplete) {
       if (users.length === 0) {
         fetchUsers()
-      } else {
-        setInitialLoading(false)
       }
     }
   }, [isInitialized, authLoading, db, fetchUsers, currentUser, profile?.onboardingComplete, users.length])
@@ -116,7 +107,10 @@ export default function HomePage() {
   const paginatedUsers = useMemo(() => filteredUsers.slice(0, displayLimit), [filteredUsers, displayLimit])
   const hasMore = paginatedUsers.length < filteredUsers.length
 
-  if (authLoading || !isInitialized || (currentUser && !profile?.onboardingComplete && profileLoading)) {
+  // If we have cached users, don't show the initial loading spinner at all
+  const showLoading = initialLoading && users.length === 0
+
+  if (showLoading && isInitialized) {
     return <div className="flex-1 bg-white min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#00A2FF] w-8 h-8" /></div>
   }
 
@@ -147,23 +141,19 @@ export default function HomePage() {
           <button onClick={handleRefresh} disabled={isRefreshing} className={cn("p-1.5 text-[#00A2FF]", isRefreshing && "animate-spin opacity-50")}><RotateCw className="w-5 h-5" /></button>
         </div>
         <main className="px-4 pt-3">
-          {initialLoading ? (
-            <div className="grid grid-cols-2 gap-4">{[1, 2, 3, 4].map((i) => <div key={i} className="aspect-[1/1.2] bg-white animate-pulse rounded-2xl border" />)}</div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {paginatedUsers.map((user) => (
-                <Card key={user.uid} className="relative overflow-hidden border-none aspect-[1/1.2] rounded-2xl shadow-xl bg-white" onClick={() => router.push(`/users/${user.uid}`)}>
-                  <Image src={user.photoURL} alt={user.name} fill className="object-cover" />
-                  <div className="absolute top-2.5 right-2.5 bg-[#00A2FF] px-4 py-1.5 rounded-full z-30 text-white font-bold text-[12px] uppercase" onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${user.uid}`); }}>CHAT</div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
-                  <div className="absolute inset-x-0 bottom-0 p-3 text-white">
-                    <div className="flex items-center gap-1.5"><h4 className="font-bold text-sm truncate">{user.name}</h4>{user.isVerified && <BadgeCheck className="w-4 h-4 text-[#00A2FF] fill-white" />}</div>
-                    <div className="flex items-center gap-1.5 mt-1"><span className="bg-[#006400] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">{calculateAge(user.dob)}</span><span className="bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-full text-white font-medium text-[10px] border border-white/20">{user.country || "KE"}</span></div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-3">
+            {paginatedUsers.map((user) => (
+              <Card key={user.uid} className="relative overflow-hidden border-none aspect-[1/1.2] rounded-2xl shadow-xl bg-white" onClick={() => router.push(`/users/${user.uid}`)}>
+                <Image src={user.photoURL} alt={user.name} fill className="object-cover" />
+                <div className="absolute top-2.5 right-2.5 bg-[#00A2FF] px-4 py-1.5 rounded-full z-30 text-white font-bold text-[12px] uppercase" onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${user.uid}`); }}>CHAT</div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
+                <div className="absolute inset-x-0 bottom-0 p-3 text-white">
+                  <div className="flex items-center gap-1.5"><h4 className="font-bold text-sm truncate">{user.name}</h4>{user.isVerified && <BadgeCheck className="w-4 h-4 text-[#00A2FF] fill-white" />}</div>
+                  <div className="flex items-center gap-1.5 mt-1"><span className="bg-[#006400] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">{calculateAge(user.dob)}</span><span className="bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-full text-white font-medium text-[10px] border border-white/20">{user.country || "KE"}</span></div>
+                </div>
+              </Card>
+            ))}
+          </div>
           {hasMore && <div className="flex justify-center pb-8 pt-4"><Button variant="ghost" className="text-gray-400 text-[9px] uppercase tracking-widest gap-2" onClick={() => setDisplayLimit(prev => prev + 12)}><ChevronDown className="w-3.5 h-3.5" />Show more</Button></div>}
         </main>
       </div>

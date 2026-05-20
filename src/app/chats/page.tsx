@@ -83,6 +83,9 @@ const GIFT_ITEMS = [
   { id: 'yacht', name: 'Luxury Yacht', price: 5000, icon: '🚢' },
 ]
 
+// Persistent cache for chat summaries during the session
+let globalChatCache: ChatSummary[] = [];
+
 function ChatListItem({ summary, onClick, onDelete }: { summary: ChatSummary, onClick: () => void, onDelete: () => void }) {
   const presence = useUserPresence(summary.partnerId)
   const lastAt = new Date(summary.lastMessageAt || Date.now())
@@ -147,8 +150,8 @@ function ChatsContent() {
   const [newMessage, setNewMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([])
   const [userBalances, setUserBalances] = useState({ coins: 0, diamonds: 0 })
-  const [chatSummaries, setChatSummaries] = useState<ChatSummary[]>([])
-  const [summariesLoading, setSummariesLoading] = useState(true)
+  const [chatSummaries, setChatSummaries] = useState<ChatSummary[]>(globalChatCache)
+  const [summariesLoading, setSummariesLoading] = useState(globalChatCache.length === 0)
   const [isGiftDrawerOpen, setIsGiftDrawerOpen] = useState(false)
   const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null)
   const [activeDeletedAt, setActiveDeletedAt] = useState<number>(0)
@@ -175,7 +178,11 @@ function ChatsContent() {
           })
           .sort((a, b) => b.lastMessageAt - a.lastMessageAt)
         setChatSummaries(list)
-      } else setChatSummaries([])
+        globalChatCache = list;
+      } else {
+        setChatSummaries([])
+        globalChatCache = [];
+      }
       setSummariesLoading(false)
     })
     return () => off(summariesRef, 'value', unsubscribe)
@@ -252,20 +259,15 @@ function ChatsContent() {
       const timestamp = Date.now()
       const giftText = `Sent a ${gift.name} ${gift.icon}`
 
-      // 1. Transactional updates
       const updates: any = {}
-      // Deduct coins from sender
       updates[`balances/${currentUser.uid}/coins`] = rtdbIncrement(-gift.price)
-      // Award diamonds to receiver (1:1 conversion for now)
       updates[`balances/${startWithId}/diamonds`] = rtdbIncrement(gift.price)
       
-      // Update chat summaries
       updates[`user_chats/${currentUser.uid}/${chatId}`] = { partnerId: partnerProfile.uid, partnerName: partnerProfile.name, partnerPhoto: partnerProfile.photoURL, lastMessage: giftText, lastMessageAt: timestamp, unreadCount: 0 }
       updates[`user_chats/${partnerProfile.uid}/${chatId}`] = { partnerId: currentUser.uid, partnerName: currentUserProfile?.name, partnerPhoto: currentUserProfile?.photoURL, lastMessage: giftText, lastMessageAt: timestamp, unreadCount: rtdbIncrement(1) }
 
       await update(ref(rtdb), updates)
 
-      // 2. Record Message
       await set(push(ref(rtdb, `chat_messages/${chatId}`)), {
         text: giftText,
         senderId: currentUser.uid,
@@ -273,7 +275,6 @@ function ChatsContent() {
         isGift: true
       })
 
-      // 3. Log History
       await set(push(ref(rtdb, `coin_history/${currentUser.uid}`)), {
         amount: -gift.price,
         type: 'gift',
@@ -312,13 +313,13 @@ function ChatsContent() {
     toast({ title: "Chat deleted" })
   }
 
-  if (authLoading && chatSummaries.length === 0) return <div className="flex-1 flex items-center justify-center h-screen bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
+  if (summariesLoading && chatSummaries.length === 0 && !startWithId) return <div className="flex-1 flex items-center justify-center h-screen bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
 
   if (!startWithId) return (
     <div className="flex-1 flex flex-col bg-white min-h-screen pb-20 select-none overflow-y-auto no-scrollbar">
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md px-4 pt-8 pb-3 border-b"><h1 className="text-2xl font-bold text-[#00A2FF] tracking-tight">Chat</h1></header>
       <main className="flex-1">
-        {summariesLoading ? <div className="flex items-center justify-center py-20 opacity-20"><Loader2 className="animate-spin" /></div> : chatSummaries.length === 0 ? <div className="flex flex-col items-center justify-center py-32 px-12 text-center opacity-40"><ShoppingBag className="w-16 h-16 mb-4" /><p className="font-semibold text-black">No chats yet...</p></div> : chatSummaries.map(s => <ChatListItem key={s.id} summary={s} onClick={() => router.push(`/chats?startWith=${s.partnerId}`)} onDelete={() => setChatToDelete(s)} />)}
+        {chatSummaries.length === 0 && !summariesLoading ? <div className="flex flex-col items-center justify-center py-32 px-12 text-center opacity-40"><ShoppingBag className="w-16 h-16 mb-4" /><p className="font-semibold text-black">No chats yet...</p></div> : chatSummaries.map(s => <ChatListItem key={s.id} summary={s} onClick={() => router.push(`/chats?startWith=${s.partnerId}`)} onDelete={() => setChatToDelete(s)} />)}
       </main>
       <BottomNav />
       <AlertDialog open={!!chatToDelete} onOpenChange={(o) => !o && setChatToDelete(null)}>
