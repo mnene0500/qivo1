@@ -3,9 +3,6 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
 import { getDatabase, Database } from 'firebase/database';
 import { firebaseConfig } from './config';
-import { useUser } from './auth/use-user';
-import { useCollection } from './firestore/use-collection';
-import { useDoc } from './firestore/use-doc';
 
 /**
  * Idempotent initialization of Firebase services.
@@ -46,8 +43,8 @@ export function initializeFirebase() {
   }
 }
 
-export * from './provider';
-export { FirebaseClientProvider } from './client-provider';
-
-// Re-export hooks
-export { useUser, useCollection, useDoc };
+// Note: Re-exporting hooks from their own files to keep index.ts lightweight for server use
+export { useUser } from './auth/use-user';
+export { useCollection } from './firestore/use-collection';
+export { useDoc } from './firestore/use-doc';
+export { useFirestore, useAuth, useDatabase } from './provider';

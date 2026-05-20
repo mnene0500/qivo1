@@ -19,7 +19,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -70,17 +69,6 @@ interface UserProfile {
   isAdmin?: boolean
   isVerified?: boolean
 }
-
-const GIFTS = [
-  { id: 'heart', name: 'Heart', price: 150, icon: '❤️' },
-  { id: 'rose', name: 'Rose', price: 250, icon: '🌹' },
-  { id: 'butterfly', name: 'Butterfly', price: 500, icon: '🦋' },
-  { id: 'perfume', name: 'Perfume', price: 1000, icon: '🧴' },
-  { id: 'teddy', name: 'Teddy', price: 2000, icon: '🧸' },
-  { id: 'motor', name: 'Harley', price: 3000, icon: '🏍️' },
-  { id: 'car', name: 'Sports Car', price: 5000, icon: '🏎️' },
-  { id: 'diamond', name: 'Diamond', price: 25000, icon: '💎' },
-]
 
 function ChatListItem({ summary, onClick, onDelete }: { summary: ChatSummary, onClick: () => void, onDelete: () => void }) {
   const presence = useUserPresence(summary.partnerId)
@@ -149,11 +137,9 @@ function ChatsContent() {
   const [chatSummaries, setChatSummaries] = useState<ChatSummary[]>([])
   const [summariesLoading, setSummariesLoading] = useState(true)
   const [isGiftDrawerOpen, setIsGiftDrawerOpen] = useState(false)
-  const [selectedGift, setSelectedGift] = useState<any>(null)
   const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null)
   const [activeDeletedAt, setActiveDeletedAt] = useState<number>(0)
   const [metadataLoading, setMetadataLoading] = useState(false)
-  const [isCalling, setIsCalling] = useState(false)
 
   const isBlocked = useMemo(() => {
     if (!startWithId || !currentUserProfile || !partnerProfile) return false
@@ -262,11 +248,22 @@ function ChatsContent() {
     <div className="flex-1 flex flex-col bg-white min-h-screen pb-20 select-none overflow-y-auto no-scrollbar">
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md px-4 pt-8 pb-3 border-b"><h1 className="text-2xl font-bold text-[#00A2FF] tracking-tight">Chat</h1></header>
       <main className="flex-1">
-        {summariesLoading ? <div className="flex items-center justify-center py-20 opacity-20"><Loader2 className="animate-spin" /></div> : chatSummaries.length === 0 ? <div className="flex flex-col items-center justify-center py-32 px-12 text-center opacity-40"><ShoppingBag className="w-16 h-16 mb-4" /><p className="font-semibold text-black">No chats yet...</p></div> : chatSummaries.map(s => <ChatListItem key={summary.id} summary={s} onClick={() => router.push(`/chats?startWith=${s.partnerId}`)} onDelete={() => setChatToDelete(s)} />)}
+        {summariesLoading ? <div className="flex items-center justify-center py-20 opacity-20"><Loader2 className="animate-spin" /></div> : chatSummaries.length === 0 ? <div className="flex flex-col items-center justify-center py-32 px-12 text-center opacity-40"><ShoppingBag className="w-16 h-16 mb-4" /><p className="font-semibold text-black">No chats yet...</p></div> : chatSummaries.map(s => <ChatListItem key={s.id} summary={s} onClick={() => router.push(`/chats?startWith=${s.partnerId}`)} onDelete={() => setChatToDelete(s)} />)}
       </main>
       <BottomNav />
       <AlertDialog open={!!chatToDelete} onOpenChange={(o) => !o && setChatToDelete(null)}>
-        <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none"><div className="flex flex-col items-center text-center space-y-4"><div className="w-20 h-20 bg-red-50 rounded-[2.5rem] flex items-center justify-center"><Trash2 className="w-10 h-10 text-red-500" /></div><AlertDialogTitle className="text-2xl font-black text-black tracking-tight">Delete Chat?</AlertDialogTitle></div><AlertDialogFooter className="flex-row gap-3 mt-8"><AlertDialogCancel className="flex-1 h-14 rounded-full border-none bg-gray-50 text-black font-black text-[10px] uppercase">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteChat} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black text-[10px] uppercase">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="w-20 h-20 bg-red-50 rounded-[2.5rem] flex items-center justify-center">
+              <Trash2 className="w-10 h-10 text-red-500" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black text-black tracking-tight">Delete Chat?</AlertDialogTitle>
+          </div>
+          <AlertDialogFooter className="flex-row gap-3 mt-8">
+            <AlertDialogCancel className="flex-1 h-14 rounded-full border-none bg-gray-50 text-black font-black text-[10px] uppercase">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteChat} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black text-[10px] uppercase">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
     </div>
   )
