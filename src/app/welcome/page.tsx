@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Mail, Loader2, AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth"
-import { useAuth, useUser } from "@/firebase"
+import { useAuth, useUser, useFirestore } from "@/firebase"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
@@ -17,8 +18,10 @@ import { useToast } from "@/hooks/use-toast"
 export default function WelcomePage() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
   
   const auth = useAuth()
+  const db = useFirestore()
   const { user, loading: authLoading, isInitialized } = useUser()
   const router = useRouter()
   const { toast } = useToast()
@@ -27,13 +30,48 @@ export default function WelcomePage() {
     setMounted(true)
   }, [])
 
-  // AUTO-GATE: Send to home once authenticated. 
-  // The Home page handles the onboarding check to prevent flickering.
+  // AUTH GATEKEEPER: Ensure account document is fully ready before taking user to next step
   useEffect(() => {
-    if (isInitialized && !authLoading && user) {
-      router.replace("/home")
+    const handleRedirect = async () => {
+      if (isInitialized && !authLoading && user && db) {
+        setRedirecting(true)
+        try {
+          const userRef = doc(db, "users", user.uid)
+          const userSnap = await getDoc(userRef)
+          
+          if (userSnap.exists()) {
+            if (userSnap.data().onboardingComplete) {
+              router.replace("/home")
+            } else {
+              router.replace("/onboarding")
+            }
+          } else {
+            // New account creation process - ensure it's fully created before moving
+            const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
+            const skeletonData = {
+              uid: user.uid,
+              email: user.email || `anon_${user.uid}@qivo.app`,
+              name: user.displayName || "New User",
+              matchFlowId: qId,
+              onboardingComplete: false,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              isVerified: false,
+              isAdmin: false,
+              photoURL: user.photoURL || `https://picsum.photos/seed/${user.uid}/400/400`
+            }
+            await setDoc(userRef, skeletonData)
+            router.replace("/onboarding")
+          }
+        } catch (error) {
+          console.error("[Welcome Redirect Error]:", error)
+          // Fallback redirect if doc check fails
+          router.replace("/onboarding")
+        }
+      }
     }
-  }, [user, isInitialized, authLoading, router])
+    handleRedirect()
+  }, [user, isInitialized, authLoading, router, db])
 
   const handleGoogleLogin = async () => {
     if (!auth) {
@@ -57,15 +95,15 @@ export default function WelcomePage() {
           description: error.message || "Failed to authenticate with Google."
         })
       }
-    } finally {
       setLoading(false)
     }
   }
 
-  if (!mounted || (isInitialized && user)) {
+  if (!mounted || (isInitialized && user && redirecting)) {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-10 h-10 animate-spin text-[#00A2FF]" />
+        <p className="text-[10px] font-bold text-[#00A2FF] uppercase tracking-[0.3em] animate-pulse">Verifying Account...</p>
       </div>
     )
   }
@@ -102,6 +140,7 @@ export default function WelcomePage() {
             )}
 
             <Button 
+              disabled={loading}
               onClick={() => router.push("/auth")}
               className="w-full h-16 rounded-3xl bg-white text-black hover:bg-white/90 font-bold text-sm tracking-widest uppercase shadow-2xl active:scale-95 transition-all"
             >

@@ -68,6 +68,7 @@ export default function OnboardingPage() {
 
       const qId = existingData?.matchFlowId || generateQivoId()
       
+      // Bonus: Boys get coins to chat, Girls get diamonds (initial earnings)
       const initialCoins = gender === 'male' ? 150 : 0
       const initialDiamonds = gender === 'female' ? 150 : 0
       const timestamp = Date.now()
@@ -82,7 +83,7 @@ export default function OnboardingPage() {
         dob: dob,
         country,
         lookingFor: lookingFor,
-        onboardingComplete: true,
+        onboardingComplete: true, // CRITICAL FLAG
         photoURL: profilePhoto,
         updatedAt: serverTimestamp(),
         createdAt: existingData?.createdAt || serverTimestamp(),
@@ -101,16 +102,14 @@ export default function OnboardingPage() {
       
       // 2. Initialize Realtime Wallet (only if not existing)
       const balanceRef = ref(rtdb, `balances/${user.uid}`)
-      const balSnap = await getDoc(userRef); // Check existence indirectly or use get(balanceRef)
-      
-      // Simple write for wallet
       await rtdbSet(balanceRef, {
         coins: initialCoins,
         diamonds: initialDiamonds,
-        updatedAt: timestamp
+        updatedAt: timestamp,
+        isVerified: false
       })
 
-      // 3. Log Bonus (Idempotent-ish)
+      // 3. Log Bonus
       if (initialCoins > 0) {
         await push(ref(rtdb, `coin_history/${user.uid}`), {
           amount: initialCoins,
@@ -120,12 +119,12 @@ export default function OnboardingPage() {
         })
       }
 
-      // 4. Decisive Redirect
-      // We use a slight delay or force a hard reload to ensure Firestore listeners catch up
-      toast({ title: "Welcome to QIVO!" })
+      toast({ title: "Setup Complete!" })
+      
+      // FORCE A SMALL DELAY to let Firebase listeners catch up across the app
       setTimeout(() => {
-        router.push("/home")
-      }, 500)
+        router.replace("/home")
+      }, 800)
       
     } catch (err: any) {
       toast({ variant: "destructive", title: "Setup Failed", description: err.message })
@@ -282,10 +281,13 @@ export default function OnboardingPage() {
           className="flex-1 h-16 rounded-2xl bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black uppercase tracking-widest shadow-lg shadow-blue-100 active:scale-95 transition-all"
         >
           {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span>Saving Profile...</span>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
-              {step === totalSteps ? "Get Started" : "Continue"}
+              {step === totalSteps ? "Finish Setup" : "Continue"}
               {step !== totalSteps && <ChevronRight className="w-5 h-5" />}
             </div>
           )}

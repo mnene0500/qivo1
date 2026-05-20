@@ -106,8 +106,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (isInitialized && !authLoading && !profileLoading && db) {
-      // CRITICAL: If the document doesn't exist yet or is incomplete, redirect.
-      // We check profileLoading to ensure we aren't redirecting while the fetch is in flight.
+      // STRICT GUARD: Wait until we are absolutely sure the profile is complete
       if (!currentUserProfile || currentUserProfile.onboardingComplete !== true) {
         console.log("[Home Guard] Incomplete profile, redirecting to onboarding...");
         router.replace("/onboarding")
@@ -135,7 +134,8 @@ export default function HomePage() {
   const paginatedUsers = useMemo(() => filteredUsers.slice(0, displayLimit), [filteredUsers, displayLimit])
   const hasMore = paginatedUsers.length < filteredUsers.length
 
-  if (!isMounted || authLoading || profileLoading || (isInitialized && currentUserProfile?.onboardingComplete !== true)) {
+  // LOADING STATE: Full screen loader while profile status is resolving to prevent loop-flicker
+  if (!isMounted || authLoading || profileLoading || (isInitialized && !currentUserProfile) || (currentUserProfile && currentUserProfile.onboardingComplete !== true)) {
     return (
       <div className="flex-1 bg-white min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
