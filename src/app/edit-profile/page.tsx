@@ -176,13 +176,6 @@ export default function EditProfilePage() {
       );
       finalFormData.additionalPhotos = uploadedGallery;
 
-      // Final check: if profile photo was uploaded and is now a URL, make sure it's in the gallery URLs too if space exists
-      if (finalFormData.photoURL.startsWith('http') && !finalFormData.additionalPhotos.includes(finalFormData.photoURL)) {
-          if (finalFormData.additionalPhotos.length < 4) {
-              finalFormData.additionalPhotos = [finalFormData.photoURL, ...finalFormData.additionalPhotos].slice(0, 4);
-          }
-      }
-
       await updateDoc(doc(db, "users", user.uid), {
         ...finalFormData,
         updatedAt: serverTimestamp()

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth"
 import { useAuth, useUser, useFirestore, useDatabase } from "@/firebase"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
-import { ref, set as rtdbSet, push } from "firebase/database"
+import { ref, set as rtdbSet } from "firebase/database"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
@@ -83,7 +83,13 @@ export default function WelcomePage() {
         })
       }
 
-      router.replace("/home")
+      // Always check profile status before going home
+      const finalSnap = await getDoc(userRef)
+      if (finalSnap.exists() && finalSnap.data().onboardingComplete) {
+        router.replace("/home")
+      } else {
+        router.replace("/fastonboard")
+      }
     } catch (error: any) {
       if (error.code !== 'auth/popup-closed-by-user') {
         toast({ variant: "destructive", title: "Sign-In Error", description: error.message })

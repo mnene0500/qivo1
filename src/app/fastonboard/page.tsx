@@ -16,9 +16,14 @@ const AFRICAN_COUNTRIES = [
   "Kenya", "Tanzania", "Uganda", "Rwanda", "Burundi", "South Sudan", "Ethiopia", "Somalia", "Eritrea", "Djibouti", "South Africa", "Nigeria", "Ghana", "Egypt"
 ]
 
+const LOOKING_FOR_OPTIONS = [
+  "Serious partner", "Casual friendship", "Networking", "Dating", "Travel buddy"
+]
+
 export default function FastOnboardingPage() {
   const [gender, setGender] = useState("")
   const [country, setCountry] = useState("")
+  const [lookingFor, setLookingFor] = useState("")
   const [loading, setLoading] = useState(false)
   
   const { user } = useUser()
@@ -50,6 +55,7 @@ export default function FastOnboardingPage() {
       const updateData: any = {
         gender,
         country,
+        lookingFor,
         onboardingComplete: true,
         updatedAt: serverTimestamp(),
       }
@@ -84,7 +90,7 @@ export default function FastOnboardingPage() {
     }
   }
 
-  const canContinue = () => !!gender && !!country
+  const canContinue = () => !!gender && !!country && !!lookingFor
 
   return (
     <div className="flex-1 flex flex-col bg-white min-h-screen">
@@ -135,6 +141,20 @@ export default function FastOnboardingPage() {
                 <SelectContent className="rounded-2xl h-64">
                   {AFRICAN_COUNTRIES.map((c) => (
                     <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Looking For</Label>
+              <Select onValueChange={setLookingFor} value={lookingFor}>
+                <SelectTrigger className="rounded-2xl h-14 border-gray-100 bg-gray-50 text-lg font-bold">
+                  <SelectValue placeholder="What are you looking for?" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  {LOOKING_FOR_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt} className="font-bold">{opt}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

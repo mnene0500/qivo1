@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth"
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { ref, set as rtdbSet } from "firebase/database"
 import { useAuth, useFirestore, useDatabase } from "@/firebase"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { ChevronLeft, Mail, UserPlus, Loader2 } from "lucide-react"
-import { Progress } from "@/components/ui/progress"
 
 export default function UnifiedAuthPage() {
   const [email, setEmail] = useState("")
@@ -33,23 +32,6 @@ export default function UnifiedAuthPage() {
     if (/[^A-Za-z0-9]/.test(password)) strength += 1
     return (strength / 5) * 100
   }, [password])
-
-  const strengthColor = useMemo(() => {
-    if (passwordStrength < 40) return "bg-red-500"
-    if (passwordStrength < 80) return "bg-yellow-500"
-    return "bg-green-500"
-  }, [passwordStrength])
-
-  const strengthText = useMemo(() => {
-    if (!password) return ""
-    if (passwordStrength < 40) return "Weak"
-    if (passwordStrength < 80) return "Fair"
-    return "Strong"
-  }, [passwordStrength, password])
-
-  const generateQivoId = () => {
-    return Math.floor(1000000 + Math.random() * 900000000).toString();
-  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,13 +59,16 @@ export default function UnifiedAuthPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
       
-      const qId = generateQivoId();
+      // Auto-generate name from email prefix
+      const nameFromEmail = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1).replace(/[._]/g, ' ');
+      
+      const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
       const userData = {
         uid: user.uid,
         email: user.email,
-        name: `User ${qId.slice(-4)}`,
+        name: nameFromEmail,
         matchFlowId: qId,
-        onboardingComplete: true, // AUTO-COMPLETE
+        onboardingComplete: false, // Redirect to Fast Setup
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         gender: "not specified",
@@ -104,7 +89,7 @@ export default function UnifiedAuthPage() {
         updatedAt: Date.now()
       })
 
-      router.push("/home")
+      router.push("/fastonboard")
     } catch (error: any) {
       toast({ variant: "destructive", title: "Registration failed", description: error.message })
     } finally {
