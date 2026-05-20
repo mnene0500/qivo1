@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useAuth, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
 import { errorEmitter } from "@/firebase/error-emitter"
 import { FirestorePermissionError, type SecurityRuleContext } from "@/firebase/errors"
@@ -7,7 +8,8 @@ import { deleteUser, signOut } from "firebase/auth"
 import { doc, deleteDoc } from "firebase/firestore"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, ShieldAlert, Link as LinkIcon, Info, RefreshCw, CreditCard, Ban } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { ChevronLeft, ChevronRight, ShieldAlert, Link as LinkIcon, Info, RefreshCw, CreditCard, Ban, LogOut } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import {
@@ -59,17 +61,18 @@ export default function SettingsPage() {
   const auth = useAuth()
   const db = useFirestore()
   const { user } = useUser()
+  const [deleteConfirmText, setDeleteConfirmText] = useState("")
 
   const profileRef = useMemoFirebase(() => user?.uid ? doc(db, "users", user.uid) : null, [db, user?.uid])
   const { data: profile } = useDoc<UserProfile>(profileRef)
 
   const handleSignOut = async () => {
+    if (!auth) return
     try {
       await signOut(auth)
-      // Redirect to cinematic welcome screen
       window.location.replace("/welcome")
     } catch (error) {
-      // Handled by Firebase
+      console.error(error)
     }
   }
 
@@ -77,60 +80,40 @@ export default function SettingsPage() {
     try {
       localStorage.clear()
       sessionStorage.clear()
-      
       if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations()
-        for (const registration of registrations) {
-          await registration.unregister()
-        }
+        const regs = await navigator.serviceWorker.getRegistrations()
+        for (const r of regs) await r.unregister()
       }
-
-      toast({ 
-        title: "App Reset", 
-        description: "Cache cleared and service worker reset. Reloading..." 
-      })
-
-      setTimeout(() => {
-        window.location.href = window.location.origin + '?v=' + Date.now()
-      }, 1500)
+      toast({ title: "App Reset", description: "Reloading..." })
+      setTimeout(() => window.location.reload(), 1000)
     } catch (err) {
-      toast({ variant: "destructive", title: "Error resettting app" })
+      toast({ variant: "destructive", title: "Error resettting cache" })
     }
   }
 
   const handleDeleteAccount = async () => {
-    if (!user) return
+    if (!user || deleteConfirmText !== "DELETE") return
 
     try {
       const uid = user.uid
-      const userRef = doc(db, "users", uid)
+      const userRef = doc(db!, "users", uid)
       
-      deleteDoc(userRef)
-        .catch(async () => {
-          const permissionError = new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'delete',
-          } satisfies SecurityRuleContext)
-          errorEmitter.emit('permission-error', permissionError)
-        })
+      await deleteDoc(userRef).catch(async () => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'delete',
+        }))
+      })
 
       await deleteUser(user)
-      
-      toast({
-        title: "Account deleted",
-        description: "Your account and data have been removed.",
-      })
-      // Redirect to cinematic welcome screen
       window.location.replace("/welcome")
     } catch (error: any) {
-      const description = error.code === 'auth/requires-recent-login' 
-        ? "For security reasons, please sign out and sign back in before deleting your account." 
-        : error.message || "Failed to delete account."
-        
       toast({
         variant: "destructive",
         title: "Deletion failed",
-        description: description,
+        description: error.code === 'auth/requires-recent-login' 
+          ? "Please sign out and sign back in before deleting your account." 
+          : error.message,
       })
     }
   }
@@ -148,7 +131,7 @@ export default function SettingsPage() {
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
           <ChevronLeft className="w-6 h-6 text-black" />
         </Button>
-        <h1 className="text-base font-black text-black uppercase tracking-widest">Settings</h1>
+        <h1 className="text-sm font-black text-black uppercase tracking-widest">Settings</h1>
         <div className="w-10" />
       </header>
 
@@ -165,8 +148,32 @@ export default function SettingsPage() {
           {settingsList.map((item, idx) => (
             <SettingItem key={idx} {...item} />
           ))}
-          
-          <SettingItem label="Sign Out" onClick={handleSignOut} />
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <div className="flex items-center justify-between py-5 px-6 border-b border-gray-50 active:bg-gray-50 transition-colors cursor-pointer bg-white">
+                <div className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-gray-50">
+                    <LogOut className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <span className="text-[15px] font-bold text-black">Sign Out</span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-300" />
+              </div>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none select-none">
+              <AlertDialogHeader className="items-center text-center">
+                <AlertDialogTitle className="text-xl font-bold">Sign Out?</AlertDialogTitle>
+                <AlertDialogDescription className="text-xs font-bold uppercase tracking-widest">
+                  Are you sure you want to end your session?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex-row gap-3 mt-6">
+                <AlertDialogCancel className="flex-1 h-14 rounded-full border-none bg-gray-50 font-bold uppercase tracking-widest text-[10px]">No</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSignOut} className="flex-1 h-14 rounded-full bg-black text-white font-bold uppercase tracking-widest text-[10px]">Yes, Logout</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </main>
 
@@ -182,22 +189,31 @@ export default function SettingsPage() {
                 <AlertDialogTrigger asChild>
                   <button className="hover:text-red-500 transition-colors">Delete Account</button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none">
+                <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none select-none">
                   <AlertDialogHeader className="items-center text-center">
-                    <AlertDialogTitle className="text-xl font-bold flex flex-col items-center gap-4">
-                      <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
-                        <ShieldAlert className="w-8 h-8 text-red-500" />
-                      </div>
-                      Permanent Deletion
-                    </AlertDialogTitle>
+                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4 mx-auto">
+                      <ShieldAlert className="w-8 h-8 text-red-500" />
+                    </div>
+                    <AlertDialogTitle className="text-xl font-bold">Delete Account?</AlertDialogTitle>
                     <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed">
-                      This action cannot be undone. All your coins, diamonds, and messages will be permanently lost.
+                      All coins and messages will be lost. To confirm, please type <span className="text-red-600 font-black">DELETE</span> below:
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter className="flex-row gap-3 mt-6">
-                    <AlertDialogCancel className="flex-1 h-14 rounded-full border-none bg-gray-100 font-bold uppercase tracking-widest text-[10px]">Cancel</AlertDialogCancel>
+                  
+                  <div className="py-4">
+                    <Input 
+                      placeholder="Type DELETE" 
+                      value={deleteConfirmText} 
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      className="rounded-2xl h-14 border-red-100 bg-red-50/30 text-center font-black uppercase tracking-widest"
+                    />
+                  </div>
+
+                  <AlertDialogFooter className="flex-row gap-3 mt-4">
+                    <AlertDialogCancel className="flex-1 h-14 rounded-full border-none bg-gray-50 font-bold uppercase tracking-widest text-[10px]">Cancel</AlertDialogCancel>
                     <AlertDialogAction 
-                      className="flex-1 h-14 rounded-full bg-red-500 hover:bg-red-600 font-bold uppercase tracking-widest text-[10px]"
+                      disabled={deleteConfirmText !== "DELETE"}
+                      className="flex-1 h-14 rounded-full bg-red-500 hover:bg-red-600 font-bold uppercase tracking-widest text-[10px] disabled:opacity-30"
                       onClick={handleDeleteAccount}
                     >
                       Delete

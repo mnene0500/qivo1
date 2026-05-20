@@ -23,30 +23,36 @@ import {
 } from 'firebase/database';
 
 /**
- * Awards coins to a user based on their numeric QIVO ID.
+ * @fileOverview Hardened Server Actions for QIVO.
+ * Returns only serializable plain objects to prevent "Server Components render" errors.
  */
+
 export async function awardCoinsAction(callerUid: string, targetMatchFlowId: string, amount: number) {
   const { firestore: db, database: rtdb } = initializeFirebase();
-  if (!db || !rtdb) return { success: false, error: "Database not available." };
+  
+  if (!db || !rtdb) {
+    return { success: false, error: "Database configuration missing in Vercel settings." };
+  }
 
   if (amount < 500) return { success: false, error: "Minimum award amount is 500 coins." };
   if (amount > 50000) return { success: false, error: "Maximum single award limit is 50,000 coins." };
 
   try {
     const callerSnap = await getDoc(doc(db, "users", callerUid));
-    if (!callerSnap.exists()) return { success: false, error: "Caller profile not found." };
+    if (!callerSnap.exists()) return { success: false, error: "Your profile was not found." };
     
     const callerData = callerSnap.data();
     if (!callerData.isAdmin && !callerData.isCoinSeller) {
-      return { success: false, error: "Unauthorized. You are not an Admin or Coin Seller." };
+      return { success: false, error: "Unauthorized. Role [Admin/CoinSeller] required." };
     }
 
+    // Coin Sellers (who aren't full Admins) must pay from their own balance
     if (callerData.isCoinSeller && !callerData.isAdmin) {
       const sellerBalanceSnap = await get(ref(rtdb, `balances/${callerUid}`));
       const currentSellerBalance = sellerBalanceSnap.val()?.coins || 0;
       
       if (currentSellerBalance < amount) {
-        return { success: false, error: `Insufficient balance. You only have ${currentSellerBalance} coins.` };
+        return { success: false, error: `Insufficient balance. You have ${currentSellerBalance} coins.` };
       }
       
       await update(ref(rtdb, `balances/${callerUid}`), {
@@ -57,28 +63,28 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
       await set(push(ref(rtdb, `coin_history/${callerUid}`)), {
         amount: -amount,
         type: 'sold',
-        description: `Sold to ID: ${targetMatchFlowId}`,
+        description: `Transferred to ID: ${targetMatchFlowId}`,
         timestamp: Date.now()
       });
     }
 
     const targetQuery = query(collection(db, "users"), where("matchFlowId", "==", targetMatchFlowId.trim()));
     const targetSnap = await getDocs(targetQuery);
-    if (targetSnap.empty) return { success: false, error: "User with this QIVO ID not found." };
+    if (targetSnap.empty) return { success: false, error: "Target User ID not found." };
 
     const targetDoc = targetSnap.docs[0];
     const targetUid = targetDoc.id;
-
     const timestamp = Date.now();
-    await update(ref(rtdb, `balances/${targetUid}`), {
-      coins: rtdbIncrement(amount),
-      updatedAt: timestamp
-    });
+
+    const updates: any = {};
+    updates[`balances/${targetUid}/coins`] = rtdbIncrement(amount);
+    updates[`balances/${targetUid}/updatedAt`] = timestamp;
+    await update(ref(rtdb), updates);
 
     await set(push(ref(rtdb, `coin_history/${targetUid}`)), {
       amount: amount,
       type: 'award',
-      description: `Awarded by ${callerData.isAdmin ? 'System Admin' : 'Certified Seller'}`,
+      description: `Received from ${callerData.isAdmin ? 'System Admin' : 'Certified Seller'}`,
       timestamp: timestamp
     });
 
@@ -87,13 +93,10 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
       message: `Successfully awarded ${amount} coins to ${targetDoc.data().name}.` 
     };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: String(error.message || "An unexpected error occurred.") };
   }
 }
 
-/**
- * Allows an Admin to toggle roles for a user.
- */
 export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId: string, role: 'isCoinSeller' | 'isAgent', value: boolean) {
   const { firestore: db } = initializeFirebase();
   if (!db) return { success: false, error: "Database not available." };
@@ -101,7 +104,7 @@ export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId:
   try {
     const callerSnap = await getDoc(doc(db, "users", callerUid));
     if (!callerSnap.exists() || !callerSnap.data()?.isAdmin) {
-      return { success: false, error: "Unauthorized. Only system Admins can manage roles." };
+      return { success: false, error: "Unauthorized. Admin privileges required." };
     }
 
     const targetQuery = query(collection(db, "users"), where("matchFlowId", "==", targetMatchFlowId.trim()));
@@ -114,15 +117,12 @@ export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId:
       updatedAt: serverTimestamp()
     });
 
-    return { success: true, message: `User role [${role}] updated to ${value}.` };
+    return { success: true, message: `Role updated successfully.` };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: String(error.message) };
   }
 }
 
-/**
- * Creates a new agency for an agent.
- */
 export async function createAgencyAction(agentUid: string, agencyName: string) {
   const { firestore: db } = initializeFirebase();
   if (!db) return { success: false, error: "Database not available." };
@@ -154,12 +154,9 @@ export async function createAgencyAction(agentUid: string, agencyName: string) {
     });
     
     return { success: true, code };
-  } catch (error: any) { return { success: false, error: error.message }; }
+  } catch (error: any) { return { success: false, error: String(error.message) }; }
 }
 
-/**
- * Requests a diamond withdrawal.
- */
 export async function requestWithdrawalAction(uid: string, diamonds: number, amountKes: number, agencyId: string) {
   const { firestore: db, database: rtdb } = initializeFirebase();
   if (!db || !rtdb) return { success: false, error: "Database not available." };
@@ -188,12 +185,9 @@ export async function requestWithdrawalAction(uid: string, diamonds: number, amo
     });
     
     return { success: true };
-  } catch (error: any) { return { success: false, error: error.message }; }
+  } catch (error: any) { return { success: false, error: String(error.message) }; }
 }
 
-/**
- * Updates withdrawal request status.
- */
 export async function updateWithdrawalStatusAction(agentUid: string, agencyId: string, withdrawalId: string, status: 'paid' | 'rejected') {
   const { firestore: db, database: rtdb } = initializeFirebase();
   if (!db || !rtdb) return { success: false, error: "Database not available." };
@@ -220,12 +214,9 @@ export async function updateWithdrawalStatusAction(agentUid: string, agencyId: s
     
     await updateDoc(withdrawalRef, { status, updatedAt: serverTimestamp() });
     return { success: true };
-  } catch (error: any) { return { success: false, error: error.message }; }
+  } catch (error: any) { return { success: false, error: String(error.message) }; }
 }
 
-/**
- * Allows a female user to join an agency.
- */
 export async function joinAgencyAction(userUid: string, agencyCode: string) {
   const { firestore: db } = initializeFirebase();
   if (!db) return { success: false, error: "Database not available." };
@@ -245,12 +236,9 @@ export async function joinAgencyAction(userUid: string, agencyCode: string) {
     });
     
     return { success: true };
-  } catch (error: any) { return { success: false, error: error.message }; }
+  } catch (error: any) { return { success: false, error: String(error.message) }; }
 }
 
-/**
- * Reviews recruitment requests.
- */
 export async function reviewRecruitmentAction(agentUid: string, targetUid: string, status: 'approved' | 'rejected') {
   const { firestore: db } = initializeFirebase();
   if (!db) return { success: false, error: "Database not available." };
@@ -262,12 +250,12 @@ export async function reviewRecruitmentAction(agentUid: string, targetUid: strin
       if (!agencyId) return { success: false, error: "Agency not found." };
       
       const membersSnap = await getDocs(query(collection(db, "users"), where("agencyId", "==", agencyId), where("agencyStatus", "==", "approved")));
-      if (membersSnap.size >= 59) return { success: false, error: "Agency limit reached (max 60 members including agent)." };
+      if (membersSnap.size >= 59) return { success: false, error: "Agency limit reached." };
     }
     await updateDoc(doc(db, "users", targetUid), { 
       agencyStatus: status, 
       updatedAt: serverTimestamp() 
     });
     return { success: true };
-  } catch (error: any) { return { success: false, error: error.message }; }
+  } catch (error: any) { return { success: false, error: String(error.message) }; }
 }
