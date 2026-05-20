@@ -54,6 +54,9 @@ export default function HomePage() {
   
   const { data: profile, loading: profileLoading } = useDoc<UserProfile>(currentUserProfileRef)
 
+  // NAVIGATION GUARD: Persistent check to prevent refreshing feel
+  const hasLoadedRef = useRef(false)
+
   useEffect(() => {
     if (isInitialized && !authLoading) {
       if (!currentUser) {
@@ -67,7 +70,7 @@ export default function HomePage() {
   const fetchUsers = useCallback(async (isManual = false) => {
     if (!db || !profile || !currentUser?.uid) return
     
-    // STOP AUTO-REFRESH: Only fetch if we have no users OR it's a manual refresh
+    // NAVIGATION STABILITY: Only fetch if we have no users OR it's a manual refresh
     if (!isManual && users.length > 0) {
       setInitialLoading(false)
       return
@@ -79,7 +82,7 @@ export default function HomePage() {
       const q = query(
         collection(db, "users"), 
         where("onboardingComplete", "==", true),
-        limit(24)
+        limit(40)
       )
       
       const snap = await getDocs(q)
@@ -95,22 +98,24 @@ export default function HomePage() {
       // Randomize for fresh feel without new server roundtrip
       const sorted = filtered.sort(() => Math.random() - 0.5)
       setUsers(sorted)
+      hasLoadedRef.current = true
     } catch (err) {
       console.error("[Home Fetch Error]:", err)
     } finally {
       setIsRefreshing(false)
       setInitialLoading(false)
     }
-  }, [db, currentUser?.uid, profile?.blocking, profile?.blockedBy, profile?.onboardingComplete, users.length])
+  }, [db, currentUser?.uid, profile, users.length])
 
   useEffect(() => {
     if (isInitialized && !authLoading && db && currentUser && profile?.onboardingComplete) {
-      // Only initial fetch
-      if (users.length === 0) {
+      if (!hasLoadedRef.current) {
         fetchUsers()
+      } else {
+        setInitialLoading(false)
       }
     }
-  }, [isInitialized, authLoading, db, fetchUsers, currentUser, profile?.onboardingComplete, users.length])
+  }, [isInitialized, authLoading, db, fetchUsers, currentUser, profile?.onboardingComplete])
 
   const handleRefresh = () => {
     fetchUsers(true)
@@ -127,7 +132,7 @@ export default function HomePage() {
   const paginatedUsers = useMemo(() => filteredUsers.slice(0, displayLimit), [filteredUsers, displayLimit])
   const hasMore = paginatedUsers.length < filteredUsers.length
 
-  if (authLoading || !isInitialized || profileLoading || (currentUser && !profile?.onboardingComplete)) {
+  if (authLoading || !isInitialized || (currentUser && !profile?.onboardingComplete && profileLoading)) {
     return (
       <div className="flex-1 bg-white min-h-screen flex items-center justify-center">
         <Loader2 className="animate-spin text-[#00A2FF] w-8 h-8" />

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useRouter } from "next/navigation"
@@ -6,7 +7,6 @@ import {
   ChevronLeft, 
   Headphones, 
   MessageSquare, 
-  ExternalLink,
   ShieldCheck,
   Zap
 } from "lucide-react"

@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useMemo, useEffect, useState } from "react"
+import { useMemo, useEffect, useState, useRef } from "react"
 import { doc } from "firebase/firestore"
 import { ref, onValue, off } from "firebase/database"
 import { useFirestore, useUser, useDoc, useDatabase } from "@/firebase"
@@ -160,8 +160,8 @@ export default function MePage() {
   const { toast } = useToast()
   
   const [copied, setCopied] = useState(false)
-  
   const [balances, setBalances] = useState({ coins: 0, diamonds: 0, isVerified: false })
+  const [isReady, setIsReady] = useState(false)
 
   const profileRef = useMemo(() => (user && db) ? doc(db, "users", user.uid) : null, [db, user])
   const { data: profile, loading: profileLoading } = useDoc<UserProfile>(profileRef)
@@ -170,7 +170,10 @@ export default function MePage() {
     if (isInitialized && !authLoading && !user) {
       router.replace("/welcome")
     }
-  }, [user, authLoading, isInitialized, router])
+    if (isInitialized && !authLoading && user && !profileLoading) {
+      setIsReady(true)
+    }
+  }, [user, authLoading, isInitialized, router, profileLoading])
 
   useEffect(() => {
     if (!user?.uid || !rtdb) return
@@ -197,7 +200,8 @@ export default function MePage() {
     }
   }
 
-  if (authLoading || !isInitialized) {
+  // NAVIGATION STABILITY: Only show full loader on absolute first init
+  if (!isReady && (authLoading || !isInitialized)) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-[#F8F9FA]">
         <Loader2 className="w-8 h-8 animate-spin text-[#00A2FF]" />
