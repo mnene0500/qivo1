@@ -128,7 +128,7 @@ export default function WelcomePage() {
           <h1 className="text-7xl font-logo font-black text-white drop-shadow-2xl tracking-tight">QIVO</h1>
         </div>
 
-        <div className="w-full max-w-sm space-y-4">
+        <div className="w-full max-sm:max-w-xs space-y-4">
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Button 
               disabled={loading}
