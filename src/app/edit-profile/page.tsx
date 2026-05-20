@@ -123,9 +123,7 @@ export default function EditProfilePage() {
       try {
         const croppedBase64 = await getCroppedImg(tempImage, croppedAreaPixels)
         if (targetPhotoIndex === 'profile') {
-          // Update profile photo state
           const newGallery = [...formData.additionalPhotos];
-          // Automatically add profile photo to gallery if there's room
           if (newGallery.length < 4 && !newGallery.includes(croppedBase64)) {
              newGallery.unshift(croppedBase64);
           }
@@ -157,14 +155,12 @@ export default function EditProfilePage() {
     try {
       const finalFormData = { ...formData };
       
-      // Upload profile photo if it's base64
       if (formData.photoURL.startsWith('data:image')) {
         const ext = formData.photoURL.includes('png') ? 'png' : 'jpg';
         const url = await uploadBase64Image(formData.photoURL, 'photos', `${user.uid}/profile_${Date.now()}.${ext}`);
         finalFormData.photoURL = url;
       }
 
-      // Upload gallery photos if they are base64
       const uploadedGallery = await Promise.all(
         formData.additionalPhotos.map(async (photo, idx) => {
           if (photo.startsWith('data:image')) {

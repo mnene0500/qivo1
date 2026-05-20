@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect, useCallback } from "react"
+import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { collection, query, where, limit, doc, getDocs } from "firebase/firestore"
 import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
 import { useRouter } from "next/navigation"
@@ -53,20 +53,25 @@ export default function HomePage() {
   
   const { data: profile, loading: profileLoading } = useDoc<UserProfile>(currentUserProfileRef)
 
-  // MANDATORY ONBOARDING GUARD
   useEffect(() => {
     if (isInitialized && !authLoading) {
       if (!currentUser) {
         router.replace("/welcome")
       } else if (profile && !profile.onboardingComplete && !profileLoading) {
-        // If profile exists but setup is not complete, take to setup
         router.replace("/fastonboard")
       }
     }
   }, [isInitialized, authLoading, currentUser, profile, profileLoading, router])
 
   const fetchUsers = useCallback(async (isManual = false) => {
-    if (!db || !profile) return
+    if (!db || !profile || !currentUser?.uid) return
+    
+    // Prevent auto-refresh if we already have users and it's not a manual trigger
+    if (!isManual && users.length > 0) {
+      setInitialLoading(false)
+      return
+    }
+
     if (isManual) setIsRefreshing(true)
     
     try {
@@ -94,13 +99,16 @@ export default function HomePage() {
       setIsRefreshing(false)
       setInitialLoading(false)
     }
-  }, [db, profile, currentUser?.uid])
+  }, [db, currentUser?.uid, profile?.blocking, profile?.blockedBy, profile?.onboardingComplete, users.length])
 
   useEffect(() => {
     if (isInitialized && !authLoading && db && currentUser && profile?.onboardingComplete) {
-      fetchUsers()
+      // Only initial fetch
+      if (users.length === 0) {
+        fetchUsers()
+      }
     }
-  }, [isInitialized, authLoading, db, fetchUsers, currentUser, profile?.onboardingComplete])
+  }, [isInitialized, authLoading, db, fetchUsers, currentUser, profile?.onboardingComplete, users.length])
 
   const handleRefresh = () => {
     fetchUsers(true)
@@ -117,7 +125,6 @@ export default function HomePage() {
   const paginatedUsers = useMemo(() => filteredUsers.slice(0, displayLimit), [filteredUsers, displayLimit])
   const hasMore = paginatedUsers.length < filteredUsers.length
 
-  // Loading state remains active until auth and profile are confirmed complete
   if (authLoading || !isInitialized || profileLoading || (currentUser && !profile?.onboardingComplete)) {
     return (
       <div className="flex-1 bg-white min-h-screen flex items-center justify-center">
@@ -162,7 +169,7 @@ export default function HomePage() {
         </div>
 
         <main className="px-4 pt-3 relative">
-          {initialLoading ? (
+          {initialLoading && users.length === 0 ? (
             <div className="grid grid-cols-2 gap-4">
               {[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="aspect-[1/1.2] bg-white animate-pulse rounded-2xl border" />)}
             </div>

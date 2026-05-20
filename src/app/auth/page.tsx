@@ -60,7 +60,8 @@ export default function UnifiedAuthPage() {
       const user = userCredential.user
       
       // Auto-generate name from email prefix
-      const nameFromEmail = email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1).replace(/[._]/g, ' ');
+      const emailPrefix = email.split('@')[0];
+      const nameFromEmail = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).replace(/[._]/g, ' ');
       
       const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
       const userData = {
@@ -68,7 +69,7 @@ export default function UnifiedAuthPage() {
         email: user.email,
         name: nameFromEmail,
         matchFlowId: qId,
-        onboardingComplete: false, // Redirect to Fast Setup
+        onboardingComplete: false, 
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         gender: "not specified",
