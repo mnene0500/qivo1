@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useRef, use, useState } from "react"
@@ -48,7 +49,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   
   // Custom Controls State
   const [micEnabled, setMicEnabled] = useState(true)
-  const [cameraEnabled, setCameraEnabled] = useState(true)
+  const [cameraEnabled, setCameraEnabled] = isVideo ? useState(true) : [false, () => {}]
 
   useEffect(() => {
     if (!user?.uid || !rtdb) return
@@ -85,7 +86,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         const serverSecret = process.env.NEXT_PUBLIC_ZEGO_SERVER_SECRET
         
         if (!appID || !serverSecret) {
-          setError("SERVICE OFFLINE: Vercel Redeploy Required. Ensure NEXT_PUBLIC_ZEGO_APP_ID and SERVER_SECRET are set in environment variables and trigger a redeploy.")
+          setError("SERVICE OFFLINE: Vercel Redeploy Required. Ensure App ID and Secret are set.")
           return
         }
 
@@ -111,11 +112,15 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
           showLeavingView: false,
           showTextChat: false,
           showUserList: false,
+          turnOnCameraWhenJoining: isVideo,
+          turnOnMicrophoneWhenJoining: true,
+          showMyCameraToggleButton: isVideo,
+          showAudioVideoSettings: false,
           layout: "Auto",
           scenario: {
             mode: isVideo ? ZegoUIKitPrebuilt.VideoCall : ZegoUIKitPrebuilt.VoiceCall,
           },
-          onUserJoin: async (users) => {
+          onUserJoin: async () => {
             if (isCaller && !billingIntervalRef.current) {
                const success = await handleDeduction();
                if (success) {
@@ -142,20 +147,27 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
   const toggleMic = () => {
     if (zpRef.current) {
-      zpRef.current.enableMicrophone(!micEnabled)
-      setMicEnabled(!micEnabled)
+      const newState = !micEnabled
+      zpRef.current.enableMicrophone(newState)
+      setMicEnabled(newState)
     }
   }
 
   const toggleCamera = () => {
-    if (zpRef.current) {
-      zpRef.current.enableCamera(!cameraEnabled)
-      setCameraEnabled(!cameraEnabled)
+    if (zpRef.current && isVideo) {
+      const newState = !cameraEnabled
+      zpRef.current.enableCamera(newState)
+      setCameraEnabled(newState)
     }
   }
 
   const hangUp = () => {
-    if (zpRef.current) zpRef.current.leaveRoom()
+    if (billingIntervalRef.current) clearInterval(billingIntervalRef.current);
+    if (zpRef.current) {
+      try {
+        zpRef.current.leaveRoom()
+      } catch (e) {}
+    }
     router.replace("/chats")
   }
 
@@ -207,7 +219,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
       </div>
 
       <div className="absolute bottom-10 left-0 right-0 z-50 px-8">
-        <div className="max-w-md mx-auto bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-4 flex items-center justify-between shadow-2xl">
+        <div className="max-w-md mx-auto bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-4 flex items-center justify-around shadow-2xl">
           <button 
             onClick={toggleMic}
             className={cn(
@@ -225,15 +237,17 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
             <PhoneOff className="w-8 h-8 text-white fill-current" />
           </button>
 
-          <button 
-            onClick={toggleCamera}
-            className={cn(
-              "w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90",
-              cameraEnabled ? "bg-white/10 text-white" : "bg-red-500 text-white"
-            )}
-          >
-            {cameraEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-          </button>
+          {isVideo && (
+            <button 
+              onClick={toggleCamera}
+              className={cn(
+                "w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90",
+                cameraEnabled ? "bg-white/10 text-white" : "bg-red-500 text-white"
+              )}
+            >
+              {cameraEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+            </button>
+          )}
         </div>
         
         <div className="mt-6 flex flex-col items-center gap-2 opacity-30">
