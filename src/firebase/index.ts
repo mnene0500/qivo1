@@ -43,8 +43,9 @@ export function initializeFirebase() {
   }
 }
 
-// Note: Re-exporting hooks from their own files to keep index.ts lightweight for server use
+// Re-exporting hooks from their own files for a clean central API
 export { useUser } from './auth/use-user';
 export { useCollection } from './firestore/use-collection';
 export { useDoc } from './firestore/use-doc';
 export { useFirestore, useAuth, useDatabase } from './provider';
+export { useMemoFirebase } from './utils-client';

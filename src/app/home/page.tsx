@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, useState, useEffect, useCallback } from "react"
@@ -63,7 +62,7 @@ export default function HomePage() {
       const q = query(
         collection(db, "users"), 
         where("onboardingComplete", "==", true),
-        limit(20)
+        limit(24)
       )
       
       const snap = await getDocs(q)
@@ -86,6 +85,7 @@ export default function HomePage() {
       const sorted = filtered.sort(() => Math.random() - 0.5)
       
       setUsers(sorted)
+      // Cache for navigation persistence
       sessionStorage.setItem('qivo_home_users', JSON.stringify(sorted))
     } catch (err) {
       console.error("[Home Fetch Error]:", err)
@@ -97,7 +97,6 @@ export default function HomePage() {
 
   useEffect(() => { 
     setIsMounted(true)
-    
     const cached = sessionStorage.getItem('qivo_home_users')
     if (cached) {
       setUsers(JSON.parse(cached))
