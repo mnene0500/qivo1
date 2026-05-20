@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useMemo, useState, useEffect, useCallback } from "react"
+import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { collection, query, where, limit, doc, getDocs } from "firebase/firestore"
 import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
 import { useRouter } from "next/navigation"
@@ -25,8 +26,9 @@ interface UserProfile {
   blockedBy?: string[]
 }
 
-// Module-level cache to persist users across navigation during the session
+// Session-persistent storage
 let globalUserCache: UserProfile[] = [];
+let globalScrollY = 0;
 
 function calculateAge(dob: string) {
   if (!dob) return 22
@@ -46,7 +48,9 @@ export default function HomePage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [users, setUsers] = useState<UserProfile[]>(globalUserCache)
   const [initialLoading, setInitialLoading] = useState(globalUserCache.length === 0)
-  const [displayLimit, setDisplayLimit] = useState(12)
+  
+  // Show whole list if cached, otherwise start with 12
+  const [displayLimit, setDisplayLimit] = useState(globalUserCache.length > 0 ? globalUserCache.length : 12)
   const [activeTab, setActiveTab] = useState<'Recommend' | 'Nearby'>('Recommend')
 
   const currentUserProfileRef = useMemoFirebase(() => 
@@ -55,6 +59,7 @@ export default function HomePage() {
   
   const { data: profile, loading: profileLoading } = useDoc<UserProfile>(currentUserProfileRef)
 
+  // Auth & Onboarding Guard
   useEffect(() => {
     if (isInitialized && !authLoading) {
       if (!currentUser) {
@@ -65,14 +70,31 @@ export default function HomePage() {
     }
   }, [isInitialized, authLoading, currentUser, profile, profileLoading, router])
 
+  // Scroll Restoration & Tracking
+  useEffect(() => {
+    if (!initialLoading) {
+      window.scrollTo(0, globalScrollY);
+    }
+
+    const handleScroll = () => {
+      globalScrollY = window.scrollY;
+    }
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [initialLoading]);
+
   const fetchUsers = useCallback(async (isManual = false) => {
     if (!db || !profile || !currentUser?.uid) return
     
-    if (isManual) setIsRefreshing(true)
+    if (isManual) {
+      setIsRefreshing(true);
+      globalScrollY = 0; // Reset scroll on fresh refresh
+    }
     else if (users.length === 0) setInitialLoading(true)
 
     try {
-      const q = query(collection(db, "users"), where("onboardingComplete", "==", true), limit(40))
+      const q = query(collection(db, "users"), where("onboardingComplete", "==", true), limit(60))
       const snap = await getDocs(q)
       const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile))
       const blockedList = [...(profile?.blocking || []), ...(profile?.blockedBy || [])]
@@ -97,17 +119,20 @@ export default function HomePage() {
     }
   }, [isInitialized, authLoading, db, fetchUsers, currentUser, profile?.onboardingComplete, users.length])
 
-  const handleRefresh = () => { fetchUsers(true); setDisplayLimit(12); }
+  const handleRefresh = () => { 
+    fetchUsers(true); 
+    setDisplayLimit(12); // Show "Show more" logic again on fresh refresh
+  }
 
   const filteredUsers = useMemo(() => {
     if (activeTab === 'Nearby' && profile) return users.filter(u => u.country === profile.country)
     return users
   }, [users, activeTab, profile])
 
+  // If cached, we show everything. If fresh, we paginate.
   const paginatedUsers = useMemo(() => filteredUsers.slice(0, displayLimit), [filteredUsers, displayLimit])
   const hasMore = paginatedUsers.length < filteredUsers.length
 
-  // If we have cached users, don't show the initial loading spinner at all
   const showLoading = initialLoading && users.length === 0
 
   if (showLoading && isInitialized) {
@@ -154,7 +179,13 @@ export default function HomePage() {
               </Card>
             ))}
           </div>
-          {hasMore && <div className="flex justify-center pb-8 pt-4"><Button variant="ghost" className="text-gray-400 text-[9px] uppercase tracking-widest gap-2" onClick={() => setDisplayLimit(prev => prev + 12)}><ChevronDown className="w-3.5 h-3.5" />Show more</Button></div>}
+          {hasMore && (
+            <div className="flex justify-center pb-8 pt-4">
+              <Button variant="ghost" className="text-gray-400 text-[9px] uppercase tracking-widest gap-2" onClick={() => setDisplayLimit(prev => prev + 24)}>
+                <ChevronDown className="w-3.5 h-3.5" />Show more
+              </Button>
+            </div>
+          )}
         </main>
       </div>
       <BottomNav />

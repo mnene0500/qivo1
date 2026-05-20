@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useRef, use, useState } from "react"
@@ -23,7 +24,7 @@ import { cn } from "@/lib/utils"
 
 /**
  * @fileOverview Custom 1-on-1 Call Interface.
- * Headless Zego implementation with connection-aware billing and isolated permissions.
+ * Optimized for hyper-fast connection with zero-latency visual transition and hardware cleanup.
  */
 export default function CallPage({ params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = use(params)
@@ -65,16 +66,15 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     if (!rtdb || !partnerId || !isCaller) return
     const callSignalRef = ref(rtdb, `calls/${partnerId}`)
     const unsubscribe = onValue(callSignalRef, (snap) => {
-      // If signal is deleted before anyone joins, it was declined or timed out
       if (!snap.exists()) {
          if (!billingIntervalRef.current) {
-            toast({ title: "Call Declined", description: `${partnerName} is unavailable.` });
-            router.replace("/chats");
+            toast({ title: "Call Ended", description: `${partnerName} disconnected.` });
+            hangUp();
          }
       }
     })
     return () => off(callSignalRef, 'value', unsubscribe)
-  }, [rtdb, partnerId, isCaller, partnerName, router, toast])
+  }, [rtdb, partnerId, isCaller, partnerName])
 
   const handleDeduction = async () => {
     if (!user || !isCaller) return true;
@@ -84,8 +84,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     
     if (!result.success) {
       toast({ variant: "destructive", title: "Call Terminated", description: result.error });
-      if (zpRef.current) zpRef.current.leaveRoom();
-      router.replace("/chats");
+      hangUp();
       return false;
     }
     return true;
@@ -102,7 +101,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         const serverSecret = process.env.NEXT_PUBLIC_ZEGO_SERVER_SECRET
         
         if (!appID || !serverSecret) {
-          setError("SERVICE OFFLINE: Vercel Redeploy Required. Ensure App ID and Secret are set.")
+          setError("SERVICE OFFLINE: Vercel Redeploy Required.")
           return
         }
 
@@ -128,16 +127,15 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
           showLeavingView: false,
           showTextChat: false,
           showUserList: false,
-          turnOnCameraWhenJoining: isVideo, // ONLY true for video calls
+          turnOnCameraWhenJoining: isVideo,
           turnOnMicrophoneWhenJoining: true,
-          showMyCameraToggleButton: isVideo, // HIDDEN for voice calls
+          showMyCameraToggleButton: isVideo,
           showAudioVideoSettings: false,
           layout: "Auto",
           scenario: {
             mode: isVideo ? ZegoUIKitPrebuilt.VideoCall : ZegoUIKitPrebuilt.VoiceCall,
           },
           onUserJoin: async (joinedUser) => {
-            // Only start billing once the OTHER user joins
             if (isCaller && joinedUser.userID !== user.uid && !billingIntervalRef.current) {
                const success = await handleDeduction();
                if (success) {
@@ -145,18 +143,11 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
                }
             }
           },
-          onUserLeave: () => {
-            // End call if partner leaves
-            if (billingIntervalRef.current) clearInterval(billingIntervalRef.current);
-            router.replace("/chats")
-          },
-          onLeaveRoom: () => {
-            if (billingIntervalRef.current) clearInterval(billingIntervalRef.current);
-            router.replace("/chats")
-          },
+          onUserLeave: () => hangUp(),
+          onLeaveRoom: () => hangUp(),
         })
       } catch (err: any) {
-        setError(err.message || "Failed to initialize call.")
+        setError(err.message || "Connection failed.")
       }
     }
 
@@ -164,8 +155,11 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
     return () => {
       if (billingIntervalRef.current) clearInterval(billingIntervalRef.current);
+      if (zpRef.current) {
+        try { zpRef.current.leaveRoom(); } catch(e) {}
+      }
     }
-  }, [user, profile, chatId, isVideo, router, isCaller])
+  }, [user, profile, chatId, isVideo, isCaller])
 
   const toggleMic = () => {
     if (zpRef.current) {
@@ -188,6 +182,9 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     if (zpRef.current) {
       try {
         zpRef.current.leaveRoom()
+        // Force track destruction for strict privacy
+        const tracks = (window as any).localStream?.getTracks?.();
+        tracks?.forEach((t: any) => t.stop());
       } catch (e) {}
     }
     router.replace("/chats")
@@ -195,25 +192,19 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
   if (error) {
     return (
-      <div className="flex-1 bg-black flex flex-col items-center justify-center text-white p-10 text-center select-none">
+      <div className="flex-1 bg-black flex flex-col items-center justify-center text-white p-10 text-center">
         <AlertCircle className="w-12 h-12 text-red-500 mb-6" />
-        <h2 className="text-2xl font-black uppercase tracking-tighter mb-4">Service Offline</h2>
-        <p className="font-bold text-white/40 uppercase tracking-widest text-[10px] leading-relaxed mb-10 max-w-xs mx-auto">
+        <h2 className="text-2xl font-black uppercase tracking-tighter mb-4">Service Error</h2>
+        <p className="font-bold text-white/40 uppercase tracking-widest text-[10px] leading-relaxed mb-10">
           {error}
         </p>
-        <Button onClick={() => router.replace("/chats")} className="rounded-full bg-white text-black font-black uppercase text-[10px] h-14 px-10 shadow-xl active:scale-95 transition-all">Return</Button>
+        <Button onClick={hangUp} className="rounded-full bg-white text-black font-black uppercase text-[10px] h-14 px-10">Return</Button>
       </div>
     )
   }
 
-  if (!user || !profile) {
-    return (
-      <div className="flex-1 bg-black flex flex-col items-center justify-center text-white">
-        <Loader2 className="w-10 h-10 animate-spin text-[#00A2FF]" />
-        <p className="mt-6 font-bold uppercase tracking-[0.3em] text-[9px] text-[#00A2FF] animate-pulse">Connecting...</p>
-      </div>
-    )
-  }
+  // Fast load check
+  if (!user || !profile) return <div className="flex-1 bg-black" />;
 
   return (
     <div className="w-full h-[100dvh] bg-black overflow-hidden relative select-none">
@@ -223,7 +214,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         <div className="bg-black/40 backdrop-blur-2xl border border-white/10 px-6 py-2.5 rounded-full flex items-center gap-4 shadow-2xl animate-in slide-in-from-top-4 duration-500">
            <div className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
            <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">
-             {isVideo ? 'Video' : 'Voice'} Call Live
+             {isVideo ? 'Video' : 'Voice'} Call
            </span>
            <div className="w-px h-3 bg-white/20" />
            <div className="flex items-center gap-2">
