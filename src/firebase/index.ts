@@ -43,7 +43,7 @@ export function initializeFirebase() {
   }
 }
 
-// Re-exporting hooks from their own files for a clean central API
+// Re-exporting hooks for a clean central API
 export { useUser } from './auth/use-user';
 export { useCollection } from './firestore/use-collection';
 export { useDoc } from './firestore/use-doc';

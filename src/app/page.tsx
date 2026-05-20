@@ -1,54 +1,37 @@
-
 "use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useUser, useFirestore, useDoc } from "@/firebase"
-import { doc } from "firebase/firestore"
+import { useUser } from "@/firebase"
 
 /**
  * Root Redirector with Cinematic Splash Screen.
- * Checks auth status and redirects automatically if a session exists.
- * Optimized for snappy transitions.
+ * Optimized for speed: Only waits for Auth session, not full profile data.
  */
 export default function RootPage() {
   const router = useRouter()
   const { user, loading: authLoading, isInitialized } = useUser()
-  const db = useFirestore()
-  const { data: profile, loading: profileLoading } = useDoc<any>(user?.uid && db ? doc(db, "users", user.uid) : null)
-  
   const [minTimeElapsed, setMinTimeElapsed] = useState(false)
 
-  // Shortened branding delay for a faster "App Open" feel
+  // Shortened branding delay for a fast "App Open" feel
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), 600)
     return () => clearTimeout(timer)
   }, [])
 
   useEffect(() => {
-    // Only proceed if snappy splash time (600ms) has passed AND auth listener has fired
+    // Only proceed if branding time (600ms) has passed AND auth listener has fired
     if (!minTimeElapsed || !isInitialized || authLoading) return
 
     if (user) {
-      // If user is logged in, we must wait for the profile to know where to send them
-      if (profileLoading) return 
-
-      if (profile) {
-        if (profile.onboardingComplete) {
-          router.replace("/home")
-        } else {
-          // Send to correct onboarding flow
-          router.replace(user.isAnonymous ? "/fastonboard" : "/onboarding")
-        }
-      } else {
-        // User exists in Auth but no Firestore record yet
-        router.replace("/onboarding")
-      }
+      // FAST REDIRECT: Go to Home immediately. 
+      // The Home page will handle redirecting to /onboarding if the profile is incomplete.
+      router.replace("/home")
     } else {
       // No active session, send to Welcome/Intro
       router.replace("/welcome")
     }
-  }, [user, isInitialized, authLoading, profile, profileLoading, router, minTimeElapsed])
+  }, [user, isInitialized, authLoading, router, minTimeElapsed])
 
   return (
     <div className="fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden">
