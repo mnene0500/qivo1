@@ -3,24 +3,40 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * @fileOverview Supabase Client for Auth and Storage.
+ * Configured using environment variables from Vercel.
+ * Uses a resilient initialization pattern to prevent app crashes if variables are missing.
+ */
+
+// Validate configuration before attempting to create the client
+const isSupabaseConfigured = !!(supabaseUrl && supabaseUrl.startsWith('https://') && supabaseAnonKey);
+
+if (!isSupabaseConfigured && typeof window !== 'undefined') {
+  console.warn(
+    "⚠️ [QIVO Configuration]: Supabase environment variables are missing or invalid. " +
+    "Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in Vercel."
+  );
+}
+
+// Create the client with placeholders if necessary to prevent the "supabaseUrl is required" crash
+export const supabase = createClient(
+  isSupabaseConfigured ? supabaseUrl : 'https://placeholder-project.supabase.co',
+  isSupabaseConfigured ? supabaseAnonKey : 'placeholder-key'
+);
 
 /**
  * Helper to upload a base64 image to Supabase Storage.
  * Supports image/jpeg, image/png, etc.
- * @param base64 The base64 string of the image.
- * @param bucket The name of the Supabase bucket.
- * @param path The destination path in the bucket (e.g., 'uid/profile_123.jpg').
- * @returns The public URL of the uploaded image.
  */
 export async function uploadBase64Image(base64: string, bucket: string, path: string): Promise<string> {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("Supabase configuration missing in Environment Variables. Returning base64.");
+  // If not configured, we can't upload. Return the base64 or a local placeholder.
+  if (!isSupabaseConfigured) {
+    console.error("[Supabase Storage]: Cannot upload. Supabase is not configured.");
     return base64;
   }
 
   try {
-    // 1. Extract MIME type and pure base64 data
     const matches = base64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.*)$/);
     
     if (!matches || matches.length !== 3) {
@@ -31,14 +47,12 @@ export async function uploadBase64Image(base64: string, bucket: string, path: st
     const mimeType = matches[1];
     const base64Data = matches[2];
 
-    // Ensure path has the correct extension based on MIME type
     let finalPath = path;
     if (!path.includes('.')) {
       const ext = mimeType.includes('png') ? 'png' : 'jpg';
       finalPath = `${path}.${ext}`;
     }
 
-    // 2. Convert to binary Blob
     const byteCharacters = atob(base64Data);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
@@ -47,7 +61,6 @@ export async function uploadBase64Image(base64: string, bucket: string, path: st
     const byteArray = new Uint8Array(byteNumbers);
     const blob = new Blob([byteArray], { type: mimeType });
 
-    // 3. Upload to Supabase
     const { error } = await supabase.storage
       .from(bucket)
       .upload(finalPath, blob, {
@@ -60,7 +73,6 @@ export async function uploadBase64Image(base64: string, bucket: string, path: st
       throw error;
     }
 
-    // 4. Retrieve and return the public URL
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
       .getPublicUrl(finalPath);

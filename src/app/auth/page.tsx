@@ -1,12 +1,11 @@
-
 "use client"
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth"
+import { supabase } from "@/lib/supabase"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { ref, set as rtdbSet } from "firebase/database"
-import { useAuth, useFirestore, useDatabase } from "@/firebase"
+import { useFirestore, useDatabase } from "@/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,7 +18,6 @@ export default function UnifiedAuthPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const auth = useAuth()
   const db = useFirestore()
   const rtdb = useDatabase()
 
@@ -36,10 +34,11 @@ export default function UnifiedAuthPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password || !auth) return
+    if (!email || !password) return
     setLoading(true)
     try {
-      await signInWithEmailAndPassword(auth, email, password)
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
       router.push("/home")
     } catch (error: any) {
       toast({ variant: "destructive", title: "Login failed", description: error.message })
@@ -49,7 +48,7 @@ export default function UnifiedAuthPage() {
   }
 
   const handleRegister = async () => {
-    if (!email || !password || !auth || !db || !rtdb) return
+    if (!email || !password || !db || !rtdb) return
     if (passwordStrength < 40) {
       toast({ variant: "destructive", title: "Weak Password", description: "Please use a stronger password." })
       return
@@ -57,16 +56,19 @@ export default function UnifiedAuthPage() {
 
     setLoading(true)
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-      const user = userCredential.user
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) throw error
       
-      // AUTO-NAME FROM EMAIL: user@example.com -> User
+      const user = data.user
+      if (!user) throw new Error("Registration failed to return user data.")
+
+      // AUTO-NAME FROM EMAIL
       const emailPrefix = email.split('@')[0];
       const nameFromEmail = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).replace(/[._]/g, ' ');
       
       const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
       const userData = {
-        uid: user.uid,
+        uid: user.id,
         email: user.email,
         name: nameFromEmail,
         matchFlowId: qId,
@@ -76,7 +78,7 @@ export default function UnifiedAuthPage() {
         gender: "not specified",
         dob: "2000-01-01",
         country: "Kenya",
-        photoURL: `https://picsum.photos/seed/${user.uid}/400/400`,
+        photoURL: `https://picsum.photos/seed/${user.id}/400/400`,
         isVerified: false,
         isAdmin: false,
         isDeleted: false,
@@ -84,8 +86,8 @@ export default function UnifiedAuthPage() {
         blockedBy: []
       }
 
-      await setDoc(doc(db, "users", user.uid), userData)
-      await rtdbSet(ref(rtdb, `balances/${user.uid}`), {
+      await setDoc(doc(db, "users", user.id), userData)
+      await rtdbSet(ref(rtdb, `balances/${user.id}`), {
         coins: 150,
         diamonds: 0,
         updatedAt: Date.now()

@@ -1,12 +1,11 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Mail, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth"
-import { useAuth, useUser, useFirestore, useDatabase } from "@/firebase"
+import { supabase } from "@/lib/supabase"
+import { useUser, useFirestore, useDatabase } from "@/firebase"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { ref, set as rtdbSet } from "firebase/database"
 import Link from "next/link"
@@ -16,7 +15,6 @@ export default function WelcomePage() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   
-  const auth = useAuth()
   const db = useFirestore()
   const rtdb = useDatabase()
   const { user, loading: authLoading, isInitialized } = useUser()
@@ -28,73 +26,41 @@ export default function WelcomePage() {
   }, [])
 
   useEffect(() => {
-    if (isInitialized && !authLoading && user) {
-      router.replace("/home")
+    if (isInitialized && !authLoading && user && mounted) {
+      checkProfileStatus(user.id)
     }
-  }, [user, isInitialized, authLoading, router])
+  }, [user, isInitialized, authLoading, mounted])
+
+  const checkProfileStatus = async (uid: string) => {
+    if (!db) return
+    const userRef = doc(db, "users", uid)
+    const userSnap = await getDoc(userRef)
+    
+    if (userSnap.exists() && userSnap.data().onboardingComplete) {
+      router.replace("/home")
+    } else {
+      router.replace("/fastonboard")
+    }
+  }
 
   const handleGoogleLogin = async () => {
-    if (!auth || !db || !rtdb) {
-      toast({ variant: "destructive", title: "Config Error", description: "Firebase not ready." });
+    if (!db || !rtdb) {
+      toast({ variant: "destructive", title: "Config Error", description: "Database services not ready." });
       return;
     }
 
     setLoading(true)
     try {
-      const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      const googleUser = result.user
-
-      const userRef = doc(db, "users", googleUser.uid)
-      const userSnap = await getDoc(userRef)
-
-      if (!userSnap.exists()) {
-        const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
-        
-        // Initial user creation - onboardingComplete is FALSE
-        const skeletonData = {
-          uid: googleUser.uid,
-          email: googleUser.email,
-          name: googleUser.displayName || "Google User",
-          matchFlowId: qId,
-          onboardingComplete: false, 
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          isVerified: false,
-          isAdmin: false,
-          gender: "not specified",
-          dob: "2000-01-01",
-          country: "Kenya",
-          photoURL: googleUser.photoURL || `https://picsum.photos/seed/${googleUser.uid}/400/400`,
-          lookingFor: "Dating",
-          isDeleted: false,
-          isCoinSeller: false,
-          isAgent: false,
-          blocking: [],
-          blockedBy: []
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/home'
         }
-        
-        await setDoc(userRef, skeletonData)
-
-        await rtdbSet(ref(rtdb, `balances/${googleUser.uid}`), {
-          coins: 0,
-          diamonds: 0,
-          updatedAt: Date.now(),
-          isVerified: false
-        })
-      }
-
-      // Always check profile status before going home
-      const finalSnap = await getDoc(userRef)
-      if (finalSnap.exists() && finalSnap.data().onboardingComplete) {
-        router.replace("/home")
-      } else {
-        router.replace("/fastonboard")
-      }
+      })
+      if (error) throw error
+      // Note: Supabase OAuth redirects away from the page
     } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user') {
-        toast({ variant: "destructive", title: "Sign-In Error", description: error.message })
-      }
+      toast({ variant: "destructive", title: "Sign-In Error", description: error.message })
       setLoading(false)
     }
   }
