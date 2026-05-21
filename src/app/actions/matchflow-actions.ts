@@ -39,7 +39,10 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
 
     const { data: targetBal } = await supabase.from('balances').select('coins').eq('user_id', target.uid).single();
     const targetTimestamp = Date.now();
-    await supabase.from('balances').update({ coins: (targetBal?.coins || 0) + amount }).eq('user_id', target.uid);
+    await supabase.from('balances').upsert({ 
+      user_id: target.uid, 
+      coins: (targetBal?.coins || 0) + amount 
+    }, { onConflict: 'user_id' });
 
     await supabase.from('coin_history').insert({
       user_id: target.uid,
@@ -79,7 +82,11 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
 
     // Award to Recipient
     const { data: recBal } = await supabase.from('balances').select('diamonds').eq('user_id', recipientUid).single();
-    await supabase.from('balances').update({ diamonds: (Number(recBal?.diamonds) || 0) + diamondGain }).eq('user_id', recipientUid);
+    await supabase.from('balances').upsert({ 
+      user_id: recipientUid, 
+      diamonds: (Number(recBal?.diamonds) || 0) + diamondGain 
+    }, { onConflict: 'user_id' });
+
     await supabase.from('diamond_history').insert({
       user_id: recipientUid,
       amount: diamondGain,
@@ -104,7 +111,7 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
       last_message: `🎁 ${giftName}`,
       last_message_at: timestamp,
       participant_ids: [senderUid, recipientUid]
-    });
+    }, { onConflict: 'id' });
 
     return { success: true };
   } catch (error: any) {
@@ -117,7 +124,10 @@ export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId:
     const { data: caller } = await supabase.from('users').select('is_admin').eq('uid', callerUid).single();
     if (!caller?.is_admin) return { success: false, error: "Admin privileges required." };
 
-    const { error } = await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchFlowId.trim());
+    // Standardize role names for DB
+    const dbRole = role === 'is_coin_seller' ? 'is_coin_seller' : role === 'is_agent' ? 'is_agent' : role;
+
+    const { error } = await supabase.from('users').update({ [dbRole]: value }).eq('match_flow_id', targetMatchFlowId.trim());
     if (error) throw error;
 
     return { success: true, message: `User authority updated successfully.` };

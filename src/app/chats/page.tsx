@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, Suspense, useRef } from "react"
@@ -72,7 +73,6 @@ function ChatsContent() {
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
   const [isLongPressing, setIsLongPressing] = useState(false)
 
-  // 1. Mark Chat as Seen
   const markAsSeen = async (id: string) => {
     if (!currentUser?.id) return
     const { data } = await supabase.from('chats').select('last_seen_at').eq('id', id).single()
@@ -80,7 +80,6 @@ function ChatsContent() {
     await supabase.from('chats').update({ last_seen_at: newSeenAt }).eq('id', id)
   }
 
-  // 2. Fetch User Info & Balance
   useEffect(() => {
     if (!currentUser?.id) return
     const fetchMyInfo = async () => {
@@ -99,7 +98,6 @@ function ChatsContent() {
     return () => { supabase.removeChannel(balChan) }
   }, [currentUser?.id])
 
-  // 3. Fetch Chat List (Summaries)
   useEffect(() => {
     if (!currentUser?.id || startWithId) return
     
@@ -119,7 +117,7 @@ function ChatsContent() {
           if (c.last_message_at <= userClearedAt) return null
 
           const userSeenAt = c.last_seen_at?.[currentUser.id] || 0
-          const isUnread = c.last_message_at > userSeenAt && c.participant_ids[0] !== currentUser.id // Simplified check
+          const isUnread = c.last_message_at > userSeenAt && c.participant_ids[0] !== currentUser.id
 
           const { data: p } = await supabase.from('users').select('name, photo_url').eq('uid', pId).single()
           return {
@@ -143,7 +141,6 @@ function ChatsContent() {
     return () => { supabase.removeChannel(channel) }
   }, [currentUser?.id, startWithId])
 
-  // 4. Handle Active Chat
   useEffect(() => {
     if (currentUser?.id && startWithId) {
       const ids = [currentUser.id, startWithId].sort()
@@ -160,7 +157,6 @@ function ChatsContent() {
     }
   }, [currentUser?.id, startWithId])
 
-  // 5. Message Listener
   useEffect(() => {
     if (!chatId) return
     const fetchMessages = async () => {
@@ -182,9 +178,18 @@ function ChatsContent() {
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !chatId || !currentUser?.id || !startWithId || !userProfile) return
+    
+    // FREE PRIVILEGE: Admin, Coin Seller, or texting an Admin/Seller is FREE
+    const isPrivileged = 
+      userProfile.is_admin || 
+      userProfile.is_coin_seller || 
+      partnerProfile?.is_admin || 
+      partnerProfile?.is_coin_seller;
+
     const isMan = userProfile.gender === 'male'
-    const cost = 15
-    if (isMan && userBalance < cost) {
+    const cost = (isMan && !isPrivileged) ? 15 : 0;
+
+    if (cost > 0 && userBalance < cost) {
       toast({ variant: "destructive", title: "Insufficient Coins", description: "Men need 15 coins per message." })
       router.push("/recharge")
       return
@@ -197,7 +202,7 @@ function ChatsContent() {
     setNewMessage("")
 
     try {
-      if (isMan) {
+      if (cost > 0) {
         await supabase.from('balances').update({ coins: userBalance - cost }).eq('user_id', currentUser.id)
         await supabase.from('coin_history').insert({ user_id: currentUser.id, amount: -cost, type: 'chat', description: `Chat with ${partnerProfile?.name || 'User'}`, timestamp })
       }
@@ -290,6 +295,8 @@ function ChatsContent() {
     </div>
   )
 
+  const isPrivileged = userProfile?.is_admin || userProfile?.is_coin_seller || partnerProfile?.is_admin || partnerProfile?.is_coin_seller;
+
   return (
     <div className="flex flex-col h-screen bg-white select-none">
       <header className="h-16 border-b flex items-center px-4 gap-4 sticky top-0 bg-white z-50">
@@ -319,7 +326,8 @@ function ChatsContent() {
       </main>
 
       <footer className="p-4 pb-8 border-t bg-white flex flex-col gap-2">
-        {userProfile?.gender === 'male' && <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-1">Message cost: 15 Coins</div>}
+        {userProfile?.gender === 'male' && !isPrivileged && <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-1">Message cost: 15 Coins</div>}
+        {isPrivileged && <div className="text-[9px] font-bold text-blue-500 uppercase tracking-widest px-2 mb-1">VIP: Free Communication Enabled</div>}
         <div className="flex gap-2 items-center">
           <input value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 h-12 bg-gray-50 rounded-2xl px-5 text-sm font-bold placeholder:text-gray-300 outline-none" placeholder="Say something nice..." />
           <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending} size="icon" className="rounded-full h-12 w-12 bg-[#00A2FF] hover:bg-[#0081CC] shadow-lg"><Send className="w-5 h-5 text-white" /></Button>

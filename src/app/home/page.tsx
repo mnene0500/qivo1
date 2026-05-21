@@ -172,7 +172,7 @@ export default function HomePage() {
                   <Image src={u.photo_url || ""} alt={u.name} fill className="object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
                   
-                  {/* Quick Chat Button - Top Right with Blue Background and Name Chat */}
+                  {/* Quick Chat Button - Blue background with "CHAT" name */}
                   <div 
                     onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}
                     className="absolute top-2.5 right-2.5 px-3 h-8 bg-[#00A2FF] rounded-full flex items-center justify-center text-white shadow-xl active:scale-90 transition-all z-20 hover:bg-[#0081CC]"
