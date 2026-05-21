@@ -8,10 +8,16 @@ import { BottomNav } from "@/components/layout/BottomNav"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, Loader2, User } from "lucide-react"
+import { Send, ChevronLeft, Loader2, User, Trash2, MoreVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Message {
   id: string | number
@@ -30,6 +36,7 @@ interface ChatSummary {
   last_message: string
   last_message_at: number
   unread_count: number
+  cleared_at?: Record<string, number>
 }
 
 let globalChatCache: ChatSummary[] = [];
@@ -48,6 +55,7 @@ function ChatsContent() {
   const [loading, setLoading] = useState(globalChatCache.length === 0)
   const [partnerProfile, setPartnerProfile] = useState<any>(null)
   const [isSending, setIsSending] = useState(false)
+  const [activeChatClearedAt, setActiveChatClearedAt] = useState<number>(0)
 
   // 1. Fetch Chat List (Summaries)
   useEffect(() => {
@@ -65,6 +73,10 @@ function ChatsContent() {
           const pId = c.participant_ids.find((id: string) => id !== currentUser.id)
           if (!pId) return null;
 
+          // SOFT DELETE FILTER: Hide chat if last message was before the user cleared it
+          const userClearedAt = c.cleared_at?.[currentUser.id] || 0
+          if (c.last_message_at <= userClearedAt) return null
+
           const { data: p } = await supabase.from('users').select('name, photo_url').eq('uid', pId).single()
           return {
             id: c.id,
@@ -73,7 +85,8 @@ function ChatsContent() {
             partner_photo: p?.photo_url || "",
             last_message: c.last_message || "",
             last_message_at: c.last_message_at || Date.now(),
-            unread_count: 0
+            unread_count: 0,
+            cleared_at: c.cleared_at
           } as ChatSummary
         }))
         const filtered = enhanced.filter(Boolean) as ChatSummary[]
@@ -92,16 +105,25 @@ function ChatsContent() {
     return () => { supabase.removeChannel(channel) }
   }, [currentUser?.id])
 
-  // 2. Set Active Chat ID
+  // 2. Set Active Chat ID & Profile
   useEffect(() => {
     if (currentUser?.id && startWithId) {
       const ids = [currentUser.id, startWithId].sort()
       const cId = `direct_${ids[0]}_${ids[1]}`
       setChatId(cId)
+      
       supabase.from('users').select('*').eq('uid', startWithId).single().then(({ data }) => setPartnerProfile(data))
+      
+      // Fetch cleared_at for this specific chat
+      supabase.from('chats').select('cleared_at').eq('id', cId).single().then(({ data }) => {
+        if (data) {
+          setActiveChatClearedAt(data.cleared_at?.[currentUser.id] || 0)
+        }
+      })
     } else {
       setChatId(null)
       setPartnerProfile(null)
+      setActiveChatClearedAt(0)
     }
   }, [currentUser?.id, startWithId])
 
@@ -114,6 +136,7 @@ function ChatsContent() {
         .from('messages')
         .select('*')
         .eq('chat_id', chatId)
+        .gt('timestamp', activeChatClearedAt) // SOFT DELETE FILTER
         .order('timestamp', { ascending: false })
         .limit(50)
       if (data) setMessages(data)
@@ -127,10 +150,12 @@ function ChatsContent() {
         filter: `chat_id=eq.${chatId}` 
       }, (payload) => {
         const newMsg = payload.new as Message
+        
+        // Only add if it's after our clear timestamp
+        if (newMsg.timestamp <= activeChatClearedAt) return
+
         setMessages(prev => {
-          // Prevent duplicates from optimistic UI
           if (prev.some(m => m.text === newMsg.text && Math.abs(m.timestamp - newMsg.timestamp) < 5000)) {
-            // Replace optimistic with real
             return prev.map(m => m.is_optimistic && m.text === newMsg.text ? newMsg : m)
           }
           return [newMsg, ...prev]
@@ -139,7 +164,7 @@ function ChatsContent() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [chatId])
+  }, [chatId, activeChatClearedAt])
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !chatId || !currentUser?.id || !startWithId) return
@@ -147,7 +172,6 @@ function ChatsContent() {
     const text = newMessage.trim()
     const timestamp = Date.now()
     
-    // IMMEDIATE OPTIMISTIC UPDATE (Zero Latency)
     const optimisticMsg: Message = {
       id: `temp-${timestamp}`,
       text: text,
@@ -160,7 +184,6 @@ function ChatsContent() {
     setNewMessage("")
 
     try {
-      // Execute database writes in parallel for speed
       await Promise.all([
         supabase.from('chats').upsert({ 
           id: chatId, 
@@ -176,9 +199,30 @@ function ChatsContent() {
         })
       ])
     } catch (err: any) {
-      // Rollback optimistic message if error
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
-      toast({ variant: "destructive", title: "Message Failed", description: "Could not send message." })
+      toast({ variant: "destructive", title: "Message Failed" })
+    }
+  }
+
+  const handleClearChat = async () => {
+    if (!chatId || !currentUser?.id) return
+    
+    const confirm = window.confirm("Clear this conversation? This will only hide it for you.")
+    if (!confirm) return
+
+    const now = Date.now()
+    try {
+      const { data: existing } = await supabase.from('chats').select('cleared_at').eq('id', chatId).single()
+      const newClearedAt = { ...(existing?.cleared_at || {}), [currentUser.id]: now }
+      
+      await supabase.from('chats').update({ cleared_at: newClearedAt }).eq('id', chatId)
+      
+      setActiveChatClearedAt(now)
+      setMessages([])
+      toast({ title: "Conversation cleared" })
+      router.push('/chats')
+    } catch (err) {
+      toast({ variant: "destructive", title: "Failed to clear chat" })
     }
   }
 
@@ -236,7 +280,7 @@ function ChatsContent() {
         <Button variant="ghost" size="icon" onClick={() => router.push('/chats')} className="rounded-full">
           <ChevronLeft className="w-6 h-6 text-black" />
         </Button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
           <Avatar className="w-9 h-9">
             <AvatarImage src={partnerProfile?.photo_url} className="object-cover" />
             <AvatarFallback>{partnerProfile?.name?.[0]}</AvatarFallback>
@@ -246,10 +290,26 @@ function ChatsContent() {
             <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest mt-1">Online</span>
           </div>
         </div>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full"><MoreVertical className="w-5 h-5 text-gray-400" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-2xl min-w-[160px]">
+            <DropdownMenuItem onClick={handleClearChat} className="text-red-500 font-bold gap-2 p-3">
+              <Trash2 className="w-4 h-4" /> Delete Chat
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       <main className="flex-1 overflow-y-auto p-6 flex flex-col-reverse gap-4 bg-[#F9FAFB]">
-        {messages.map(m => (
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center opacity-20 text-center space-y-2">
+            <User className="w-12 h-12" />
+            <p className="text-xs font-bold uppercase tracking-widest">Start the conversation</p>
+          </div>
+        ) : messages.map(m => (
           <div 
             key={m.id} 
             className={cn(
