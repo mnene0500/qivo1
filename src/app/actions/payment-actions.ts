@@ -1,12 +1,11 @@
 'use server';
 
 import { PESAPAL_CONFIG } from '@/lib/pesapal-config';
-import { initializeFirebase } from '@/firebase';
-import { ref, update, increment, push, set, get } from 'firebase/database';
+import { supabase } from '@/lib/supabase';
 
 /**
- * @fileOverview PesaPal integration actions for API v3.
- * Hardened for production with strict User ID extraction and real-time awarding.
+ * @fileOverview PesaPal integration actions for API v3 using Supabase.
+ * Optimized for production with strict User ID extraction and real-time awarding.
  */
 
 export interface TransactionStatusResponse {
@@ -133,28 +132,30 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
     
     // Status 1 = Completed
     if (status && status.status_code === 1) {
-      const { database: rtdb } = initializeFirebase();
-      if (!rtdb) return { success: false, error: "Database not connected" };
-      
       // Extraction: QV_{uid}_{timestamp}
       const parts = merchantReference.split('_');
       const uid = parts[1];
 
-      if (!uid || uid.length < 10) {
+      if (!uid || uid.length < 5) {
         console.error("[PesaPal Fulfillment] Invalid UID extracted:", uid);
         return { success: false, error: "Invalid User Reference" };
       }
 
-      // Idempotency: Prevent double-award
-      const processedRef = ref(rtdb, `processed_payments/${orderTrackingId}`);
-      const snap = await get(processedRef);
-      if (snap.exists()) {
-        return { success: true, message: "Already awarded", coins: snap.val().coins };
+      // 1. Idempotency Check via Supabase
+      const { data: existing } = await supabase
+        .from('processed_payments')
+        .select('*')
+        .eq('order_tracking_id', orderTrackingId)
+        .maybeSingle();
+
+      if (existing) {
+        return { success: true, message: "Already awarded", coins: existing.coins };
       }
 
       const amount = Number(status.amount);
       let coinsToAward = 0;
       
+      // Award Logic
       if (amount >= 1800) coinsToAward = 20000;
       else if (amount >= 1000) coinsToAward = 10000;
       else if (amount >= 550) coinsToAward = 5000;
@@ -165,21 +166,38 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
 
       if (coinsToAward > 0) {
         const timestamp = Date.now();
-        const updates: any = {};
+
+        // 2. Award Coins (Atomic Update)
+        const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', uid).single();
+        const currentCoins = bal?.coins || 0;
         
-        updates[`balances/${uid}/coins`] = increment(coinsToAward);
-        updates[`balances/${uid}/updatedAt`] = timestamp;
-        updates[`processed_payments/${orderTrackingId}`] = {
-          uid, amount, coins: coinsToAward, timestamp, merchantReference, payment_method: status.payment_method
-        };
+        const { error: updateErr } = await supabase
+          .from('balances')
+          .update({ 
+            coins: currentCoins + coinsToAward,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', uid);
 
-        await update(ref(rtdb), updates);
+        if (updateErr) throw updateErr;
 
-        await set(push(ref(rtdb, `coin_history/${uid}`)), {
+        // 3. Log to Coin History
+        await supabase.from('coin_history').insert({
+          user_id: uid,
           amount: coinsToAward,
           type: 'recharge',
           description: `PesaPal: KES ${amount}`,
           timestamp
+        });
+
+        // 4. Mark as Processed
+        await supabase.from('processed_payments').insert({
+          order_tracking_id: orderTrackingId,
+          user_id: uid,
+          amount: amount,
+          coins: coinsToAward,
+          payment_method: status.payment_method,
+          timestamp: timestamp
         });
 
         console.log(`[PesaPal Fulfillment] SUCCESS: Awarded ${coinsToAward} coins to ${uid}`);
@@ -189,6 +207,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
     }
     return { success: false, error: "Payment verification failed or pending" };
   } catch (err: any) {
+    console.error("[PesaPal Fulfillment] ERROR:", err.message);
     return { success: false, error: err.message };
   }
 }
