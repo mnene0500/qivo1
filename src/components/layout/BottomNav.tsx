@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "link"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, MessageSquare, User } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,11 +21,13 @@ export function BottomNav() {
     if (!user?.id) return
     
     const fetchUnread = async () => {
+      // In Supabase, we query the chats table where the current user is a participant
       const { data } = await supabase
         .from('chats')
-        .select('participant_ids, last_message_at')
+        .select('participant_ids')
         .contains('participant_ids', [user.id])
       
+      // Simple logic: if there are chats, show a badge (MVP)
       if (data) setTotalUnread(data.length > 0 ? 1 : 0)
     }
 
