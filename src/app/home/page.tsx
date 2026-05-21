@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, useState, useEffect, useCallback } from "react"
@@ -9,7 +8,6 @@ import { BottomNav } from "@/components/layout/BottomNav"
 import { Target, RotateCw, FileText, BadgeCheck, Loader2 } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { useUser } from "@/firebase/auth/use-user"
 
 interface UserProfile {
@@ -46,7 +44,6 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'Recommend' | 'Nearby'>('Recommend')
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
-  // 1. Manage Authentication and Profile Redirects
   useEffect(() => {
     if (!isInitialized || authLoading) return;
 
@@ -64,7 +61,6 @@ export default function HomePage() {
           .single();
 
         if (error || !data) {
-          // No user record found, force onboarding
           router.replace("/fastonboard");
           return;
         }
@@ -74,7 +70,6 @@ export default function HomePage() {
           router.replace("/fastonboard");
         }
       } catch (err) {
-        console.error("Profile check error:", err);
         router.replace("/fastonboard");
       }
     };
@@ -82,7 +77,6 @@ export default function HomePage() {
     checkProfile();
   }, [isInitialized, currentUser, authLoading, router])
 
-  // 2. Scroll Position Persistence
   useEffect(() => {
     if (!initialLoading) {
        setTimeout(() => window.scrollTo(0, globalScrollY), 50);
@@ -92,7 +86,6 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [initialLoading])
 
-  // 3. User Discovery Feed Fetching
   const fetchUsers = useCallback(async (isManual = false) => {
     if (isManual) { 
       setIsRefreshing(true); 
@@ -122,7 +115,6 @@ export default function HomePage() {
     }
   }, [currentUser?.id, users.length])
 
-  // Trigger discovery fetch
   useEffect(() => {
     if (isInitialized && currentUser && users.length === 0) {
       fetchUsers()
@@ -134,7 +126,6 @@ export default function HomePage() {
     return users
   }, [users, activeTab, profile])
 
-  // Loading state guard
   if ((initialLoading && users.length === 0) || authLoading || !isInitialized) {
     return (
       <div className="flex-1 bg-white min-h-screen flex items-center justify-center">
@@ -178,13 +169,6 @@ export default function HomePage() {
               </Card>
             ))}
           </div>
-
-          {filteredUsers.length === 0 && !initialLoading && (
-            <div className="py-20 text-center flex flex-col items-center gap-4 opacity-40">
-              <RotateCw className="w-10 h-10 text-gray-300" />
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">No users found nearby</p>
-            </div>
-          )}
         </main>
       </div>
       <BottomNav />

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react"
@@ -30,10 +29,6 @@ export default function UnifiedAuthPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isSupabaseConfigured) {
-      toast({ variant: "destructive", title: "Configuration Missing", description: "Supabase URL and Key must be set in environment variables." })
-      return
-    }
     if (!email || !password) return
     setLoading(true)
     try {
@@ -48,10 +43,6 @@ export default function UnifiedAuthPage() {
   }
 
   const handleRegister = async () => {
-    if (!isSupabaseConfigured) {
-      toast({ variant: "destructive", title: "Configuration Missing", description: "Supabase URL and Key must be set in environment variables." })
-      return
-    }
     if (!email || !password) return
     if (passwordStrength < 40) {
       toast({ variant: "destructive", title: "Weak Password", description: "Please use a stronger password." })
@@ -66,7 +57,6 @@ export default function UnifiedAuthPage() {
       const user = data.user
       if (!user) throw new Error("Registration failed to return user data.")
 
-      // Initialize Profile in Supabase
       const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
       await supabase.from('users').insert({
         uid: user.id,
@@ -104,15 +94,6 @@ export default function UnifiedAuthPage() {
       </header>
 
       <div className="flex-1 flex flex-col justify-center space-y-8 max-w-sm mx-auto w-full">
-        {!isSupabaseConfigured && (
-          <div className="bg-red-50 p-4 rounded-2xl flex items-start gap-3 border border-red-100">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <p className="text-[10px] font-bold text-red-700 uppercase tracking-tight leading-relaxed">
-              Supabase is not configured. Please add environment variables and redeploy.
-            </p>
-          </div>
-        )}
-
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-black text-black tracking-tight">Welcome</h1>
           <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Login or Join QIVO</p>
@@ -131,7 +112,7 @@ export default function UnifiedAuthPage() {
           </div>
 
           <div className="space-y-4 pt-4">
-            <Button type="submit" disabled={loading || !isSupabaseConfigured} className="w-full rounded-full h-14 text-base font-bold bg-[#00A2FF] hover:bg-[#0081CC] shadow-xl shadow-blue-100 flex items-center justify-center gap-2">
+            <Button type="submit" disabled={loading} className="w-full rounded-full h-14 text-base font-bold bg-[#00A2FF] hover:bg-[#0081CC] shadow-xl shadow-blue-100 flex items-center justify-center gap-2">
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Mail className="w-5 h-5" /> Login</>}
             </Button>
 
@@ -141,7 +122,7 @@ export default function UnifiedAuthPage() {
               <div className="flex-grow border-t border-gray-100"></div>
             </div>
 
-            <Button type="button" variant="outline" disabled={loading || !isSupabaseConfigured} onClick={handleRegister} className="w-full rounded-full h-14 text-base font-bold border-2 border-gray-100 text-black hover:bg-gray-50 flex items-center justify-center gap-2">
+            <Button type="button" variant="outline" disabled={loading} onClick={handleRegister} className="w-full rounded-full h-14 text-base font-bold border-2 border-gray-100 text-black hover:bg-gray-50 flex items-center justify-center gap-2">
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><UserPlus className="w-5 h-5" /> Create Account</>}
             </Button>
           </div>

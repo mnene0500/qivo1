@@ -4,8 +4,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://taxmenbtzsi
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRheG1lbmJ0enNpb3RnY3ZwdHVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMTUzOTMsImV4cCI6MjA5NDY5MTM5M30.KToHUbmwdKus6jDoP7ojmM2xILcbIae3G-9E6Wb4xTw';
 
 /**
- * @fileOverview Central Supabase Client for Auth, Database, and Realtime.
- * Now hardcoded with initial project credentials as requested.
+ * @fileOverview Central Supabase Client.
  */
 export const isSupabaseConfigured = true;
 
