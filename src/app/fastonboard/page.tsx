@@ -34,9 +34,15 @@ export default function FastOnboardingPage() {
   const { toast } = useToast()
 
   const handleClearCache = () => {
-    localStorage.clear()
+    // SAFE CLEAR: Preserving Auth tokens
+    const keys = Object.keys(localStorage);
+    for (const key of keys) {
+      if (!key.includes('auth-token')) {
+        localStorage.removeItem(key);
+      }
+    }
     sessionStorage.clear()
-    toast({ title: "Cache Cleared" })
+    toast({ title: "Cache Optimized" })
     window.location.reload()
   }
 
@@ -170,7 +176,7 @@ export default function FastOnboardingPage() {
 
           <div className="pt-10 flex justify-center">
              <Button variant="ghost" size="sm" onClick={handleClearCache} className="text-[9px] font-bold text-gray-300 uppercase tracking-[0.2em] gap-2 hover:bg-transparent">
-               <RefreshCw className="w-3 h-3" /> Clear Cache & Reload
+               <RefreshCw className="w-3 h-3" /> Optimize Storage & Reload
              </Button>
           </div>
         </div>

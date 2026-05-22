@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/dialog"
 
 interface SettingItemProps {
   label: string
@@ -75,9 +75,15 @@ export default function SettingsPage() {
 
   const handleClearCache = async () => {
     try {
-      localStorage.clear()
+      // SAFE CLEAR: Remove everything except Supabase Auth tokens
+      const keys = Object.keys(localStorage);
+      for (const key of keys) {
+        if (!key.includes('auth-token')) {
+          localStorage.removeItem(key);
+        }
+      }
       sessionStorage.clear()
-      toast({ title: "App Reset", description: "Reloading..." })
+      toast({ title: "App Reset", description: "Storage optimized. Reloading..." })
       setTimeout(() => window.location.reload(), 1000)
     } catch (err) {
       toast({ variant: "destructive", title: "Error" })
@@ -114,7 +120,6 @@ export default function SettingsPage() {
           <SettingItem label="About QIVO" href="/about" icon={<Info className="w-5 h-5 text-gray-500" />} />
           <SettingItem label="Clear Cache" onClick={handleClearCache} icon={<RefreshCw className="w-5 h-5 text-orange-500" />} />
 
-          {/* Delete Account button optimized to prevent sudden flickering */}
           {!loading && !profile?.is_admin && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
