@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useRef, useEffect } from "react"
@@ -106,7 +105,9 @@ export default function VerifyIdentityPage() {
             {step === 'capture' && capturedImage && (
               <div className="flex-1 flex flex-col space-y-8 animate-in zoom-in-95 duration-300">
                 <h2 className="text-sm font-bold text-gray-400 text-center uppercase tracking-widest pt-4">Review Photo</h2>
-                <div className="relative aspect-[3/4] w-full rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white bg-gray-100"><Image src={capturedImage} alt="Selfie" fill className="object-cover" /></div>
+                <div className="relative aspect-[3/4] w-full rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white bg-gray-100">
+                  <Image src={capturedImage} alt="Selfie" fill className="object-cover" sizes="(max-width: 768px) 100vw, 400px" />
+                </div>
                 <div className="flex flex-col gap-4 mt-auto">
                   <Button className="w-full h-16 rounded-full bg-[#00A2FF] text-white font-bold uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all" onClick={runVerification} disabled={loading}>Submit for Analysis</Button>
                   <Button variant="ghost" className="font-bold text-gray-400 uppercase text-[10px] tracking-widest hover:bg-transparent" onClick={() => fileInputRef.current?.click()}>Retake Photo</Button>

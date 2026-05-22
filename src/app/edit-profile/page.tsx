@@ -174,7 +174,7 @@ export default function EditProfilePage() {
           <div className="grid grid-cols-4 gap-3">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="relative aspect-square rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => { setTargetPhotoIndex(i); fileInputRef.current?.click(); }}>
-                {formData.additional_photos[i] ? (<><Image src={formData.additional_photos[i]} alt={`P${i}`} fill className="object-cover" /><button onClick={(e) => { e.stopPropagation(); const n = [...formData.additional_photos]; n.splice(i,1); setFormData({...formData, additional_photos: n}); }} className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white"><X className="w-3 h-3" /></button></>) : (<Plus className="w-6 h-6 text-gray-300" />)}
+                {formData.additional_photos[i] ? (<><Image src={formData.additional_photos[i]} alt={`P${i}`} fill className="object-cover" sizes="25vw" /><button onClick={(e) => { e.stopPropagation(); const n = [...formData.additional_photos]; n.splice(i,1); setFormData({...formData, additional_photos: n}); }} className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white"><X className="w-3 h-3" /></button></>) : (<Plus className="w-6 h-6 text-gray-300" />)}
               </div>
             ))}
           </div>

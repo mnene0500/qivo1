@@ -16,7 +16,6 @@ export function useUser() {
     // 1. Get initial Supabase session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
-        console.error("[Auth] Session retrieval error:", error.message);
         // If there's an explicit refresh token error, clear local storage to force fresh login
         if (error.message.includes("Refresh Token")) {
           localStorage.clear();
@@ -31,8 +30,6 @@ export function useUser() {
 
     // 2. Listen for Auth changes (Sign in, Sign out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[Auth] State change event:", event);
-      
       if (event === 'SIGNED_OUT') {
         setUser(null);
       } else if (session?.user) {

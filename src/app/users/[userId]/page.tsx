@@ -130,7 +130,14 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
   return (
     <div className="flex-1 bg-white flex flex-col min-h-screen pb-40 select-none overflow-x-hidden">
       <div className="relative h-[60vh] w-full cursor-pointer overflow-hidden" onClick={() => { setSelectedPhoto(profile.photo_url); setIsPhotoOpen(true); }}>
-        <Image src={profile.photo_url || ""} alt={profile.name} fill className="object-cover animate-in fade-in zoom-in-105 duration-1000" priority />
+        <Image 
+          src={profile.photo_url || ""} 
+          alt={profile.name} 
+          fill 
+          className="object-cover animate-in fade-in zoom-in-105 duration-1000" 
+          priority 
+          sizes="100vw"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-white via-black/10 to-black/40" />
         <div className="absolute top-12 inset-x-0 px-6 flex justify-between items-center z-20" onClick={(e) => e.stopPropagation()}>
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full bg-black/20 backdrop-blur-xl text-white w-12 h-12 border border-white/20 shadow-xl active:scale-90 transition-all"><ChevronLeft className="w-7 h-7" /></Button>
@@ -182,7 +189,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
       {isPhotoOpen && selectedPhoto && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" onClick={() => setIsPhotoOpen(false)}>
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setIsPhotoOpen(false); }} className="absolute top-12 right-6 rounded-full bg-white/10 text-white w-14 h-14 z-[110]"><X className="w-8 h-8 stroke-[3]" /></Button>
-          <div className="relative w-full h-full p-4 flex items-center justify-center"><Image src={selectedPhoto} alt="Full screen" fill className="object-contain" priority /></div>
+          <div className="relative w-full h-full p-4 flex items-center justify-center"><Image src={selectedPhoto} alt="Full screen" fill className="object-contain" priority sizes="100vw" /></div>
         </div>
       )}
 
