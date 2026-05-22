@@ -163,9 +163,9 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* TAB SELECTOR - STICKY TOP WITH TOP SPACING */}
+      {/* TAB SELECTOR - STICKY TOP WITH TOP SPACING GAP */}
       <div className="sticky top-0 z-30 bg-white">
-        <div className="h-8 bg-white" /> {/* SPACER SO IT DOESNT TOUCH BUTTONS */}
+        <div className="h-8 bg-white" /> {/* GAP SO IT DOESNT TOUCH BUTTONS */}
         <div className="px-6 py-2 flex items-center justify-between border-b border-black/5">
           <div className="flex items-center gap-6">
             <button 

@@ -18,6 +18,16 @@ export default function TaskCenterPage() {
   const [loading, setLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
 
+  const days = [
+    { day: "1st", reward: 2 },
+    { day: "2nd", reward: 2 },
+    { day: "3rd", reward: 5 },
+    { day: "4th", reward: 2 },
+    { day: "5th", reward: 2 },
+    { day: "6th", reward: 2 },
+    { day: "7th", reward: 10 },
+  ]
+
   useEffect(() => {
     if (!user?.id) return
     const fetchProfile = async () => {
@@ -36,16 +46,6 @@ export default function TaskCenterPage() {
     return () => { supabase.removeChannel(channel) }
   }, [user?.id])
 
-  const days = [
-    { day: "1st", reward: 2 },
-    { day: "2nd", reward: 2 },
-    { day: "3rd", reward: 5 },
-    { day: "4th", reward: 2 },
-    { day: "5th", reward: 2 },
-    { day: "6th", reward: 2 },
-    { day: "7th", reward: 10 },
-  ]
-
   const hasCheckedInToday = useMemo(() => {
     if (!profile?.last_check_in_date) return false
     const lastDate = new Date(profile.last_check_in_date)
@@ -63,36 +63,42 @@ export default function TaskCenterPage() {
     if (!user || hasCheckedInToday || isProcessing) return
     setIsProcessing(true)
     
+    // Streak index is 0 for Day 1, 1 for Day 2 ... 6 for Day 7.
+    // If streak is 7, they just finished Day 7 yesterday. Index is 7 % 7 = 0 (Day 1 again).
     const streakIndex = currentStreak % 7
     const rewardAmount = days[streakIndex].reward
     const timestamp = Date.now()
     
     try {
-      // 1. Update User Record (Streak and Date)
-      await supabase.from('users').update({
-        last_check_in_date: new Date().toISOString(),
-        check_in_streak: currentStreak + 1
-      }).eq('uid', user.id)
+      // 1. Fetch current balance first for atomic update
+      const { data: balData } = await supabase.from('balances').select('coins').eq('user_id', user.id).maybeSingle()
+      const currentCoins = balData?.coins || 0
 
-      // 2. Award Coins Atomically
-      const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', user.id).single()
-      await supabase.from('balances').update({ coins: (bal?.coins || 0) + rewardAmount }).eq('user_id', user.id)
-
-      // 3. Log History for record keeping
-      await supabase.from('coin_history').insert({
-        user_id: user.id,
-        amount: rewardAmount,
-        type: 'task',
-        description: `Daily Check-in Day ${streakIndex + 1}`,
-        timestamp: timestamp
-      })
+      // 2. Update Streak & Balance in parallel
+      await Promise.all([
+        supabase.from('users').update({
+          last_check_in_date: new Date().toISOString(),
+          check_in_streak: currentStreak + 1
+        }).eq('uid', user.id),
+        supabase.from('balances').upsert({ 
+          user_id: user.id, 
+          coins: currentCoins + rewardAmount 
+        }, { onConflict: 'user_id' }),
+        supabase.from('coin_history').insert({
+          user_id: user.id,
+          amount: rewardAmount,
+          type: 'task',
+          description: `Daily Check-in Day ${streakIndex + 1}`,
+          timestamp: timestamp
+        })
+      ])
 
       toast({ 
         title: "Check-in Successful!", 
-        description: `You earned ${rewardAmount} coins. Come back tomorrow!` 
+        description: `You earned ${rewardAmount} coins. Day ${streakIndex + 1} collected!` 
       })
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Task Failed", description: "Network error. Try again." })
+      toast({ variant: "destructive", title: "Task Failed", description: "Network error. Please check your connection." })
     } finally {
       setIsProcessing(false)
     }
@@ -122,25 +128,25 @@ export default function TaskCenterPage() {
                 <Trophy className="w-5 h-5 text-yellow-500" />
                 <h2 className="text-xs font-bold text-black uppercase tracking-widest">Daily Rewards</h2>
               </div>
-              <span className="text-[10px] font-semibold text-gray-400">Streak: {currentStreak} Days</span>
+              <span className="text-[10px] font-semibold text-gray-400">Total Check-ins: {currentStreak}</span>
             </div>
             
             <div className="grid grid-cols-4 gap-3">
               {days.map((d, i) => {
-                // Calculation: Is the user past this index in their current 7-day cycle?
-                const currentCycleIndex = currentStreak % 7
-                const isChecked = i < currentCycleIndex || (currentStreak > 0 && currentCycleIndex === 0 && i < 7)
-                const isTodayActive = hasCheckedInToday && (i === (currentStreak - 1) % 7)
+                // If user checked in today, the last index collected is (currentStreak - 1) % 7
+                const lastIndexCollected = hasCheckedInToday ? (currentStreak - 1) % 7 : -1
+                // A day is "checked" if it's already been collected in the current 7-day cycle
+                const isCollected = i <= lastIndexCollected && hasCheckedInToday
                 
                 return (
                   <div 
                     key={i} 
                     className={cn(
                       "aspect-square rounded-2xl flex flex-col items-center justify-center border-2 transition-all", 
-                      (isChecked || isTodayActive) ? "bg-green-50 border-green-200" : "bg-gray-50 border-transparent"
+                      isCollected ? "bg-green-50 border-green-200" : "bg-gray-50 border-transparent"
                     )}
                   >
-                    {(isChecked || isTodayActive) ? (
+                    {isCollected ? (
                       <CheckCircle2 className="w-6 h-6 text-green-500" />
                     ) : (
                       <>
@@ -159,20 +165,20 @@ export default function TaskCenterPage() {
               disabled={hasCheckedInToday || isProcessing}
               className={cn(
                 "w-full mt-6 h-14 rounded-full text-white font-bold uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all", 
-                hasCheckedInToday ? "bg-gray-300 shadow-none cursor-default" : "bg-[#00A2FF] shadow-blue-100"
+                hasCheckedInToday ? "bg-gray-200 text-gray-400 shadow-none cursor-default" : "bg-[#00A2FF] shadow-blue-100"
               )}
             >
-              {isProcessing ? <Loader2 className="animate-spin" /> : hasCheckedInToday ? "Claimed Today" : "Claim Daily Reward"}
+              {isProcessing ? <Loader2 className="animate-spin" /> : hasCheckedInToday ? "Day " + (currentStreak % 7 === 0 ? 7 : currentStreak % 7) + " Collected" : "Claim Day " + (currentStreak % 7 + 1) + " Reward"}
             </Button>
           </section>
         )}
 
         <section className="bg-white p-6 rounded-3xl shadow-sm border border-black/5 space-y-4">
-          <h2 className="text-[10px] font-black uppercase tracking-widest text-gray-400">App Incentives</h2>
+          <h2 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Identity Incentives</h2>
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
              <div className="flex items-center gap-3">
                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500"><Trophy className="w-5 h-5" /></div>
-               <div><p className="text-xs font-bold">Identity Verification</p><p className="text-[9px] text-gray-400 font-medium">Verify your profile for a badge</p></div>
+               <div><p className="text-xs font-bold">Profile Verification</p><p className="text-[9px] text-gray-400 font-medium">Get a badge & build trust</p></div>
              </div>
              <Button size="sm" onClick={() => router.push('/verify-identity')} className="rounded-full bg-[#00A2FF] text-[9px] font-bold h-7">GO</Button>
           </div>

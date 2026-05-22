@@ -7,7 +7,7 @@ import { BottomNav } from "@/components/layout/BottomNav"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, Loader2, User, Trash2, MoreVertical, Sparkles, AlertCircle, Gift, Phone, Video } from "lucide-react"
+import { Send, ChevronLeft, Loader2, User, Trash2, MoreVertical, AlertCircle, Gift, Phone, Video } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
@@ -51,9 +51,6 @@ interface ChatSummary {
   last_seen_at?: Record<string, number>
 }
 
-/**
- * GLOBAL PERSISTENCE CACHE FOR CHATS
- */
 let globalChatSummaries: ChatSummary[] = [];
 
 function ChatsContent() {
@@ -231,10 +228,7 @@ function ChatsContent() {
 
   const handleCall = async (type: 'voice' | 'video') => {
     if (!currentUser || !startWithId || !partnerProfile || !chatId) return
-    
-    // Privilege check (free for admin/seller)
     const isPrivileged = userProfile?.is_admin || userProfile?.is_coin_seller;
-    
     if (!isPrivileged && userProfile?.gender === 'male') {
       const balanceCheck = await checkCallBalanceAction(currentUser.id, type)
       if (!balanceCheck.success) {
@@ -243,7 +237,6 @@ function ChatsContent() {
         return
       }
     }
-
     router.push(`/call/${chatId}?type=${type}&partner=${encodeURIComponent(partnerProfile.name)}&partnerId=${startWithId}&partnerPhoto=${encodeURIComponent(partnerProfile.photo_url)}&caller=true`)
   }
 

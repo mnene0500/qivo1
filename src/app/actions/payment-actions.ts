@@ -140,7 +140,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
     const status = await statusRes.json();
     
     // status_code 1 = Completed/Success
-    if (status && status.status_code === 1) {
+    if (status && (status.status_code === 1 || status.payment_status_description === 'Completed')) {
       const uid = merchantReference.split('_')[1];
       if (!uid) return { success: false, error: "Invalid Merchant Reference." };
 
@@ -157,12 +157,14 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
       const timestamp = Date.now();
 
       // Robust Atomic Update
-      const { data: balData } = await supabase.from('balances').select('coins').eq('user_id', uid).maybeSingle();
+      const { data: balData } = await supabase.from('balances').select('coins, diamonds').eq('user_id', uid).maybeSingle();
       const currentCoins = Number(balData?.coins) || 0;
+      const currentDiamonds = Number(balData?.diamonds) || 0;
       
       const { error: upsertErr } = await supabase.from('balances').upsert({ 
         user_id: uid, 
         coins: currentCoins + coinsToAward,
+        diamonds: currentDiamonds,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
 
