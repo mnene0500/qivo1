@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { BottomNav } from "@/components/layout/BottomNav"
-import { RotateCw, BadgeCheck, Loader2, FileText, Target } from "lucide-react"
+import { RotateCw, BadgeCheck, Loader2, FileText, Target, Sparkles } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
@@ -140,8 +140,8 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* TOP ACTION CARDS */}
-      <div className="relative px-4 grid grid-cols-2 gap-3 -mt-10 z-20">
+      {/* TOP ACTION CARDS - PULLED UP HIGHER */}
+      <div className="relative px-4 grid grid-cols-2 gap-3 -mt-12 z-20">
         <button 
           onClick={() => router.push('/mystery-note')}
           className="h-28 bg-gradient-to-br from-[#FFA800] to-[#FF8A00] rounded-[1.5rem] p-4 flex flex-col items-start justify-end gap-1 shadow-xl active:scale-95 transition-all text-white text-left"
@@ -165,8 +165,8 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* TAB SELECTOR */}
-      <div className="px-6 py-2 flex items-center justify-between bg-white sticky top-0 z-30">
+      {/* TAB SELECTOR - ADDED MT-8 TO PREVENT TOUCHING BUTTONS */}
+      <div className="px-6 py-2 flex items-center justify-between bg-white sticky top-0 z-30 mt-8">
         <div className="flex items-center gap-6">
           <button 
             onClick={() => setActiveTab('Recommend')} 
