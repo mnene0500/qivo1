@@ -13,12 +13,14 @@ Run the SQL script found in [DOCS_SUPABASE_SQL.md](./DOCS_SUPABASE_SQL.md) in yo
 ### 2. Vercel Environment Variables
 Add the following keys to your **Vercel Dashboard > Settings > Environment Variables**:
 
-| Service | Variable Name |
-| :--- | :--- |
-| **Supabase** | `SUPABASE_SERVICE_ROLE_KEY` |
-| **ZegoCloud** | `ZEGO_APP_ID`, `ZEGO_SERVER_SECRET` |
-| **PesaPal** | `PESAPAL_CONSUMER_KEY`, `PESAPAL_CONSUMER_SECRET`, `PESAPAL_IPN_ID` |
-| **Gemini AI** | `GOOGLE_GENAI_API_KEY` |
+| Service | Variable Name | Importance |
+| :--- | :--- | :--- |
+| **Supabase (Public)** | `NEXT_PUBLIC_SUPABASE_URL` | **CRITICAL** (Browser connection) |
+| **Supabase (Public)** | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **CRITICAL** (Browser connection) |
+| **Supabase (Secret)** | `SUPABASE_SERVICE_ROLE_KEY` | **CRITICAL** (Financial transactions) |
+| **ZegoCloud** | `ZEGO_APP_ID`, `ZEGO_SERVER_SECRET` | Voice/Video Calling |
+| **PesaPal** | `PESAPAL_CONSUMER_KEY`, `PESAPAL_CONSUMER_SECRET`, `PESAPAL_IPN_ID` | Coin Recharge |
+| **Gemini AI** | `GOOGLE_GENAI_API_KEY` | Identity Verification |
 
 ### 3. PesaPal IPN Registration
 Once the app is live on Vercel:
