@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -23,24 +24,27 @@ export default function CoinHistoryPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchHistory = async () => {
     if (!user?.id) return
-    const fetchHistory = async () => {
-      const { data } = await supabase
-        .from('coin_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('timestamp', { ascending: false })
-        .limit(100)
-      
-      if (data) setTransactions(data)
-      setLoading(false)
-    }
+    const { data } = await supabase
+      .from('coin_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('timestamp', { ascending: false })
+      .limit(100)
     
+    if (data) setTransactions(data)
+    setLoading(false)
+  }
+
+  useEffect(() => {
     fetchHistory()
 
-    const channel = supabase.channel(`coin-history:${user.id}`)
-      .on('postgres_changes', { event: 'INSERT', table: 'coin_history', filter: `user_id=eq.${user.id}` }, () => fetchHistory())
+    if (!user?.id) return
+
+    // REALTIME: Synchronize all coin ledger events
+    const channel = supabase.channel(`coin-history-live:${user.id}`)
+      .on('postgres_changes', { event: '*', table: 'coin_history', filter: `user_id=eq.${user.id}` }, () => fetchHistory())
       .subscribe()
     
     return () => { supabase.removeChannel(channel) }
@@ -77,7 +81,7 @@ export default function CoinHistoryPage() {
             {transactions.map((tx) => {
               const isCredit = tx.amount > 0
               return (
-                <div key={tx.id} className="flex items-center justify-between p-6 hover:bg-gray-50/50 transition-colors">
+                <div key={tx.id} className="flex items-center justify-between p-6 hover:bg-gray-50/50 transition-colors animate-in fade-in">
                   <div className="flex items-center gap-4">
                     <div className={cn(
                       "w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", 

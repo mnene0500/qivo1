@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, Suspense, useEffect } from "react"
@@ -60,14 +61,22 @@ function RechargeContent() {
     }
     fetchData()
 
+    // REALTIME: Sync balance changes immediately
     const channel = supabase.channel(`recharge-bal:${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', table: 'balances', filter: `user_id=eq.${user.id}` }, (payload) => {
-        setCurrentCoins(payload.new.coins || 0)
+        const newBal = payload.new.coins || 0
+        setCurrentCoins(newBal)
+        
+        // If we were waiting for fulfillment and coins just arrived via REALTIME (IPN)
+        if (isFulfilling && newBal > currentCoins) {
+          setIsFulfilling(false)
+          setFulfillmentSuccess(true)
+        }
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [user?.id])
+  }, [user?.id, isFulfilling, currentCoins])
 
   useEffect(() => {
     const orderId = searchParams.get("OrderTrackingId") || searchParams.get("orderTrackingId");
@@ -78,29 +87,30 @@ function RechargeContent() {
         setIsFulfilling(true);
         setFulfillmentError(null);
         try {
-          // Add a small delay to allow webhook to process first if it's running
-          await new Promise(r => setTimeout(r, 1000));
-          
+          // Manual fulfillment attempt
           const res = await fulfillPaymentAction(orderId, merchantRef);
           if (res.success) {
             setFulfillmentSuccess(true);
-            toast({ title: "Success!", description: `Added ${res.coins || ''} coins to your wallet.` });
+            toast({ title: "Success!", description: `Coins added to your wallet.` });
             setTimeout(() => router.replace("/profile"), 2500);
           } else {
-            setFulfillmentError(res.error || "Verification pending...");
-            // Keep error on screen for 5 seconds so user can read it
-            setTimeout(() => router.replace("/profile"), 5000);
+            // We don't error out immediately; realtime might pick it up if IPN is slow
+            console.log("Manual fulfillment pending... waiting for realtime stream.");
+            setTimeout(() => {
+               if (!fulfillmentSuccess) {
+                 setFulfillmentError("Fulfillment taking longer than expected. Check your profile in a moment.");
+                 setTimeout(() => router.replace("/profile"), 4000);
+               }
+            }, 8000);
           }
         } catch (e: any) {
-          setFulfillmentError("Connection error during sync.");
+          setFulfillmentError("Fulfillment issue. Please check history.");
           setTimeout(() => router.replace("/profile"), 5000);
-        } finally {
-          setIsFulfilling(false);
         }
       };
       runFulfillment();
     }
-  }, [searchParams, router, toast]);
+  }, [searchParams, router, toast, fulfillmentSuccess]);
 
   const handlePayment = async () => {
     const pkg = PACKAGES.find(p => p.amount === selectedPackage)
@@ -115,7 +125,7 @@ function RechargeContent() {
       if (result.success && result.redirect_url) setPaymentUrl(result.redirect_url)
       else toast({ variant: "destructive", title: "Error", description: result.error })
     } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to connect to secure line." })
+      toast({ variant: "destructive", title: "Error", description: "Connection failed." })
     } finally {
       setLoading(false)
     }
@@ -140,15 +150,15 @@ function RechargeContent() {
         </div>
         <div className="text-center space-y-3">
           <h2 className="text-2xl font-black text-black uppercase tracking-tight">
-            {isFulfilling ? "Verifying..." : (fulfillmentSuccess ? "Payment Confirmed!" : "Sync Issue")}
+            {isFulfilling ? "Verifying..." : (fulfillmentSuccess ? "Payment Confirmed!" : "Check Wallet")}
           </h2>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] leading-relaxed max-w-[200px] mx-auto">
-            {isFulfilling ? "Syncing your wallet with the bank..." : (fulfillmentSuccess ? "Coins added to your account." : fulfillmentError)}
+            {isFulfilling ? "Synchronizing ledger via Realtime..." : (fulfillmentSuccess ? "Coins added successfully." : fulfillmentError)}
           </p>
         </div>
         {!isFulfilling && (
           <Button variant="ghost" className="text-[9px] font-black text-gray-300 uppercase tracking-widest" onClick={() => router.replace("/profile")}>
-            Closing automatically...
+            Returning to profile...
           </Button>
         )}
       </div>

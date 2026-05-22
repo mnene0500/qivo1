@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -51,17 +52,16 @@ export default function AgencyManagePage() {
       setProfile(p)
       const aid = p.agency_id
       if (aid) {
-        // 1. Fetch applicants (pending)
-        const { data: apps } = await supabase.from('users').select('*').eq('agency_id', aid).eq('agency_status', 'pending')
-        setApplicants(apps || [])
+        // Fetch all relevant data for the agency
+        const [apps, mems, withs] = await Promise.all([
+          supabase.from('users').select('*').eq('agency_id', aid).eq('agency_status', 'pending'),
+          supabase.from('users').select('*').eq('agency_id', aid).eq('agency_status', 'approved'),
+          supabase.from('withdrawals').select('*').eq('agency_id', aid).eq('status', 'pending').order('timestamp', { ascending: false })
+        ])
         
-        // 2. Fetch members (approved)
-        const { data: mems } = await supabase.from('users').select('*').eq('agency_id', aid).eq('agency_status', 'approved')
-        setMembers(mems || [])
-
-        // 3. Fetch withdrawals (pending)
-        const { data: withs } = await supabase.from('withdrawals').select('*').eq('agency_id', aid).eq('status', 'pending')
-        setWithdrawals(withs as any || [])
+        setApplicants(apps.data || [])
+        setMembers(mems.data || [])
+        setWithdrawals(withs.data as any || [])
       }
     }
     setLoading(false)
@@ -69,6 +69,16 @@ export default function AgencyManagePage() {
 
   useEffect(() => {
     fetchData()
+
+    if (!user?.id) return
+
+    // REALTIME: Listen for new agency activity
+    const channel = supabase.channel(`agency-center-live`)
+      .on('postgres_changes', { event: '*', table: 'users' }, () => fetchData())
+      .on('postgres_changes', { event: '*', table: 'withdrawals' }, () => fetchData())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [user?.id])
 
   const handleReview = async (applicantUid: string, status: 'approved' | 'rejected') => {
@@ -76,7 +86,6 @@ export default function AgencyManagePage() {
     const res = await reviewRecruitmentAction(user.id, applicantUid, status)
     if (res.success) {
       toast({ title: status === 'approved' ? "Member Approved" : "Applicant Rejected" })
-      fetchData()
     }
   }
 
@@ -86,7 +95,6 @@ export default function AgencyManagePage() {
     const res = await updateWithdrawalStatusAction(user.id, profile.agency_id, requestId, status)
     if (res.success) {
       toast({ title: `Payout marked as ${status}` })
-      fetchData()
     }
     setIsProcessing(false)
   }
@@ -113,7 +121,7 @@ export default function AgencyManagePage() {
         {activeTab === 'recruitment' && (
           <div className="space-y-4">
             {applicants.length === 0 ? <div className="p-12 text-center text-gray-300 text-xs font-bold uppercase tracking-widest">No pending applications</div> : applicants.map(app => (
-              <div key={app.uid} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+              <div key={app.uid} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl animate-in fade-in slide-in-from-right-4">
                 <div className="flex items-center gap-3"><Avatar className="w-10 h-10"><AvatarImage src={app.photo_url} /><AvatarFallback><User /></AvatarFallback></Avatar><span className="font-bold text-sm">{app.name}</span></div>
                 <div className="flex gap-2">
                   <Button size="icon" onClick={() => handleReview(app.uid, 'approved')} className="bg-green-500 rounded-full h-9 w-9 shadow-lg shadow-green-100"><Check className="w-4 h-4 text-white" /></Button>
@@ -146,7 +154,7 @@ export default function AgencyManagePage() {
         {activeTab === 'withdrawals' && (
           <div className="space-y-4">
             {withdrawals.length === 0 ? <div className="p-12 text-center text-gray-300 text-xs font-bold uppercase tracking-widest">No pending payouts</div> : withdrawals.map(req => (
-              <div key={req.id} className="p-5 bg-white border rounded-2xl shadow-sm space-y-4">
+              <div key={req.id} className="p-5 bg-white border rounded-2xl shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4">
                 <div className="flex justify-between items-start">
                   <div><h4 className="font-bold text-sm">UID: {req.user_id.slice(0, 8)}...</h4><p className="text-[10px] font-bold text-gray-400 uppercase">Requested: {format(req.timestamp, "MMM d, HH:mm")}</p></div>
                   <div className="text-right"><p className="text-lg font-bold text-green-600">Ksh {req.amount_kes}</p><p className="text-[10px] font-bold text-gray-400 uppercase">{req.diamonds} Diamonds</p></div>
