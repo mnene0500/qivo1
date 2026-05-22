@@ -24,15 +24,22 @@ export default function RootPage() {
 
     // Secure check for onboarding completion
     const checkOnboarding = async () => {
-      const { data } = await supabase
-        .from('users')
-        .select('onboarding_complete')
-        .eq('uid', user.id)
-        .maybeSingle()
-      
-      if (data?.onboarding_complete) {
-        router.replace("/home")
-      } else {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('onboarding_complete')
+          .eq('uid', user.id)
+          .maybeSingle()
+        
+        if (error) throw error;
+
+        if (data?.onboarding_complete) {
+          router.replace("/home")
+        } else {
+          router.replace("/fastonboard")
+        }
+      } catch (err) {
+        // Fallback to onboarding if profile check fails
         router.replace("/fastonboard")
       }
     }

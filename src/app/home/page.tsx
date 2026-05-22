@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { BottomNav } from "@/components/layout/BottomNav"
-import { RotateCw, BadgeCheck, Loader2, FileText, Target, Sparkles } from "lucide-react"
+import { RotateCw, BadgeCheck, Loader2, FileText, Target } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
@@ -133,14 +133,10 @@ export default function HomePage() {
 
   return (
     <div className="flex-1 pb-24 bg-white min-h-screen relative select-none animate-in fade-in duration-300">
-      {/* HEADER WITH BLUE BACKGROUND - HEIGHT SET TO 72PX */}
-      <div className="bg-[#00A2FF] h-[72px] relative overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
-          <span className="text-8xl font-logo font-black text-white -rotate-12 tracking-tighter">QIVO</span>
-        </div>
-      </div>
+      {/* HEADER WITH BLUE BACKGROUND - FIXED TO 72PX */}
+      <div className="bg-[#00A2FF] h-[72px] relative overflow-hidden" />
 
-      {/* TOP ACTION CARDS - PULLED UP HIGHER */}
+      {/* TOP ACTION CARDS - PULLED UP HIGHER INTO THE BLUE */}
       <div className="relative px-4 grid grid-cols-2 gap-3 -mt-12 z-20">
         <button 
           onClick={() => router.push('/mystery-note')}
