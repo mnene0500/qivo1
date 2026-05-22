@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ChevronLeft, Coins, Users, Loader2, Send, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { sendMysteryNoteAction } from "@/app/actions/matchflow-actions"
 
 const RECIPIENT_OPTIONS = [2, 5, 10, 20]
 const COST_PER_PERSON = 5
@@ -21,15 +22,12 @@ export default function MysteryNotePage() {
   const [recipientCount, setRecipientCount] = useState(2)
   const [isSending, setIsSending] = useState(false)
   const [userCoins, setUserCoins] = useState(0)
-  const [profile, setProfile] = useState<any>(null)
 
   useEffect(() => {
     if (!user?.id) return
     const fetchData = async () => {
-      const { data: u } = await supabase.from('users').select('*').eq('uid', user.id).single()
-      const { data: b } = await supabase.from('balances').select('coins').eq('user_id', user.id).single()
-      if (u) setProfile(u)
-      if (b) setUserCoins(b.coins)
+      const { data: b } = await supabase.from('balances').select('coins').eq('user_id', user.id).maybeSingle()
+      if (b) setUserCoins(b.coins || 0)
     }
     fetchData()
   }, [user?.id])
@@ -37,7 +35,8 @@ export default function MysteryNotePage() {
   const totalCost = recipientCount * COST_PER_PERSON
 
   const handleSend = async () => {
-    if (!user || !profile || !message.trim()) return
+    if (!user || !message.trim()) return
+    
     if (userCoins < totalCost) {
       toast({ variant: "destructive", title: "Insufficient Coins", description: `You need ${totalCost} coins.` })
       return
@@ -45,46 +44,15 @@ export default function MysteryNotePage() {
 
     setIsSending(true)
     try {
-      const targetGender = profile.gender === 'male' ? 'female' : 'male'
-      
-      const { data: targets } = await supabase
-        .from('users')
-        .select('uid, name, photo_url')
-        .eq('gender', targetGender)
-        .eq('onboarding_complete', true)
-        .neq('uid', user.id)
-        .limit(50)
-
-      if (!targets || targets.length < recipientCount) {
-        toast({ variant: "destructive", title: "Error", description: "Not enough recipients found." })
-        setIsSending(false)
-        return
+      const res = await sendMysteryNoteAction(message, recipientCount)
+      if (res.success) {
+        toast({ title: "Note Sent!", description: `Sent to ${recipientCount} people anonymously.` })
+        router.push("/chats")
+      } else {
+        toast({ variant: "destructive", title: "Error", description: res.error })
       }
-
-      const shuffled = targets.sort(() => Math.random() - 0.5).slice(0, recipientCount)
-      const timestamp = Date.now()
-
-      // Deduct Balance
-      await supabase.from('balances').update({ coins: userCoins - totalCost }).eq('user_id', user.id)
-      await supabase.from('coin_history').insert({ amount: -totalCost, type: 'mystery_note', description: `Mystery Note to ${recipientCount} people`, timestamp, user_id: user.id })
-
-      for (const target of shuffled) {
-        const ids = [user.id, target.uid].sort()
-        const chatId = `direct_${ids[0]}_${ids[1]}`
-        
-        await supabase.from('messages').insert({ chat_id: chatId, text: message.trim(), sender_id: user.id, timestamp })
-        await supabase.from('chats').upsert({
-          id: chatId,
-          last_message: message.trim(),
-          last_message_at: timestamp,
-          participant_ids: [user.id, target.uid]
-        })
-      }
-
-      toast({ title: "Note Sent!" })
-      router.push("/chats")
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Error" })
+      toast({ variant: "destructive", title: "Error", description: "Failed to connect to secure line." })
     } finally {
       setIsSending(false)
     }
@@ -105,19 +73,38 @@ export default function MysteryNotePage() {
           <div className="space-y-4">
             <h2 className="text-2xl font-black text-white leading-tight">Write something<br/>anonymous...</h2>
             <div className="flex flex-wrap items-center gap-3">
-               <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-400 rounded-full shadow-lg"><Coins className="w-3.5 h-3.5 text-yellow-800" /><span className="text-[10px] font-black text-yellow-900">5 coins / user</span></div>
+               <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-400 rounded-full shadow-lg"><Coins className="w-3.5 h-3.5 text-yellow-800" /><span className="text-[10px] font-black text-yellow-900">{COST_PER_PERSON} coins / user</span></div>
                <div className="flex items-center gap-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20">
                   <Users className="w-3.5 h-3.5 text-white/80" />
-                  <select value={recipientCount} onChange={(e) => setRecipientCount(Number(e.target.value))} className="bg-transparent border-none text-[10px] font-black text-white outline-none cursor-pointer uppercase">
+                  <select 
+                    value={recipientCount} 
+                    onChange={(e) => setRecipientCount(Number(e.target.value))} 
+                    className="bg-transparent border-none text-[10px] font-black text-white outline-none cursor-pointer uppercase"
+                  >
                     {RECIPIENT_OPTIONS.map(n => <option key={n} value={n} className="text-black">{n} People</option>)}
                   </select>
                </div>
             </div>
           </div>
-          <Textarea placeholder="Type your note..." value={message} onChange={(e) => setMessage(e.target.value)} className="bg-white rounded-[2rem] min-h-[180px] border-none text-black font-bold p-6 text-sm resize-none shadow-inner" />
-          <Button onClick={handleSend} disabled={isSending || !message.trim()} className="w-full h-16 rounded-full bg-white text-[#00A2FF] font-black uppercase tracking-[0.2em] text-sm shadow-xl active:scale-95 transition-all">
-            {isSending ? <Loader2 className="w-6 h-6 animate-spin" /> : <div className="flex items-center gap-2"><Send className="w-5 h-5" />Blast to {recipientCount} Users</div>}
-          </Button>
+          <Textarea 
+            placeholder="Type your note..." 
+            value={message} 
+            onChange={(e) => setMessage(e.target.value)} 
+            className="bg-white rounded-[2rem] min-h-[180px] border-none text-black font-bold p-6 text-sm resize-none shadow-inner" 
+          />
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-4">
+              <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Total Cost</span>
+              <span className="text-lg font-black text-white">{totalCost} Coins</span>
+            </div>
+            <Button 
+              onClick={handleSend} 
+              disabled={isSending || !message.trim()} 
+              className="w-full h-16 rounded-full bg-white text-[#00A2FF] font-black uppercase tracking-[0.2em] text-sm shadow-xl active:scale-95 transition-all"
+            >
+              {isSending ? <Loader2 className="w-6 h-6 animate-spin" /> : <div className="flex items-center gap-2"><Send className="w-5 h-5" />Blast to {recipientCount} Users</div>}
+            </Button>
+          </div>
         </div>
       </main>
     </div>

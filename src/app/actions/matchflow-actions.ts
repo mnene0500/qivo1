@@ -112,6 +112,66 @@ export async function sendGiftAction(recipientUid: string, coinAmount: number, g
   }
 }
 
+export async function sendMysteryNoteAction(message: string, recipientCount: number) {
+  const COST_PER_PERSON = 5;
+  const totalCost = recipientCount * COST_PER_PERSON;
+
+  try {
+    const user = await getAuthenticatedUser();
+    const { data: profile } = await supabase.from('users').select('gender').eq('uid', user.id).single();
+    if (!profile) return { success: false, error: "Profile not found." };
+
+    const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', user.id).single();
+    if ((bal?.coins || 0) < totalCost) return { success: false, error: "Insufficient coins." };
+
+    const targetGender = profile.gender === 'male' ? 'female' : 'male';
+    const { data: targets } = await supabase
+      .from('users')
+      .select('uid')
+      .eq('gender', targetGender)
+      .eq('onboarding_complete', true)
+      .neq('uid', user.id)
+      .limit(60);
+
+    if (!targets || targets.length < recipientCount) {
+      return { success: false, error: "Not enough matching users online." };
+    }
+
+    const shuffled = targets.sort(() => Math.random() - 0.5).slice(0, recipientCount);
+    const timestamp = Date.now();
+
+    // 1. Deduct Balance
+    await supabase.from('balances').update({ coins: (bal?.coins || 0) - totalCost }).eq('user_id', user.id);
+    await supabase.from('coin_history').insert({
+      user_id: user.id,
+      amount: -totalCost,
+      type: 'mystery_note',
+      description: `Mystery Note to ${recipientCount} people`,
+      timestamp
+    });
+
+    // 2. Deliver Messages
+    for (const target of shuffled) {
+      const ids = [user.id, target.uid].sort();
+      const chatId = `direct_${ids[0]}_${ids[1]}`;
+      
+      await Promise.all([
+        supabase.from('messages').insert({ chat_id: chatId, text: message.trim(), sender_id: user.id, timestamp }),
+        supabase.from('chats').upsert({
+          id: chatId,
+          last_message: message.trim(),
+          last_message_at: timestamp,
+          participant_ids: [user.id, target.uid]
+        }, { onConflict: 'id' })
+      ]);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function toggleUserRoleAction(targetMatchFlowId: string, role: string, value: boolean) {
   try {
     const user = await getAuthenticatedUser();
