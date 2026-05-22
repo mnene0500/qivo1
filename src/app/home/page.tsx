@@ -163,43 +163,44 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* TAB SELECTOR - ADDED MT-8 TO PREVENT TOUCHING BUTTONS */}
-      <div className="px-6 py-2 flex items-center justify-between bg-white sticky top-0 z-30 mt-8">
-        <div className="flex items-center gap-6">
+      {/* TAB SELECTOR - STICKY TOP WITH TOP SPACING */}
+      <div className="sticky top-0 z-30 bg-white">
+        <div className="h-8 bg-white" /> {/* SPACER SO IT DOESNT TOUCH BUTTONS */}
+        <div className="px-6 py-2 flex items-center justify-between border-b border-black/5">
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setActiveTab('Recommend')} 
+              className={cn(
+                "text-base font-bold transition-all relative pb-2", 
+                activeTab === 'Recommend' ? "text-[#00A2FF]" : "text-gray-300"
+              )}
+            >
+              Recommend
+            </button>
+            <button 
+              onClick={() => setActiveTab('Nearby')} 
+              className={cn(
+                "text-base font-bold transition-all relative pb-2", 
+                activeTab === 'Nearby' ? "text-[#00A2FF]" : "text-gray-300"
+              )}
+            >
+              Nearby
+            </button>
+          </div>
           <button 
-            onClick={() => setActiveTab('Recommend')} 
+            onClick={() => fetchUsers(true)} 
+            disabled={isRefreshing}
             className={cn(
-              "text-base font-bold transition-all relative pb-1", 
-              activeTab === 'Recommend' ? "text-[#00A2FF]" : "text-gray-300"
+              "p-2 text-[#00A2FF] active:scale-90 transition-transform", 
+              isRefreshing && "animate-spin"
             )}
           >
-            Recommend
-            {activeTab === 'Recommend' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#00A2FF] rounded-full" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('Nearby')} 
-            className={cn(
-              "text-base font-bold transition-all relative pb-1", 
-              activeTab === 'Nearby' ? "text-[#00A2FF]" : "text-gray-300"
-            )}
-          >
-            Nearby
-            {activeTab === 'Nearby' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#00A2FF] rounded-full" />}
+            <RotateCw className="w-5 h-5" />
           </button>
         </div>
-        <button 
-          onClick={() => fetchUsers(true)} 
-          disabled={isRefreshing}
-          className={cn(
-            "p-2 text-[#00A2FF] active:scale-90 transition-transform", 
-            isRefreshing && "animate-spin"
-          )}
-        >
-          <RotateCw className="w-5 h-5" />
-        </button>
       </div>
 
-      <main className="px-4 pt-1 space-y-4">
+      <main className="px-4 pt-4 space-y-4">
         {initialLoading && users.length === 0 ? (
           <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-[#00A2FF] w-8 h-8" /></div>
         ) : filteredUsers.length === 0 ? (

@@ -126,7 +126,7 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
 
 /**
  * Fulfills a payment by awarding coins.
- * Uses atomic UPSERT to ensure reliability even if RLS is partially restrictive.
+ * Uses atomic fulfillment logic to ensure balance reliability.
  */
 export async function fulfillPaymentAction(orderTrackingId: string, merchantReference: string) {
   try {
@@ -156,7 +156,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
 
       const timestamp = Date.now();
 
-      // Atomic Update: Using UPSERT to bypass "row violates policy" if record missing
+      // Robust Atomic Update
       const { data: balData } = await supabase.from('balances').select('coins').eq('user_id', uid).maybeSingle();
       const currentCoins = Number(balData?.coins) || 0;
       
@@ -168,7 +168,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
 
       if (upsertErr) {
         console.error("Fulfillment Upsert Error:", upsertErr.message);
-        return { success: false, error: "Database fulfillment error." };
+        return { success: false, error: "Database error during fulfillment. Please contact support." };
       }
       
       // Log History & Mark Processed
@@ -180,8 +180,9 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
       return { success: true, coins: coinsToAward };
     }
     
-    return { success: false, error: `Payment status: ${status.status_code}` };
+    return { success: false, error: `Payment status not completed: ${status.status_code}` };
   } catch (err: any) {
+    console.error("Fulfillment Exception:", err.message);
     return { success: false, error: err.message };
   }
 }

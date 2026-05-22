@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useRef } from "react"
@@ -276,7 +275,6 @@ function ChatsContent() {
     <div className="flex-1 bg-white min-h-screen pb-20 select-none">
       <header className="px-6 h-16 flex items-center border-b sticky top-0 bg-white/80 backdrop-blur-md z-50 justify-between">
         <h1 className="text-3xl font-logo text-[#00A2FF] tracking-tight">Chats</h1>
-        <Sparkles className="w-5 h-5 text-blue-100" />
       </header>
       <main className="flex flex-col">
         {loading && chatSummaries.length === 0 ? (
