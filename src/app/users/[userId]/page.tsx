@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, use, useState, useEffect, useRef } from "react"
@@ -252,10 +251,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
               <div className="flex items-center gap-1 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
                 <MapPin className="w-3 h-3 text-[#00A2FF]" />
                 <span className="text-[10px] font-black uppercase tracking-widest">{profile.country || "GLOBAL"}</span>
-              </div>
-              <div className="flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                <Sparkles className="w-3 h-3 text-[#00A2FF]" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#00A2FF]">Top Match</span>
               </div>
             </div>
           </div>

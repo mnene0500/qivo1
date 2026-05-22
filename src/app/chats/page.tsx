@@ -51,10 +51,26 @@ interface ChatSummary {
 }
 
 const GIFTS = [
+  { id: 'candy', name: 'Candy', price: 20, icon: '🍭' },
+  { id: 'coffee', name: 'Coffee', price: 50, icon: '☕' },
+  { id: 'heart', name: 'Heart', price: 100, icon: '❤️' },
   { id: 'rose', name: 'Rose', price: 200, icon: '🌹' },
+  { id: 'chocolate', name: 'Chocolate', price: 300, icon: '🍫' },
+  { id: 'teddy', name: 'Teddy Bear', price: 500, icon: '🧸' },
+  { id: 'perfume', name: 'Perfume', price: 800, icon: '🧴' },
   { id: 'watch', name: 'Luxury Watch', price: 1000, icon: '⌚' },
+  { id: 'handbag', name: 'Handbag', price: 1500, icon: '👜' },
+  { id: 'bouquet', name: 'Bouquet', price: 2000, icon: '💐' },
+  { id: 'sneakers', name: 'Sneakers', price: 3000, icon: '👟' },
+  { id: 'diamond', name: 'Diamond', price: 4000, icon: '💎' },
   { id: 'ring', name: 'Engagement Ring', price: 5000, icon: '💍' },
+  { id: 'phone', name: 'Smartphone', price: 8000, icon: '📱' },
+  { id: 'car', name: 'Sports Car', price: 12000, icon: '🏎️' },
+  { id: 'mansion', name: 'Mansion', price: 15000, icon: '🏰' },
+  { id: 'yacht', name: 'Yacht', price: 18000, icon: '🛥️' },
   { id: 'jet', name: 'Private Jet', price: 20000, icon: '🛩️' },
+  { id: 'supernova', name: 'Supernova', price: 25000, icon: '🌟' },
+  { id: 'universe', name: 'Universe', price: 30000, icon: '🌌' },
 ]
 
 let globalChatSummaries: ChatSummary[] = [];
@@ -214,7 +230,7 @@ function ChatsContent() {
     const cost = (isMan && !isPrivileged) ? 15 : 0;
 
     if (cost > 0 && userBalance < cost) {
-      toast({ variant: "destructive", title: "Insufficient Coins", description: "Men need 15 coins per message." })
+      toast({ variant: "destructive", title: "Insufficient Coins" })
       router.push("/recharge")
       return
     }
@@ -268,7 +284,7 @@ function ChatsContent() {
     // Safety check: verify local balance first for UX
     const cost = type === 'video' ? 150 : 70;
     if (!isPrivileged && userProfile?.gender === 'male' && userBalance < cost) {
-      toast({ variant: "destructive", title: "Insufficient Balance", description: `You need ${cost} coins to start.` })
+      toast({ variant: "destructive", title: "Insufficient Balance" })
       router.push("/recharge")
       return
     }
@@ -276,7 +292,7 @@ function ChatsContent() {
     if (!isPrivileged && userProfile?.gender === 'male') {
       const balanceCheck = await checkCallBalanceAction(currentUser.id, type)
       if (!balanceCheck.success) {
-        toast({ variant: "destructive", title: "Insufficient Balance", description: `You need ${cost} coins to start.` })
+        toast({ variant: "destructive", title: "Insufficient Balance" })
         router.push("/recharge")
         return
       }
@@ -416,27 +432,27 @@ function ChatsContent() {
       {/* GIFT SELECTOR OVERLAY */}
       {showGiftSelector && (
         <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm animate-in fade-in duration-300 flex flex-col justify-end">
-          <div className="bg-white rounded-t-[3rem] p-8 space-y-6 shadow-2xl animate-in slide-in-from-bottom-full duration-500">
+          <div className="bg-white rounded-t-[3rem] p-8 space-y-6 shadow-2xl animate-in slide-in-from-bottom-full duration-500 max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black uppercase tracking-widest">Select a Gift</h3>
-              </div>
+              <h3 className="text-sm font-black uppercase tracking-widest">Select a Gift</h3>
               <Button variant="ghost" size="icon" onClick={() => setShowGiftSelector(false)} className="rounded-full"><X className="w-5 h-5" /></Button>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              {GIFTS.map(gift => (
-                <button 
-                  key={gift.id} 
-                  disabled={isSending}
-                  onClick={() => handleSendGift(gift)}
-                  className="flex flex-col items-center p-6 bg-gray-50 rounded-3xl border border-gray-100 hover:border-pink-200 transition-all active:scale-95 group"
-                >
-                  <span className="text-4xl mb-3 group-hover:scale-110 transition-transform">{gift.icon}</span>
-                  <p className="text-[10px] font-black uppercase tracking-tight text-gray-800">{gift.name}</p>
-                  <p className="text-[9px] font-bold text-pink-500 mt-1">{gift.price} Coins</p>
-                </button>
-              ))}
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
+              <div className="grid grid-cols-2 gap-4">
+                {GIFTS.map(gift => (
+                  <button 
+                    key={gift.id} 
+                    disabled={isSending}
+                    onClick={() => handleSendGift(gift)}
+                    className="flex flex-col items-center p-6 bg-gray-50 rounded-3xl border border-gray-100 hover:border-pink-200 transition-all active:scale-95 group"
+                  >
+                    <span className="text-4xl mb-3 group-hover:scale-110 transition-transform">{gift.icon}</span>
+                    <p className="text-[10px] font-black uppercase tracking-tight text-gray-800">{gift.name}</p>
+                    <p className="text-[9px] font-bold text-pink-500 mt-1">{gift.price} Coins</p>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
