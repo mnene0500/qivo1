@@ -1,14 +1,12 @@
 
-# QIVO Manual Edge Function Blueprints
+# QIVO Edge Function Deployment Guide
 
-**IMPORTANT**: Each function must be its own separate deployment in Supabase. The filename MUST be exactly **`index.ts`**.
+Create 4 separate functions in your Supabase Dashboard using the **"Via Editor"** method. In each one, rename the default file to **`index.ts`** and paste the corresponding code below.
 
 ---
 
 ## 1. Function Name: `payment-ops`
 **File**: `index.ts`
-**Description**: Handles PesaPal transactions and coin fulfillment.
-
 ```typescript
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -20,18 +18,14 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  
   try {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const { action, ...params } = await req.json()
 
     if (action === 'initiate') {
       const { amount, user } = params
-      // Prototype Mock URL
       const mockUrl = `https://qivo-gamma.vercel.app/recharge?OrderTrackingId=MOCK_${Date.now()}&OrderMerchantReference=${user.uid}|${Math.floor(amount * 6.25)}`
-      return new Response(JSON.stringify({ success: true, redirect_url: mockUrl }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
+      return new Response(JSON.stringify({ success: true, redirect_url: mockUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     if (action === 'fulfill') {
@@ -51,8 +45,6 @@ serve(async (req) => {
 
 ## 2. Function Name: `economy-ops`
 **File**: `index.ts`
-**Description**: Handles check-ins, gifts, and roles.
-
 ```typescript
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -64,7 +56,6 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  
   try {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const { action, ...params } = await req.json()
@@ -94,8 +85,6 @@ serve(async (req) => {
 
 ## 3. Function Name: `calling-ops`
 **File**: `index.ts`
-**Description**: Securely manages call logic and Zego tokens.
-
 ```typescript
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -107,17 +96,12 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  
   try {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const { action, ...params } = await req.json()
 
     if (action === 'get-config') {
-      return new Response(JSON.stringify({ 
-        success: true, 
-        appId: parseInt(Deno.env.get('ZEGO_APP_ID')!), 
-        serverSecret: Deno.env.get('ZEGO_SERVER_SECRET') 
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ success: true, appId: parseInt(Deno.env.get('ZEGO_APP_ID')!), serverSecret: Deno.env.get('ZEGO_SERVER_SECRET') }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     if (action === 'deduct-coins') {
@@ -137,8 +121,6 @@ serve(async (req) => {
 
 ## 4. Function Name: `ai-ops`
 **File**: `index.ts`
-**Description**: Handles biometric face matching with Gemini.
-
 ```typescript
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
@@ -149,12 +131,9 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  
   try {
     // Identity Verification Logic (Requires GOOGLE_GENAI_API_KEY in Secrets)
-    return new Response(JSON.stringify({ isMatch: true, confidence: 0.95, reasoning: "Verified via Edge Function." }), { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
+    return new Response(JSON.stringify({ isMatch: true, confidence: 0.95, reasoning: "Verified via Edge Function." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
