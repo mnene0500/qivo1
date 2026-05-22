@@ -21,7 +21,7 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
 
     if (error) {
       console.error("[Initiate Payment Error]", error);
-      return { success: false, error: `Function Error: ${error.message || 'Check if payment-ops is deployed.'}` };
+      return { success: false, error: `Edge Function Error: ${error.message}` };
     }
 
     return data || { success: false, error: "Empty response from payment service." };
@@ -33,18 +33,7 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
 
 export async function fulfillPaymentAction(orderTrackingId: string, merchantReference: string) {
   try {
-    // 1. Instant detection: Check if the background IPN already finished
-    const { data: existing } = await supabase
-      .from('processed_payments')
-      .select('order_tracking_id')
-      .eq('order_tracking_id', orderTrackingId)
-      .maybeSingle();
-
-    if (existing) {
-      return { success: true, message: 'Payment already processed.' };
-    }
-
-    // 2. Active verification: Trigger the Edge Function to verify with PesaPal
+    // Instant check against the balance ledger
     const { data, error } = await supabase.functions.invoke('payment-ops', {
       body: { 
         action: 'fulfill',
@@ -57,6 +46,6 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
     return data;
   } catch (err: any) { 
     console.error("[Fulfill Payment Proxy Error]", err);
-    return { success: false, error: "Verifying with PesaPal..." }; 
+    return { success: false, error: "Verifying with server..." }; 
   }
 }
