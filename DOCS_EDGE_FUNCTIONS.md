@@ -1,15 +1,12 @@
 
 # QIVO Manual Edge Function Blueprints
 
-Follow these steps for each of the 4 required functions:
-1. Create a **New Function** in Supabase.
-2. Name it exactly (e.g., `payment-ops`).
-3. Paste the corresponding code below into the `index.ts` file.
-4. Add your secrets in **Edge Functions > Manage Secrets**.
+**IMPORTANT**: Each function must be its own separate deployment in Supabase. The filename MUST be exactly **`index.ts`**.
 
 ---
 
 ## 1. Function Name: `payment-ops`
+**File**: `index.ts`
 **Description**: Handles PesaPal transactions and coin fulfillment.
 
 ```typescript
@@ -53,6 +50,7 @@ serve(async (req) => {
 ---
 
 ## 2. Function Name: `economy-ops`
+**File**: `index.ts`
 **Description**: Handles check-ins, gifts, and roles.
 
 ```typescript
@@ -95,6 +93,7 @@ serve(async (req) => {
 ---
 
 ## 3. Function Name: `calling-ops`
+**File**: `index.ts`
 **Description**: Securely manages call logic and Zego tokens.
 
 ```typescript
@@ -137,6 +136,7 @@ serve(async (req) => {
 ---
 
 ## 4. Function Name: `ai-ops`
+**File**: `index.ts`
 **Description**: Handles biometric face matching with Gemini.
 
 ```typescript
