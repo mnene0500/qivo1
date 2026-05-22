@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Mail, Loader2 } from "lucide-react"
+import { Mail, Loader2, RefreshCw } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
@@ -64,6 +64,13 @@ export default function WelcomePage() {
     }
   }
 
+  const handleClearCache = () => {
+    localStorage.clear()
+    sessionStorage.clear()
+    toast({ title: "App Reset", description: "Storage cleared. Refreshing..." })
+    setTimeout(() => window.location.reload(), 1000)
+  }
+
   if (!mounted || (isInitialized && user)) {
     return (
       <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4">
@@ -123,9 +130,13 @@ export default function WelcomePage() {
                 Continue with Google
               </div>
             </Button>
+
+            <button onClick={handleClearCache} className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em] gap-2 flex items-center justify-center w-full hover:text-white/40 transition-colors">
+              <RefreshCw className="w-2 h-2" /> Stale Session? Clear Cache
+            </button>
           </div>
 
-          <div className="pt-8">
+          <div className="pt-4">
             <p className="text-[10px] text-white/30 font-medium px-8 leading-relaxed">
               By entering, you confirm you are 18+ and agree to our <Link href="/terms" className="text-white/50 underline">Terms</Link> and <Link href="/privacy" className="text-white/50 underline">Privacy Policy</Link>.
             </p>

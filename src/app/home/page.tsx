@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { BottomNav } from "@/components/layout/BottomNav"
-import { Target, RotateCw, FileText, BadgeCheck, Loader2, MessageSquare } from "lucide-react"
+import { Target, RotateCw, FileText, BadgeCheck, Loader2, MessageSquare, Sparkles } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
@@ -147,8 +147,12 @@ export default function HomePage() {
   return (
     <div className="flex-1 pb-24 bg-[#F9FAFB] min-h-screen relative select-none">
       <div className="absolute top-0 left-0 right-0 z-0 flex flex-col">
-        <div className="h-[72px] bg-[#00A2FF]" /><div className="h-[120px] bg-white shadow-sm" />
+        <div className="h-[100px] bg-[#00A2FF] flex items-end justify-center pb-4">
+           <h1 className="text-4xl font-logo text-white drop-shadow-md">QIVO</h1>
+        </div>
+        <div className="h-[120px] bg-white shadow-sm" />
       </div>
+
       <div className="relative z-10">
         <div className="px-4 pt-4 pb-2">
           <div className="grid grid-cols-2 gap-4">
@@ -156,13 +160,15 @@ export default function HomePage() {
             <div onClick={() => router.push('/tasks')} className="bg-gradient-to-br from-[#A88CFF] to-[#7B61FF] p-4 flex flex-col justify-between h-28 rounded-2xl shadow-lg cursor-pointer active:scale-95 transition-transform"><Target className="w-5 h-5 text-white" /><h3 className="text-white font-semibold text-sm">Task Center</h3></div>
           </div>
         </div>
+
         <div className="sticky top-0 z-40 bg-[#F9FAFB]/90 backdrop-blur-md px-5 pt-3 pb-3 border-b border-black/5 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <button onClick={() => setActiveTab('Recommend')} className={cn("text-sm font-semibold", activeTab === 'Recommend' ? "text-[#00A2FF]" : "text-gray-400")}>Recommend</button>
-            <button onClick={() => setActiveTab('Nearby')} className={cn("text-sm font-semibold", activeTab === 'Nearby' ? "text-[#00A2FF]" : "text-gray-400")}>Nearby</button>
+            <button onClick={() => setActiveTab('Recommend')} className={cn("text-sm font-black uppercase tracking-widest", activeTab === 'Recommend' ? "text-[#00A2FF]" : "text-gray-300")}>Recommend</button>
+            <button onClick={() => setActiveTab('Nearby')} className={cn("text-sm font-black uppercase tracking-widest", activeTab === 'Nearby' ? "text-[#00A2FF]" : "text-gray-300")}>Nearby</button>
           </div>
           <button onClick={() => fetchUsers(true)} disabled={isRefreshing} className={cn("p-1.5 text-[#00A2FF]", isRefreshing && "animate-spin")}><RotateCw className="w-5 h-5" /></button>
         </div>
+
         <main className="px-4 pt-3">
           {filteredUsers.length === 0 && !initialLoading ? (
             <div className="py-20 text-center space-y-4 opacity-40">
@@ -172,20 +178,20 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {filteredUsers.map((u) => (
-                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.2] rounded-2xl shadow-xl bg-white group" onClick={() => router.push(`/users/${u.uid}`)}>
+                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.2] rounded-2xl shadow-xl bg-white group animate-in fade-in zoom-in-95 duration-500" onClick={() => router.push(`/users/${u.uid}`)}>
                   <Image src={u.photo_url || ""} alt={u.name} fill className="object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
                   
                   <div 
                     onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}
-                    className="absolute top-2.5 right-2.5 px-3 h-8 bg-[#00A2FF] rounded-full flex items-center justify-center text-white shadow-xl active:scale-90 transition-all z-20 hover:bg-[#0081CC]"
+                    className="absolute top-2.5 right-2.5 px-4 h-8 bg-[#00A2FF] rounded-full flex items-center justify-center text-white shadow-xl active:scale-90 transition-all z-20 hover:bg-[#0081CC] border border-white/20"
                   >
                     <span className="text-[10px] font-black uppercase tracking-widest">Chat</span>
                   </div>
 
                   <div className="absolute inset-x-0 bottom-0 p-3 text-white">
                     <div className="flex items-center gap-1.5"><h4 className="font-bold text-sm truncate">{u.name}</h4>{u.is_verified && <BadgeCheck className="w-4 h-4 text-[#00A2FF] fill-white" />}</div>
-                    <div className="flex items-center gap-1.5 mt-1"><span className="bg-[#006400] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">{calculateAge(u.dob)}</span><span className="text-white/60 text-[10px]">{u.country}</span></div>
+                    <div className="flex items-center gap-1.5 mt-1"><span className="bg-[#006400] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">{calculateAge(u.dob)}</span><span className="text-white/60 text-[10px] font-medium uppercase tracking-tighter">{u.country}</span></div>
                   </div>
                 </Card>
               ))}
