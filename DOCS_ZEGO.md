@@ -1,3 +1,4 @@
+
 # ZegoCloud Production One-on-One Calling
 
 ## 1. Production Credentials
@@ -7,7 +8,9 @@ Add these to your **Vercel Environment Variables**:
 | Variable | Value | Importance |
 | :--- | :--- | :--- |
 | `ZEGO_APP_ID` | Your App ID | Critical |
-| `ZEGO_SERVER_SECRET` | Your Server Secret | **DO NOT PREFIX WITH NEXT_PUBLIC_** |
+| `ZEGO_SERVER_SECRET` | Your Server Secret | **SECRET (Keep Private)** |
+
+*Note: Unlike the prototype, do NOT prefix these with `NEXT_PUBLIC_`. The app now fetches them securely via a server action.*
 
 ## 2. Real-time Calling Logic
 - **Caller**: Deducted **150 coins/min** (Video) or **70 coins/min** (Voice).

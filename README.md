@@ -1,25 +1,35 @@
 
-# QIVO
+# QIVO Production Platform
 
-This is a NextJS social platform built in Firebase Studio, optimized for Supabase high-performance backend.
+This is the production-ready build of QIVO, optimized for Supabase and integrated with PesaPal, ZegoCloud, and Gemini AI.
 
-## Getting Started
-To get started, take a look at `src/app/page.tsx`.
+## 🚀 Critical Production Checklist
 
-## Critical Setup
-To enable all premium features, you must configure the following:
+To enable all features, you MUST complete these steps in order:
 
-1. **Supabase Database**: You MUST run the SQL initialization script found in [DOCS_SUPABASE_SQL.md](./DOCS_SUPABASE_SQL.md) in your Supabase SQL Editor. This is required for the wallet, gifting, and reporting systems to function.
-2. **PesaPal**: Follow [DOCS_PESAPAL.md](./DOCS_PESAPAL.md) for mobile payments.
-3. **ZegoCloud**: Follow [DOCS_ZEGO.md](./DOCS_ZEGO.md) for video calling.
-4. **Gemini AI**: Add `GOOGLE_GENAI_API_KEY` as detailed in [DOCS_AI.md](./DOCS_AI.md).
+### 1. Database Initialization
+Run the SQL script found in [DOCS_SUPABASE_SQL.md](./DOCS_SUPABASE_SQL.md) in your **Supabase SQL Editor**. This sets up the wallet, gifting, and Row Level Security (RLS).
 
-## Features
-- **Real-time Economy**: Coins and Diamonds synced via Supabase Realtime.
-- **Gender-Based Gifting**: Rewards recipients (50% for females, 40% for males).
-- **Violation Reporting**: Submit formal complaints with statement and photo proof.
-- **Cinematic Discovery**: Modern hero headers and sticky navigation for smooth browsing.
-- **Identity Verification**: AI-powered selfie verification using Genkit.
-- **Agency System**: Recruitment and diamond withdrawal management.
-- **Strict Blocking**: Secure communication gates to prevent harassment.
-- **Progressive Web App**: Offline support and home screen installation.
+### 2. Vercel Environment Variables
+Add the following keys to your **Vercel Dashboard > Settings > Environment Variables**:
+
+| Service | Variable Name |
+| :--- | :--- |
+| **Supabase** | `SUPABASE_SERVICE_ROLE_KEY` |
+| **ZegoCloud** | `ZEGO_APP_ID`, `ZEGO_SERVER_SECRET` |
+| **PesaPal** | `PESAPAL_CONSUMER_KEY`, `PESAPAL_CONSUMER_SECRET`, `PESAPAL_IPN_ID` |
+| **Gemini AI** | `GOOGLE_GENAI_API_KEY` |
+
+### 3. PesaPal IPN Registration
+Once the app is live on Vercel:
+1. Log in as an Admin.
+2. Visit `/pesapal-admin`.
+3. Run the "Live Registration" tool to get your `PESAPAL_IPN_ID`.
+4. Update Vercel with this ID and redeploy.
+
+## 💎 Core Features
+- **Secure Economy**: Coins/Diamonds managed via atomic server-side transactions.
+- **Biometric Verification**: AI face-matching using Genkit and Gemini 2.5 Flash.
+- **Premium Calling**: One-on-one video/voice calls with per-minute billing and recipient rewards.
+- **Agency Ecosystem**: Integrated recruitment and diamond withdrawal management.
+- **Safe Community**: Multi-layered reporting, blocking, and admin control centers.
