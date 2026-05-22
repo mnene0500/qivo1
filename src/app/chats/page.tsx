@@ -7,7 +7,7 @@ import { BottomNav } from "@/components/layout/BottomNav"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, Loader2, User, Trash2, MoreVertical, AlertCircle, Gift, Phone, Video } from "lucide-react"
+import { Send, ChevronLeft, Loader2, User, Trash2, MoreVertical, AlertCircle, Gift, Phone, Video, Ban } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
@@ -101,7 +101,7 @@ function ChatsContent() {
   }, [currentUser?.id])
 
   useEffect(() => {
-    if (!currentUser?.id || startWithId) return
+    if (!currentUser?.id || startWithId || !userProfile) return
     
     const fetchSummaries = async () => {
       const { data: chatsData } = await supabase
@@ -111,9 +111,11 @@ function ChatsContent() {
         .order('last_message_at', { ascending: false })
 
       if (chatsData) {
+        const blockedUids = new Set([...(userProfile.blocking || []), ...(userProfile.blocked_by || [])]);
+        
         const enhanced = await Promise.all(chatsData.map(async (c) => {
           const pId = c.participant_ids.find((id: string) => id !== currentUser.id)
-          if (!pId) return null;
+          if (!pId || blockedUids.has(pId)) return null;
 
           const userClearedAt = c.cleared_at?.[currentUser.id] || 0
           if (c.last_message_at <= userClearedAt) return null
@@ -143,7 +145,7 @@ function ChatsContent() {
     fetchSummaries()
     const channel = supabase.channel('chats_realtime').on('postgres_changes', { event: '*', table: 'chats' }, () => fetchSummaries()).subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [currentUser?.id, startWithId])
+  }, [currentUser?.id, startWithId, userProfile])
 
   useEffect(() => {
     if (currentUser?.id && startWithId) {
@@ -180,8 +182,13 @@ function ChatsContent() {
     return () => { supabase.removeChannel(channel) }
   }, [chatId, activeChatClearedAt])
 
+  const isBlocked = partnerProfile && userProfile && (
+    (userProfile.blocking || []).includes(partnerProfile.uid) || 
+    (userProfile.blocked_by || []).includes(partnerProfile.uid)
+  );
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !chatId || !currentUser?.id || !startWithId || !userProfile) return
+    if (!newMessage.trim() || !chatId || !currentUser?.id || !startWithId || !userProfile || isBlocked) return
     
     const isPrivileged = 
       userProfile.is_admin || 
@@ -220,14 +227,14 @@ function ChatsContent() {
   }
 
   const handleSendGift = async () => {
-    if (!currentUser || !startWithId) return
+    if (!currentUser || !startWithId || isBlocked) return
     const res = await sendGiftAction(startWithId, 200, "Rose")
     if (res.success) toast({ title: "Gift Sent!" })
     else toast({ variant: "destructive", title: "Error", description: res.error })
   }
 
   const handleCall = async (type: 'voice' | 'video') => {
-    if (!currentUser || !startWithId || !partnerProfile || !chatId) return
+    if (!currentUser || !startWithId || !partnerProfile || !chatId || isBlocked) return
     const isPrivileged = userProfile?.is_admin || userProfile?.is_coin_seller;
     if (!isPrivileged && userProfile?.gender === 'male') {
       const balanceCheck = await checkCallBalanceAction(currentUser.id, type)
@@ -325,8 +332,8 @@ function ChatsContent() {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => handleCall('voice')} className="rounded-full text-black"><Phone className="w-5 h-5" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => handleCall('video')} className="rounded-full text-black"><Video className="w-5 h-5" /></Button>
+          <Button disabled={isBlocked} variant="ghost" size="icon" onClick={() => handleCall('voice')} className="rounded-full text-black"><Phone className="w-5 h-5" /></Button>
+          <Button disabled={isBlocked} variant="ghost" size="icon" onClick={() => handleCall('video')} className="rounded-full text-black"><Video className="w-5 h-5" /></Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="rounded-full"><MoreVertical className="w-5 h-5 text-gray-400" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl min-w-[160px]"><DropdownMenuItem onClick={() => handleClearChat()} className="text-red-500 font-bold gap-2 p-3"><Trash2 className="w-4 h-4" /> Delete Chat</DropdownMenuItem></DropdownMenuContent>
@@ -335,7 +342,12 @@ function ChatsContent() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-6 flex flex-col-reverse gap-4 bg-[#F9FAFB]">
-        {messages.map(m => (
+        {isBlocked ? (
+          <div className="flex-1 flex flex-col items-center justify-center opacity-40 space-y-4">
+             <Ban className="w-12 h-12 text-gray-300" />
+             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">User Unavailable</p>
+          </div>
+        ) : messages.map(m => (
           <div key={m.id} className={cn("max-w-[80%] p-4 rounded-3xl text-sm font-medium shadow-sm", m.sender_id === currentUser?.id ? "bg-[#00A2FF] text-white self-end rounded-br-none" : "bg-white text-black self-start rounded-bl-none border border-black/5", m.is_optimistic && "opacity-60", m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-400 text-white italic")}>
             {m.text}
           </div>
@@ -343,12 +355,24 @@ function ChatsContent() {
       </main>
 
       <footer className="p-4 pb-8 border-t bg-white flex flex-col gap-2">
-        {userProfile?.gender === 'male' && !isPrivileged && <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-1">Message cost: 15 Coins</div>}
-        {isPrivileged && <div className="text-[9px] font-bold text-blue-500 uppercase tracking-widest px-2 mb-1">VIP: Free Communication Enabled</div>}
+        {!isBlocked && (
+          <>
+            {userProfile?.gender === 'male' && !isPrivileged && <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-1">Message cost: 15 Coins</div>}
+            {isPrivileged && <div className="text-[9px] font-bold text-blue-500 uppercase tracking-widest px-2 mb-1">VIP: Free Communication Enabled</div>}
+          </>
+        )}
         <div className="flex gap-2 items-center">
-          <Button variant="ghost" size="icon" onClick={handleSendGift} className="rounded-full h-12 w-12 text-pink-500 hover:bg-pink-50"><Gift className="w-6 h-6" /></Button>
-          <input value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 h-12 bg-gray-50 rounded-2xl px-5 text-sm font-bold placeholder:text-gray-300 outline-none" placeholder="Say something nice..." />
-          <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending} size="icon" className="rounded-full h-12 w-12 bg-[#00A2FF] hover:bg-[#0081CC] shadow-lg"><Send className="w-5 h-5 text-white" /></Button>
+          {isBlocked ? (
+            <div className="flex-1 h-12 bg-gray-50 rounded-2xl flex items-center justify-center border border-dashed border-gray-200">
+               <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Interaction Restricted</span>
+            </div>
+          ) : (
+            <>
+              <Button variant="ghost" size="icon" onClick={handleSendGift} className="rounded-full h-12 w-12 text-pink-500 hover:bg-pink-50"><Gift className="w-6 h-6" /></Button>
+              <input value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 h-12 bg-gray-50 rounded-2xl px-5 text-sm font-bold placeholder:text-gray-300 outline-none" placeholder="Say something nice..." />
+              <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending} size="icon" className="rounded-full h-12 w-12 bg-[#00A2FF] hover:bg-[#0081CC] shadow-lg"><Send className="w-5 h-5 text-white" /></Button>
+            </>
+          )}
         </div>
       </footer>
     </div>

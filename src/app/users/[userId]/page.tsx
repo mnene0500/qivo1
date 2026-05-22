@@ -57,17 +57,23 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
   const presence = useUserPresence(userId)
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [myProfile, setMyProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isPhotoOpen, setIsPhotoOpen] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    supabase.from('users').select('*').eq('uid', userId).single().then(({ data }) => {
-      if (data) setProfile(data)
+    if (!currentUser?.id) return
+    Promise.all([
+      supabase.from('users').select('*').eq('uid', userId).single(),
+      supabase.from('users').select('blocking, blocked_by').eq('uid', currentUser.id).single()
+    ]).then(([{ data: target }, { data: me }]) => {
+      if (target) setProfile(target)
+      if (me) setMyProfile(me)
       setLoading(false)
     })
-  }, [userId])
+  }, [userId, currentUser?.id])
 
   const calculateAge = (dob: string) => {
     if (!dob) return "21"
@@ -124,6 +130,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
     </div>
   )
 
+  const isBlocked = myProfile && (
+    (myProfile.blocking || []).includes(profile.uid) || 
+    (myProfile.blocked_by || []).includes(profile.uid)
+  );
+
   const age = calculateAge(profile.dob)
   const allPhotos = Array.from(new Set([profile.photo_url, ...(profile.additional_photos || [])].filter(Boolean)));
 
@@ -143,10 +154,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full bg-black/20 backdrop-blur-xl text-white w-12 h-12 border border-white/20 shadow-xl active:scale-90 transition-all"><ChevronLeft className="w-7 h-7" /></Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="rounded-full bg-black/20 backdrop-blur-xl text-white w-12 h-12 border border-white/20 shadow-xl active:scale-90 transition-all"><MoreHorizontal className="w-7 h-7" /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-[2rem] min-w-[180px] p-2 border-none shadow-2xl"><DropdownMenuItem onClick={handleBlock} className="rounded-2xl h-12 text-red-500 font-bold gap-3 px-4"><Ban className="w-5 h-5" /> Block User</DropdownMenuItem><DropdownMenuItem onClick={handleReport} className="rounded-2xl h-12 font-bold gap-3 px-4"><Flag className="w-5 h-5 text-gray-400" /> Report</DropdownMenuItem></DropdownMenuContent>
+            <DropdownMenuContent align="end" className="rounded-[2rem] min-w-[180px] p-2 border-none shadow-2xl">
+              <DropdownMenuItem onClick={handleBlock} className="rounded-2xl h-12 text-red-500 font-bold gap-3 px-4"><Ban className="w-5 h-5" /> Block User</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleReport} className="rounded-2xl h-12 font-bold gap-3 px-4"><Flag className="w-5 h-5 text-gray-400" /> Report</DropdownMenuItem>
+            </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {presence?.state === 'online' && (
+        {presence?.state === 'online' && !isBlocked && (
           <div className="absolute bottom-10 left-8 bg-green-500/90 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl flex items-center gap-2">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />Online
           </div>
@@ -194,7 +208,16 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
       )}
 
       <div className="fixed bottom-0 inset-x-0 p-8 bg-gradient-to-t from-white via-white/95 to-transparent z-50">
-        <Button className="w-full h-20 rounded-[2.5rem] bg-[#00A2FF] hover:bg-[#0081CC] text-white text-base font-black flex items-center justify-center gap-4 shadow-[0_20px_50px_rgba(0,162,255,0.4)] uppercase tracking-[0.2em]" onClick={() => router.push(`/chats?startWith=${profile.uid}`)}><MessageSquare className="w-6 h-6 fill-white" />Send Message</Button>
+        <Button 
+          disabled={isBlocked}
+          className={cn(
+            "w-full h-20 rounded-[2.5rem] text-white text-base font-black flex items-center justify-center gap-4 shadow-xl uppercase tracking-[0.2em]",
+            isBlocked ? "bg-gray-200 shadow-none cursor-not-allowed" : "bg-[#00A2FF] hover:bg-[#0081CC] shadow-[0_20px_50px_rgba(0,162,255,0.4)]"
+          )} 
+          onClick={() => router.push(`/chats?startWith=${profile.uid}`)}
+        >
+          {isBlocked ? <><Ban className="w-6 h-6" /> User Blocked</> : <><MessageSquare className="w-6 h-6 fill-white" />Send Message</>}
+        </Button>
       </div>
     </div>
   )

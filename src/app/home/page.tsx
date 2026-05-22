@@ -20,6 +20,8 @@ interface UserProfile {
   onboarding_complete: boolean
   is_verified?: boolean
   is_deleted?: boolean
+  blocking?: string[]
+  blocked_by?: string[]
 }
 
 let globalUserCache: UserProfile[] = [];
@@ -57,7 +59,7 @@ export default function HomePage() {
     const checkProfile = async () => {
       const { data } = await supabase
         .from('users')
-        .select('onboarding_complete, country, gender')
+        .select('onboarding_complete, country, gender, blocking, blocked_by')
         .eq('uid', currentUser.id)
         .maybeSingle();
       
@@ -105,7 +107,8 @@ export default function HomePage() {
         .limit(60);
 
       if (data) {
-        const filtered = (data as UserProfile[]).filter(u => u.uid !== currentUser?.id)
+        const blockedUids = new Set([...(profile.blocking || []), ...(profile.blocked_by || [])]);
+        const filtered = (data as UserProfile[]).filter(u => u.uid !== currentUser?.id && !blockedUids.has(u.uid))
         const shuffled = filtered.sort(() => Math.random() - 0.5)
         setUsers(shuffled)
         globalUserCache = shuffled
@@ -116,7 +119,7 @@ export default function HomePage() {
       setIsRefreshing(false)
       setInitialLoading(false)
     }
-  }, [currentUser?.id, profile?.gender, users.length])
+  }, [currentUser?.id, profile, users.length])
 
   useEffect(() => {
     if (statusChecked && profile && users.length === 0) {
@@ -133,12 +136,10 @@ export default function HomePage() {
 
   return (
     <div className="flex-1 pb-24 bg-white min-h-screen relative select-none animate-in fade-in duration-300">
-      {/* HEADER WITH BLUE BACKGROUND - FIXED TO 72PX */}
       <div className="bg-[#00A2FF] h-[72px] relative overflow-hidden">
         <h1 className="absolute -bottom-4 left-4 text-7xl font-black text-white opacity-10 -rotate-12 pointer-events-none select-none">QIVO</h1>
       </div>
 
-      {/* TOP ACTION CARDS - PULLED UP HIGHER INTO THE BLUE */}
       <div className="relative px-4 grid grid-cols-2 gap-3 -mt-12 z-20">
         <button 
           onClick={() => router.push('/mystery-note')}
@@ -163,9 +164,8 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* TAB SELECTOR - STICKY TOP WITH TOP SPACING GAP */}
       <div className="sticky top-0 z-30 bg-white">
-        <div className="h-8 bg-white" /> {/* GAP SO IT DOESNT TOUCH BUTTONS */}
+        <div className="h-8 bg-white" />
         <div className="px-6 py-2 flex items-center justify-between border-b border-black/5">
           <div className="flex items-center gap-6">
             <button 
