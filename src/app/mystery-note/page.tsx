@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { sendMysteryNoteAction } from "@/app/actions/matchflow-actions"
 
 const RECIPIENT_OPTIONS = [2, 5, 10, 20]
-const COST_PER_PERSON = 5
+const COST_PER_PERSON = 10
 
 export default function MysteryNotePage() {
   const router = useRouter()

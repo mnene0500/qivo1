@@ -113,7 +113,7 @@ export async function sendGiftAction(recipientUid: string, coinAmount: number, g
 }
 
 export async function sendMysteryNoteAction(message: string, recipientCount: number) {
-  const COST_PER_PERSON = 5;
+  const COST_PER_PERSON = 10;
   const totalCost = recipientCount * COST_PER_PERSON;
 
   try {
