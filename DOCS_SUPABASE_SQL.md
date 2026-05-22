@@ -1,18 +1,23 @@
+# QIVO Production SQL (Secure with RLS)
 
-# QIVO Supabase SQL Setup (Production with RLS)
-
-To enable the economy, gifting, reporting, and realtime systems, copy and run the following script in your **Supabase SQL Editor**. 
-
-**IMPORTANT**: This script enables **Row Level Security (RLS)**. Users will only be able to view and manage their own financial data and private conversations.
+Run this entire script in your **Supabase SQL Editor** to initialize the economy, gifting, and calling systems.
 
 ```sql
--- 1. RESET TABLES
-DROP TABLE IF EXISTS public.users, public.balances, public.coin_history, public.diamond_history, public.processed_payments, public.chats, public.messages, public.agencies, public.withdrawals, public.reports CASCADE;
+-- 1. SETUP HELPER FUNCTIONS
+CREATE OR REPLACE FUNCTION public.increment_diamonds(user_id UUID, amount NUMERIC)
+RETURNS VOID AS $$
+BEGIN
+  INSERT INTO public.balances (user_id, diamonds)
+  VALUES (user_id, amount)
+  ON CONFLICT (user_id)
+  DO UPDATE SET diamonds = balances.diamonds + amount, updated_at = NOW();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. EXTEND USERS TABLE
+-- 2. CREATE TABLES
 CREATE TABLE public.users (
   uid UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT UNIQUE,
+  email TEXT,
   name TEXT,
   gender TEXT,
   dob DATE,
@@ -38,7 +43,6 @@ CREATE TABLE public.users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. WALLET BALANCES
 CREATE TABLE public.balances (
   user_id UUID PRIMARY KEY REFERENCES public.users(uid) ON DELETE CASCADE,
   coins BIGINT DEFAULT 0,
@@ -46,7 +50,6 @@ CREATE TABLE public.balances (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. COIN LEDGER
 CREATE TABLE public.coin_history (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
@@ -56,7 +59,6 @@ CREATE TABLE public.coin_history (
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
--- 5. DIAMOND LEDGER
 CREATE TABLE public.diamond_history (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
@@ -66,7 +68,6 @@ CREATE TABLE public.diamond_history (
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
--- 6. PAYMENT TRACKING
 CREATE TABLE public.processed_payments (
   order_tracking_id TEXT PRIMARY KEY,
   user_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
@@ -76,7 +77,6 @@ CREATE TABLE public.processed_payments (
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
--- 7. CHATS & MESSAGING
 CREATE TABLE public.chats (
   id TEXT PRIMARY KEY,
   participant_ids UUID[] NOT NULL,
@@ -95,7 +95,6 @@ CREATE TABLE public.messages (
   is_gift BOOLEAN DEFAULT FALSE
 );
 
--- 8. AGENCY SYSTEM
 CREATE TABLE public.agencies (
   code TEXT PRIMARY KEY,
   agent_uid UUID REFERENCES public.users(uid) ON DELETE CASCADE,
@@ -113,7 +112,6 @@ CREATE TABLE public.withdrawals (
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
--- 9. REPORTING SYSTEM
 CREATE TABLE public.reports (
   id BIGSERIAL PRIMARY KEY,
   reporter_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
@@ -125,17 +123,10 @@ CREATE TABLE public.reports (
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
--- 10. ENABLE REALTIME REPLICATION
-ALTER PUBLICATION supabase_realtime ADD TABLE public.balances;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.coin_history;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.diamond_history;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.chats;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.withdrawals;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.reports;
+-- 3. ENABLE REALTIME
+ALTER PUBLICATION supabase_realtime ADD TABLE public.balances, public.coin_history, public.diamond_history, public.chats, public.messages, public.users, public.withdrawals, public.reports;
 
--- 11. ENABLE ROW LEVEL SECURITY (RLS)
+-- 4. ENABLE RLS
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.balances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coin_history ENABLE ROW LEVEL SECURITY;
@@ -147,31 +138,32 @@ ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
--- 12. DEFINE SECURITY POLICIES
+-- 5. DEFINE SECURITY POLICIES
 
--- USERS: Everyone can read profiles, only owner can update
+-- USERS
 CREATE POLICY "Public profiles are viewable by everyone" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Users can insert own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = uid);
 CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = uid);
 
--- BALANCES: Only user can see/update their own balance
+-- BALANCES (Secure: System-only updates via Server Actions)
 CREATE POLICY "Users can view own balance" ON public.balances FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "System can update balance" ON public.balances FOR ALL USING (true); 
 
--- LEDGERS: Only owner can view
+-- LEDGERS (Secure: User can see history, but not spoof entries)
 CREATE POLICY "Users can view own coin history" ON public.coin_history FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can view own diamond history" ON public.diamond_history FOR SELECT USING (auth.uid() = user_id);
 
--- CHATS: Only participants can view
-CREATE POLICY "Participants can view their chats" ON public.chats FOR SELECT USING (auth.uid() = ANY(participant_ids));
-CREATE POLICY "Participants can update their chats" ON public.chats FOR UPDATE USING (auth.uid() = ANY(participant_ids));
-
--- MESSAGES: Only chat participants can read/write
+-- CHATS & MESSAGES
+CREATE POLICY "Participants can view chats" ON public.chats FOR SELECT USING (auth.uid() = ANY(participant_ids));
 CREATE POLICY "Participants can view messages" ON public.messages FOR SELECT USING (EXISTS (
   SELECT 1 FROM public.chats WHERE id = chat_id AND auth.uid() = ANY(participant_ids)
 ));
 CREATE POLICY "Participants can send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
--- 13. GRANT PERMISSIONS
+-- FINANCIALS (Withdrawals/Payments)
+CREATE POLICY "Users can view own withdrawals" ON public.withdrawals FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own payments" ON public.processed_payments FOR SELECT USING (auth.uid() = user_id);
+
+-- 6. GRANT PERMISSIONS
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;

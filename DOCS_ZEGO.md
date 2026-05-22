@@ -1,37 +1,23 @@
+# ZegoCloud Production One-on-One Calling
 
-# ZegoCloud One-on-One Calling Setup
+## 1. Production Credentials
+Go to [ZegoCloud Admin Console](https://console.zegocloud.com/) and get your App ID and Server Secret.
 
-## 1. Credentials
-Go to [ZegoCloud Admin Console](https://console.zegocloud.com/) and create a project.
-Get your App ID and Server Secret.
+Add these to your **Vercel Environment Variables**:
+| Variable | Value | Importance |
+| :--- | :--- | :--- |
+| `ZEGO_APP_ID` | Your App ID | Critical |
+| `ZEGO_SERVER_SECRET` | Your Server Secret | **DO NOT PREFIX WITH NEXT_PUBLIC_** |
 
-Add to Vercel/Environment:
-| Variable | Value |
-| :--- | :--- |
-| `NEXT_PUBLIC_ZEGO_APP_ID` | Your App ID (Number) |
-| `NEXT_PUBLIC_ZEGO_SERVER_SECRET` | Your Server Secret (String) |
+## 2. Real-time Calling Logic
+- **Caller**: Deducted **150 coins/min** (Video) or **70 coins/min** (Voice).
+- **Recipient**: Receives **Diamonds** based on their gender-reward rate.
+- **Server Authority**: Every minute is validated on the server. If balance runs out, the call is disconnected automatically.
 
-*Note: For testing convenience in a prototype, we use `NEXT_PUBLIC_` for the secret. In a strict production app, tokens should be generated on a secure server.*
+## 3. Production Token Note
+For maximum security, you should use the `zego-server-assistant` library on the server to generate a JWT token rather than using `generateKitTokenForTest`. The current implementation hides the secret from the browser, but a JWT token is the final industry standard for production apps.
 
-## 2. RTDB Rules
-Update your Firebase Realtime Database rules to allow signaling:
-
-```json
-{
-  "rules": {
-    "calls": {
-      "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null"
-      }
-    }
-  }
-}
-```
-
-## 3. How it Works
-1. When User A clicks the "Video" icon in Chat, it writes to `calls/UserB` in RTDB.
-2. User B has a `CallManager` listening globally. It shows a premium full-screen "Incoming Call" popup.
-3. If User B accepts, both are redirected to `/call/[chatId]`.
-4. The caller is billed **150 coins/min** for Video or **70 coins/min** for Voice. 
-5. The first charge occurs as soon as User B joins the room.
+## 4. Troubleshooting
+If calls fail to connect:
+1. Ensure `ZEGO_SERVER_SECRET` is exactly as shown in the console.
+2. Verify your domain is not blocked by Zego's allowlist (if configured).
