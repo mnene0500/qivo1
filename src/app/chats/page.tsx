@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, Loader2, User, Trash2, MoreVertical, AlertCircle, Gift, Phone, Video, Ban, X, Sparkles } from "lucide-react"
+import { Send, ChevronLeft, Loader2, User, Trash2, MoreVertical, AlertCircle, Gift, Phone, Video, Ban, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
@@ -419,7 +419,6 @@ function ChatsContent() {
           <div className="bg-white rounded-t-[3rem] p-8 space-y-6 shadow-2xl animate-in slide-in-from-bottom-full duration-500">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-pink-500" />
                 <h3 className="text-sm font-black uppercase tracking-widest">Select a Gift</h3>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setShowGiftSelector(false)} className="rounded-full"><X className="w-5 h-5" /></Button>
@@ -438,10 +437,6 @@ function ChatsContent() {
                   <p className="text-[9px] font-bold text-pink-500 mt-1">{gift.price} Coins</p>
                 </button>
               ))}
-            </div>
-
-            <div className="pt-4 text-center">
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-[0.2em]">Gifts award diamonds to the recipient</p>
             </div>
           </div>
         </div>
