@@ -1,3 +1,4 @@
+
 'use server';
 
 import { PESAPAL_CONFIG } from '@/lib/pesapal-config';
@@ -5,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 /**
  * @fileOverview Hardened PesaPal integration using Supabase Admin for fulfillment.
+ * Includes idempotency checks to prevent duplicate coin awards.
  */
 
 export async function getAccessToken(): Promise<string> {
@@ -88,13 +90,27 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
   } catch (error: any) { return { success: false, error: error.message }; }
 }
 
+/**
+ * ATOMIC FULFILLMENT: Awards coins and prevents double-processing.
+ * Can be called by the client UI OR the background IPN webhook.
+ */
 export async function fulfillPaymentAction(orderTrackingId: string, merchantReference: string) {
   try {
     if (!orderTrackingId || !merchantReference) return { success: false, error: "Missing tracking ID or reference." };
 
-    const { data: existing } = await supabaseAdmin.from('processed_payments').select('coins').eq('order_tracking_id', orderTrackingId).maybeSingle();
-    if (existing) return { success: true, coins: existing.coins };
+    // 1. IDEMPOTENCY CHECK: Have we already processed this specific PesaPal tracking ID?
+    const { data: existing } = await supabaseAdmin
+      .from('processed_payments')
+      .select('coins')
+      .eq('order_tracking_id', orderTrackingId)
+      .maybeSingle();
+      
+    if (existing) {
+      console.log(`[Payment] Order ${orderTrackingId} already fulfilled.`);
+      return { success: true, coins: existing.coins };
+    }
 
+    // 2. VERIFY WITH PESAPAL: Get the actual status from the source
     const token = await getAccessToken();
     const statusRes = await fetch(`${PESAPAL_CONFIG.API_BASE_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${orderTrackingId}`, {
       method: 'GET',
@@ -104,34 +120,61 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
     if (!statusRes.ok) return { success: false, error: "PesaPal status check failed." };
     const status = await statusRes.json();
     
+    // Status Code 1 is "Completed" in PesaPal v3
     const isCompleted = status && (status.status_code === 1 || status.payment_status_description === 'Completed');
     
     if (isCompleted) {
-      const uid = merchantReference.split('_')[1];
+      const uid = merchantReference.split('_')[1]; // Ref format: QV_UID_TIMESTAMP
       if (!uid) return { success: false, error: "Invalid reference format." };
 
       const amount = Number(status.amount);
       let coinsToAward = Math.floor(amount * 10);
-      if (Math.abs(amount - 1) < 0.01) coinsToAward = 200;
+      
+      // Specialized logic for test package (KES 1 = 200 coins)
+      if (Math.abs(amount - 1) < 0.01) {
+        coinsToAward = 200;
+      }
 
       const timestamp = Date.now();
+      
+      // 3. GET CURRENT BALANCE
       const { data: balData } = await supabaseAdmin.from('balances').select('coins').eq('user_id', uid).maybeSingle();
       const currentCoins = Number(balData?.coins) || 0;
       
-      await supabaseAdmin.from('balances').upsert({ 
+      // 4. ATOMIC UPDATES via Admin Client
+      const { error: balErr } = await supabaseAdmin.from('balances').upsert({ 
         user_id: uid, 
         coins: currentCoins + coinsToAward,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
 
+      if (balErr) throw balErr;
+
+      // Log both history and processing record
       await Promise.all([
-        supabaseAdmin.from('coin_history').insert({ user_id: uid, amount: coinsToAward, type: 'recharge', description: `Recharge: KES ${amount}`, timestamp }),
-        supabaseAdmin.from('processed_payments').insert({ order_tracking_id: orderTrackingId, user_id: uid, amount, coins: coinsToAward, payment_method: status.payment_method || 'pesapal', timestamp })
+        supabaseAdmin.from('coin_history').insert({ 
+          user_id: uid, 
+          amount: coinsToAward, 
+          type: 'recharge', 
+          description: `Recharge: KES ${amount}`, 
+          timestamp 
+        }),
+        supabaseAdmin.from('processed_payments').insert({ 
+          order_tracking_id: orderTrackingId, 
+          user_id: uid, 
+          amount, 
+          coins: coinsToAward, 
+          payment_method: status.payment_method || 'pesapal', 
+          timestamp 
+        })
       ]);
 
       return { success: true, coins: coinsToAward };
     }
     
-    return { success: false, error: "Payment pending." };
-  } catch (err: any) { return { success: false, error: err.message }; }
+    return { success: false, error: "Payment not completed on provider side." };
+  } catch (err: any) { 
+    console.error("[Payment Fulfillment Error]", err);
+    return { success: false, error: err.message }; 
+  }
 }

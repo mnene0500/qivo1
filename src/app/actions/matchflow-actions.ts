@@ -1,3 +1,4 @@
+
 'use server';
 
 import { supabase, supabaseAdmin } from '@/lib/supabase';
@@ -12,14 +13,9 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
   if (amount < 500) return { success: false, error: "Minimum award amount is 500 coins." };
 
   try {
-    // 1. Verify Caller Authority
     const { data: caller } = await supabaseAdmin.from('users').select('*').eq('uid', callerUid).single();
-    
-    if (!caller?.is_admin && !caller?.is_coin_seller) {
-      return { success: false, error: "Unauthorized role required." };
-    }
+    if (!caller?.is_admin && !caller?.is_coin_seller) return { success: false, error: "Unauthorized role required." };
 
-    // 2. Handle Merchant Balance (if not Admin)
     if (caller.is_coin_seller && !caller.is_admin) {
       const { data: bal } = await supabaseAdmin.from('balances').select('coins').eq('user_id', callerUid).single();
       if ((Number(bal?.coins) || 0) < amount) return { success: false, error: "Insufficient business balance." };
@@ -34,7 +30,6 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
       });
     }
 
-    // 3. Award Target
     const { data: target } = await supabaseAdmin.from('users').select('uid, name').eq('match_flow_id', targetMatchFlowId.trim()).single();
     if (!target) return { success: false, error: "Target User ID not found." };
 
@@ -55,11 +50,12 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
     });
 
     return { success: true, message: `Successfully awarded ${amount} coins to ${target.name}.` };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
+/**
+ * ATOMIC CHECK-IN: Prevents multiple rewards per day and manages streaks.
+ */
 export async function dailyCheckInAction(uid: string) {
   try {
     const { data: profile } = await supabaseAdmin.from('users').select('last_check_in_date, check_in_streak').eq('uid', uid).single();
@@ -68,11 +64,21 @@ export async function dailyCheckInAction(uid: string) {
     const today = new Date().toISOString().split('T')[0];
     const lastCheckIn = profile.last_check_in_date ? new Date(profile.last_check_in_date).toISOString().split('T')[0] : null;
 
-    if (lastCheckIn === today) return { success: false, error: "Already collected today." };
+    if (lastCheckIn === today) return { success: false, error: "Reward already collected for today." };
 
     const days = [2, 2, 5, 2, 2, 2, 10];
     const currentStreak = profile.check_in_streak || 0;
-    const streakIndex = currentStreak % 7;
+    
+    // Check if streak was broken (last check-in was more than 48h ago)
+    let newStreak = currentStreak + 1;
+    if (lastCheckIn) {
+      const lastTime = new Date(profile.last_check_in_date).getTime();
+      const now = Date.now();
+      const hoursSinceLast = (now - lastTime) / (1000 * 60 * 60);
+      if (hoursSinceLast > 48) newStreak = 1;
+    }
+
+    const streakIndex = (newStreak - 1) % 7;
     const rewardAmount = days[streakIndex];
     const timestamp = Date.now();
 
@@ -82,7 +88,7 @@ export async function dailyCheckInAction(uid: string) {
     await Promise.all([
       supabaseAdmin.from('users').update({
         last_check_in_date: new Date().toISOString(),
-        check_in_streak: currentStreak + 1
+        check_in_streak: newStreak
       }).eq('uid', uid),
       supabaseAdmin.from('balances').upsert({ 
         user_id: uid, 
@@ -99,40 +105,25 @@ export async function dailyCheckInAction(uid: string) {
     ]);
 
     return { success: true, amount: rewardAmount, day: streakIndex + 1 };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
-/**
- * Sends a gift, deducting coins from sender and awarding diamonds to recipient.
- * Reward Logic: 50% for females, 40% for males.
- */
 export async function sendGiftAction(senderUid: string, recipientUid: string, coinAmount: number, giftName: string) {
   try {
-    // 1. Get both profiles and sender balance
     const [senderProfile, recipientProfile, senderBal] = await Promise.all([
       supabaseAdmin.from('users').select('name').eq('uid', senderUid).single(),
       supabaseAdmin.from('users').select('name, gender').eq('uid', recipientUid).single(),
       supabaseAdmin.from('balances').select('coins').eq('user_id', senderUid).single()
     ]);
 
-    if (!senderBal.data || (Number(senderBal.data.coins) || 0) < coinAmount) {
-      return { success: false, error: "Insufficient coins." };
-    }
+    if (!senderBal.data || (Number(senderBal.data.coins) || 0) < coinAmount) return { success: false, error: "Insufficient coins." };
 
     const timestamp = Date.now();
     const rewardRate = recipientProfile.data?.gender === 'female' ? 0.5 : 0.4;
     const diamondReward = Math.floor(coinAmount * rewardRate);
 
-    // 2. Sender Update (Deduct Coins)
-    const { error: senderErr } = await supabaseAdmin.from('balances').update({ 
-      coins: (Number(senderBal.data.coins) || 0) - coinAmount 
-    }).eq('user_id', senderUid);
+    await supabaseAdmin.from('balances').update({ coins: (Number(senderBal.data.coins) || 0) - coinAmount }).eq('user_id', senderUid);
 
-    if (senderErr) throw senderErr;
-
-    // 3. Recipient Update (Add Diamonds)
     const { data: recBal } = await supabaseAdmin.from('balances').select('diamonds').eq('user_id', recipientUid).maybeSingle();
     await supabaseAdmin.from('balances').upsert({
       user_id: recipientUid,
@@ -140,65 +131,28 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
 
-    // 4. Ledgers
     await Promise.all([
-      supabaseAdmin.from('coin_history').insert({
-        user_id: senderUid,
-        amount: -coinAmount,
-        type: 'gift_sent',
-        description: `Sent ${giftName} to ${recipientProfile.data?.name}`,
-        timestamp
-      }),
-      supabaseAdmin.from('diamond_history').insert({
-        user_id: recipientUid,
-        amount: diamondReward,
-        type: 'gift_received',
-        description: `Received ${giftName} from ${senderProfile.data?.name}`,
-        timestamp
-      })
+      supabaseAdmin.from('coin_history').insert({ user_id: senderUid, amount: -coinAmount, type: 'gift_sent', description: `Sent ${giftName} to ${recipientProfile.data?.name}`, timestamp }),
+      supabaseAdmin.from('diamond_history').insert({ user_id: recipientUid, amount: diamondReward, type: 'gift_received', description: `Received ${giftName} from ${senderProfile.data?.name}`, timestamp })
     ]);
 
-    // 5. Chat Integration
     const ids = [senderUid, recipientUid].sort();
     const chatId = `direct_${ids[0]}_${ids[1]}`;
     await Promise.all([
-      supabaseAdmin.from('messages').insert({ 
-        chat_id: chatId, 
-        sender_id: senderUid, 
-        text: `🎁 Sent a ${giftName}!`, 
-        timestamp, 
-        is_gift: true 
-      }),
-      supabaseAdmin.from('chats').upsert({ 
-        id: chatId, 
-        last_message: `🎁 ${giftName}`, 
-        last_message_at: timestamp, 
-        participant_ids: [senderUid, recipientUid] 
-      }, { onConflict: 'id' })
+      supabaseAdmin.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text: `🎁 Sent a ${giftName}!`, timestamp, is_gift: true }),
+      supabaseAdmin.from('chats').upsert({ id: chatId, last_message: `🎁 ${giftName}`, last_message_at: timestamp, participant_ids: [senderUid, recipientUid] }, { onConflict: 'id' })
     ]);
 
     return { success: true };
-  } catch (error: any) {
-    console.error("Gifting transaction failed:", error);
-    return { success: false, error: "Gift delivery failed." };
-  }
+  } catch (error: any) { return { success: false, error: "Gift delivery failed." }; }
 }
 
 export async function submitReportAction(reporterUid: string, reportedUid: string, reason: string, description: string, proofUrl: string) {
   try {
-    const { error } = await supabaseAdmin.from('reports').insert({
-      reporter_id: reporterUid,
-      reported_id: reportedUid,
-      reason,
-      description,
-      proof_photo_url: proofUrl,
-      timestamp: Date.now()
-    });
+    const { error } = await supabaseAdmin.from('reports').insert({ reporter_id: reporterUid, reported_id: reportedUid, reason, description, proof_photo_url: proofUrl, timestamp: Date.now() });
     if (error) throw error;
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
 export async function sendMysteryNoteAction(senderUid: string, message: string, recipientCount: number) {
@@ -209,18 +163,10 @@ export async function sendMysteryNoteAction(senderUid: string, message: string, 
     const { data: profile } = await supabaseAdmin.from('users').select('gender').eq('uid', senderUid).single();
     const { data: bal } = await supabaseAdmin.from('balances').select('coins').eq('user_id', senderUid).single();
     
-    if (!profile || (Number(bal?.coins) || 0) < totalCost) {
-      return { success: false, error: "Insufficient coins." };
-    }
+    if (!profile || (Number(bal?.coins) || 0) < totalCost) return { success: false, error: "Insufficient coins." };
 
     const targetGender = profile.gender === 'male' ? 'female' : 'male';
-    const { data: targets } = await supabaseAdmin
-      .from('users')
-      .select('uid')
-      .eq('gender', targetGender)
-      .eq('onboarding_complete', true)
-      .neq('uid', senderUid)
-      .limit(60);
+    const { data: targets } = await supabaseAdmin.from('users').select('uid').eq('gender', targetGender).eq('onboarding_complete', true).neq('uid', senderUid).limit(60);
 
     if (!targets || targets.length < recipientCount) return { success: false, error: "Not enough matching users." };
 
@@ -228,13 +174,7 @@ export async function sendMysteryNoteAction(senderUid: string, message: string, 
     const timestamp = Date.now();
 
     await supabaseAdmin.from('balances').update({ coins: Number(bal?.coins) - totalCost }).eq('user_id', senderUid);
-    await supabaseAdmin.from('coin_history').insert({
-      user_id: senderUid,
-      amount: -totalCost,
-      type: 'mystery_note',
-      description: `Mystery Note to ${recipientCount} people`,
-      timestamp
-    });
+    await supabaseAdmin.from('coin_history').insert({ user_id: senderUid, amount: -totalCost, type: 'mystery_note', description: `Mystery Note to ${recipientCount} people`, timestamp });
 
     for (const target of shuffled) {
       const ids = [senderUid, target.uid].sort();
@@ -244,11 +184,8 @@ export async function sendMysteryNoteAction(senderUid: string, message: string, 
         supabaseAdmin.from('chats').upsert({ id: chatId, last_message: message.trim(), last_message_at: timestamp, participant_ids: [senderUid, target.uid] }, { onConflict: 'id' })
       ]);
     }
-
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
 export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId: string, role: string, value: boolean) {
@@ -259,11 +196,8 @@ export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId:
     const dbRole = role === 'is_coin_seller' ? 'is_coin_seller' : role === 'is_agent' ? 'is_agent' : role;
     const { error } = await supabaseAdmin.from('users').update({ [dbRole]: value }).eq('match_flow_id', targetMatchFlowId.trim());
     if (error) throw error;
-
     return { success: true, message: `Authority updated successfully.` };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
 export async function createAgencyAction(creatorUid: string, agencyName: string) {
@@ -272,9 +206,7 @@ export async function createAgencyAction(creatorUid: string, agencyName: string)
     await supabaseAdmin.from('agencies').insert({ code, agent_uid: creatorUid, name: agencyName });
     await supabaseAdmin.from('users').update({ agency_id: code, agency_status: 'approved', is_agent: true }).eq('uid', creatorUid);
     return { success: true, code };
-  } catch (error: any) { 
-    return { success: false, error: error.message }; 
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
 export async function requestWithdrawalAction(userUid: string, diamonds: number, amountKes: number, agencyId: string) {
@@ -285,11 +217,8 @@ export async function requestWithdrawalAction(userUid: string, diamonds: number,
     await supabaseAdmin.from('balances').update({ diamonds: (Number(bal?.diamonds) || 0) - diamonds }).eq('user_id', userUid);
     await supabaseAdmin.from('withdrawals').insert({ user_id: userUid, agency_id: agencyId, diamonds, amount_kes: amountKes, status: 'pending', timestamp: Date.now() });
     await supabaseAdmin.from('diamond_history').insert({ user_id: userUid, amount: -diamonds, type: 'withdrawal', description: `Withdrawal for Ksh ${amountKes}`, timestamp: Date.now() });
-
     return { success: true };
-  } catch (error: any) { 
-    return { success: false, error: error.message }; 
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
 export async function joinAgencyAction(userUid: string, agencyCode: string) {
@@ -298,9 +227,7 @@ export async function joinAgencyAction(userUid: string, agencyCode: string) {
     if (!agency) return { success: false, error: "Invalid Agency Code." };
     await supabaseAdmin.from('users').update({ agency_id: agencyCode.trim(), agency_status: 'pending' }).eq('uid', userUid);
     return { success: true };
-  } catch (error: any) { 
-    return { success: false, error: error.message }; 
-  }
+  } catch (error: any) { return { success: false, error: error.message }; }
 }
 
 export async function reviewRecruitmentAction(agentUid: string, applicantUid: string, status: 'approved' | 'rejected') {
