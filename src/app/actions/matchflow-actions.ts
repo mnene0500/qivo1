@@ -37,11 +37,13 @@ export async function awardCoinsAction(callerUid: string, targetMatchFlowId: str
     const { data: target } = await supabase.from('users').select('uid, name').eq('match_flow_id', targetMatchFlowId.trim()).single();
     if (!target) return { success: false, error: "Target User ID not found." };
 
-    const { data: targetBal } = await supabase.from('balances').select('coins').eq('user_id', target.uid).single();
+    const { data: targetBal } = await supabase.from('balances').select('coins').eq('user_id', target.uid).maybeSingle();
     const targetTimestamp = Date.now();
+    
     await supabase.from('balances').upsert({ 
       user_id: target.uid, 
-      coins: (targetBal?.coins || 0) + amount 
+      coins: (targetBal?.coins || 0) + amount,
+      updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
 
     await supabase.from('coin_history').insert({
@@ -70,7 +72,7 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
     const timestamp = Date.now();
     const diamondGain = Math.floor(coinAmount * 0.7); 
 
-    // Deduct from Sender
+    // 1. Deduct from Sender
     await supabase.from('balances').update({ coins: (senderBal?.coins || 0) - coinAmount }).eq('user_id', senderUid);
     await supabase.from('coin_history').insert({
       user_id: senderUid,
@@ -80,11 +82,12 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
       timestamp
     });
 
-    // Award to Recipient
-    const { data: recBal } = await supabase.from('balances').select('diamonds').eq('user_id', recipientUid).single();
+    // 2. Award to Recipient
+    const { data: recBal } = await supabase.from('balances').select('diamonds').eq('user_id', recipientUid).maybeSingle();
     await supabase.from('balances').upsert({ 
       user_id: recipientUid, 
-      diamonds: (Number(recBal?.diamonds) || 0) + diamondGain 
+      diamonds: (Number(recBal?.diamonds) || 0) + diamondGain,
+      updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
 
     await supabase.from('diamond_history').insert({
@@ -95,7 +98,7 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
       timestamp
     });
 
-    // System message in chat
+    // 3. System message in chat
     const ids = [senderUid, recipientUid].sort();
     const chatId = `direct_${ids[0]}_${ids[1]}`;
     await supabase.from('messages').insert({
@@ -124,7 +127,6 @@ export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId:
     const { data: caller } = await supabase.from('users').select('is_admin').eq('uid', callerUid).single();
     if (!caller?.is_admin) return { success: false, error: "Admin privileges required." };
 
-    // Standardize role names for DB
     const dbRole = role === 'is_coin_seller' ? 'is_coin_seller' : role === 'is_agent' ? 'is_agent' : role;
 
     const { error } = await supabase.from('users').update({ [dbRole]: value }).eq('match_flow_id', targetMatchFlowId.trim());

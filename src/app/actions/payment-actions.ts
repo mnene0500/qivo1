@@ -160,7 +160,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
       const uid = merchantReference.split('_')[1];
       if (!uid) return { success: false, error: "Invalid Ref" };
 
-      // 1. Check if already processed to prevent double crediting
+      // 1. Check if already processed
       const { data: existing } = await supabase
         .from('processed_payments')
         .select('*')
@@ -168,17 +168,16 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
         .maybeSingle();
 
       if (existing) {
-        console.log(`[Payment] Order ${orderTrackingId} already processed.`);
         return { success: true, coins: existing.coins };
       }
 
       const amount = Number(status.amount);
-      // Award Logic: KES 1 = 10 Coins
       let coinsToAward = Math.floor(amount * 10);
       const timestamp = Date.now();
 
-      // 2. Fetch current balance
-      const { data: balData, error: fetchErr } = await supabase
+      // 2. Atomic Balance Fulfillment using UPSERT
+      // Note: This requires a UNIQUE constraint on balances.user_id in SQL
+      const { data: balData } = await supabase
         .from('balances')
         .select('coins')
         .eq('user_id', uid)
@@ -186,7 +185,6 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
 
       const currentCoins = balData?.coins || 0;
       
-      // 3. Update or Create Balance (UPSERT is more reliable)
       const { error: upsertErr } = await supabase
         .from('balances')
         .upsert({ 
@@ -196,11 +194,11 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
         }, { onConflict: 'user_id' });
 
       if (upsertErr) {
-        console.error("[Payment] Balance Update Error:", upsertErr.message);
-        throw upsertErr;
+        console.error("[Payment] RLS Error:", upsertErr.message);
+        return { success: false, error: "Database Policy Violation: Check RLS settings." };
       }
       
-      // 4. Log Recharge History
+      // 3. Log History
       await supabase.from('coin_history').insert({ 
         user_id: uid, 
         amount: coinsToAward, 
@@ -209,7 +207,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
         timestamp 
       });
       
-      // 5. Mark payment as processed
+      // 4. Mark as processed
       await supabase.from('processed_payments').insert({ 
         order_tracking_id: orderTrackingId, 
         user_id: uid, 
@@ -219,13 +217,11 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
         timestamp 
       });
 
-      console.log(`[Payment] Successfully awarded ${coinsToAward} coins to ${uid}`);
       return { success: true, coins: coinsToAward };
     }
     
-    return { success: false, error: `Payment not completed (Status: ${status.status_code})` };
+    return { success: false, error: `Payment pending (Status: ${status.status_code})` };
   } catch (err: any) {
-    console.error("[Payment] Fulfillment Critical Error:", err.message);
     return { success: false, error: err.message };
   }
 }

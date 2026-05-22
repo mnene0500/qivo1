@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useMemo, useState, useEffect, useCallback } from "react"
@@ -5,7 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { BottomNav } from "@/components/layout/BottomNav"
-import { Target, RotateCw, FileText, BadgeCheck, Loader2, MessageSquare, Sparkles } from "lucide-react"
+import { Target, RotateCw, FileText, BadgeCheck, Loader2, Sparkles } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
@@ -24,7 +25,6 @@ interface UserProfile {
 
 /**
  * GLOBAL PERSISTENCE CACHE
- * Stops costs from spiking by preserving feed data across navigations.
  */
 let globalUserCache: UserProfile[] = [];
 let globalScrollY = 0;
@@ -51,54 +51,27 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!isInitialized || authLoading) return;
-
-    if (!currentUser) {
-      router.replace("/welcome")
-      return;
-    }
+    if (!currentUser) { router.replace("/welcome"); return; }
 
     const checkProfile = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('onboarding_complete, country')
-          .eq('uid', currentUser.id)
-          .maybeSingle();
-
-        if (error || !data) {
-          router.replace("/fastonboard");
-          return;
-        }
-
-        setProfile(data as any);
-        if (!data.onboarding_complete) {
-          router.replace("/fastonboard");
-        }
-      } catch (err) {
-        router.replace("/fastonboard");
-      }
+      const { data } = await supabase.from('users').select('onboarding_complete, country').eq('uid', currentUser.id).maybeSingle();
+      if (!data) { router.replace("/fastonboard"); return; }
+      setProfile(data as any);
+      if (!data.onboarding_complete) router.replace("/fastonboard");
     };
-
     checkProfile();
   }, [isInitialized, currentUser, authLoading, router])
 
-  // Restore scroll position when navigating back
   useEffect(() => {
-    if (!initialLoading) {
-       setTimeout(() => window.scrollTo(0, globalScrollY), 50);
-    }
+    if (!initialLoading) { setTimeout(() => window.scrollTo(0, globalScrollY), 50); }
     const handleScroll = () => { globalScrollY = window.scrollY }
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [initialLoading])
 
   const fetchUsers = useCallback(async (isManual = false) => {
-    if (isManual) { 
-      setIsRefreshing(true); 
-      globalScrollY = 0; 
-    } else if (users.length === 0) {
-      setInitialLoading(true);
-    }
+    if (isManual) { setIsRefreshing(true); globalScrollY = 0; } 
+    else if (users.length === 0) { setInitialLoading(true); }
 
     try {
       const { data } = await supabase
@@ -123,9 +96,7 @@ export default function HomePage() {
   }, [currentUser?.id, users.length])
 
   useEffect(() => {
-    if (isInitialized && currentUser && users.length === 0) {
-      fetchUsers()
-    }
+    if (isInitialized && currentUser && users.length === 0) fetchUsers()
   }, [isInitialized, currentUser, users.length, fetchUsers])
 
   const filteredUsers = useMemo(() => {
@@ -136,64 +107,58 @@ export default function HomePage() {
   if ((initialLoading && users.length === 0) || authLoading || !isInitialized) {
     return (
       <div className="flex-1 bg-white min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="animate-spin text-[#00A2FF] w-8 h-8" />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Syncing Feed...</p>
-        </div>
+        <Loader2 className="animate-spin text-[#00A2FF] w-8 h-8" />
       </div>
     )
   }
 
   return (
     <div className="flex-1 pb-24 bg-[#F9FAFB] min-h-screen relative select-none">
-      {/* BRANDING HEADER STAMP */}
-      <div className="absolute top-0 left-0 right-0 z-0 flex flex-col">
-        <div className="h-[100px] bg-[#00A2FF] flex items-end justify-center pb-4">
-           <h1 className="text-4xl font-logo text-white drop-shadow-md">QIVO</h1>
+      {/* BRANDING HEADER - THE STAMP */}
+      <header className="sticky top-0 z-50 bg-white border-b shadow-sm h-16 flex items-center justify-between px-6">
+        <h1 className="text-3xl font-logo text-[#00A2FF] tracking-tighter">QIVO</h1>
+        <div className="flex items-center gap-4">
+          <button onClick={() => fetchUsers(true)} disabled={isRefreshing} className={cn("p-2 text-[#00A2FF]", isRefreshing && "animate-spin")}>
+            <RotateCw className="w-5 h-5" />
+          </button>
         </div>
-        <div className="h-[120px] bg-white shadow-sm" />
-      </div>
+      </header>
 
-      <div className="relative z-10">
-        <div className="px-4 pt-4 pb-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div onClick={() => router.push('/mystery-note')} className="bg-gradient-to-br from-[#00A2FF] to-[#0081CC] p-4 flex flex-col justify-between h-28 rounded-2xl shadow-lg cursor-pointer active:scale-95 transition-transform"><FileText className="w-5 h-5 text-white" /><h3 className="text-white font-semibold text-sm">Mystery Note</h3></div>
-            <div onClick={() => router.push('/tasks')} className="bg-gradient-to-br from-[#A88CFF] to-[#7B61FF] p-4 flex flex-col justify-between h-28 rounded-2xl shadow-lg cursor-pointer active:scale-95 transition-transform"><Target className="w-5 h-5 text-white" /><h3 className="text-white font-semibold text-sm">Task Center</h3></div>
-          </div>
-        </div>
-
-        <div className="sticky top-0 z-40 bg-[#F9FAFB]/90 backdrop-blur-md px-5 pt-3 pb-3 border-b border-black/5 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button onClick={() => setActiveTab('Recommend')} className={cn("text-sm font-black uppercase tracking-widest", activeTab === 'Recommend' ? "text-[#00A2FF]" : "text-gray-300")}>Recommend</button>
-            <button onClick={() => setActiveTab('Nearby')} className={cn("text-sm font-black uppercase tracking-widest", activeTab === 'Nearby' ? "text-[#00A2FF]" : "text-gray-300")}>Nearby</button>
-          </div>
-          <button onClick={() => fetchUsers(true)} disabled={isRefreshing} className={cn("p-1.5 text-[#00A2FF]", isRefreshing && "animate-spin")}><RotateCw className="w-5 h-5" /></button>
+      <div className="px-4 pt-6 space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div onClick={() => router.push('/mystery-note')} className="bg-gradient-to-br from-[#00A2FF] to-[#0081CC] p-4 flex flex-col justify-between h-28 rounded-2xl shadow-lg cursor-pointer active:scale-95 transition-transform"><FileText className="w-5 h-5 text-white" /><h3 className="text-white font-black text-xs uppercase">Mystery Note</h3></div>
+          <div onClick={() => router.push('/tasks')} className="bg-gradient-to-br from-[#A88CFF] to-[#7B61FF] p-4 flex flex-col justify-between h-28 rounded-2xl shadow-lg cursor-pointer active:scale-95 transition-transform"><Target className="w-5 h-5 text-white" /><h3 className="text-white font-black text-xs uppercase">Task Center</h3></div>
         </div>
 
-        <main className="px-4 pt-3">
-          {filteredUsers.length === 0 && !initialLoading ? (
-            <div className="py-20 text-center space-y-4 opacity-40">
-               <RotateCw className="w-10 h-10 mx-auto text-gray-300" />
-               <p className="text-[10px] font-black uppercase tracking-widest">No users found</p>
+        <div className="flex items-center gap-6 pb-2 border-b border-black/5">
+          <button onClick={() => setActiveTab('Recommend')} className={cn("text-xs font-black uppercase tracking-[0.2em]", activeTab === 'Recommend' ? "text-[#00A2FF]" : "text-gray-300")}>Recommend</button>
+          <button onClick={() => setActiveTab('Nearby')} className={cn("text-xs font-black uppercase tracking-[0.2em]", activeTab === 'Nearby' ? "text-[#00A2FF]" : "text-gray-300")}>Nearby</button>
+        </div>
+
+        <main>
+          {filteredUsers.length === 0 ? (
+            <div className="py-20 text-center opacity-40">
+               <RotateCw className="w-10 h-10 mx-auto text-gray-300 mb-4" />
+               <p className="text-[10px] font-black uppercase tracking-widest">Finding matches...</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {filteredUsers.map((u) => (
-                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.2] rounded-2xl shadow-xl bg-white group animate-in fade-in zoom-in-95 duration-500" onClick={() => router.push(`/users/${u.uid}`)}>
+                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.25] rounded-[2rem] shadow-xl bg-white group animate-in fade-in zoom-in-95" onClick={() => router.push(`/users/${u.uid}`)}>
                   <Image src={u.photo_url || ""} alt={u.name} fill className="object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-80" />
                   
-                  {/* QUICK CHAT BUTTON */}
+                  {/* BRANDED CHAT BUTTON */}
                   <div 
                     onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}
-                    className="absolute top-2.5 right-2.5 px-4 h-8 bg-[#00A2FF] rounded-full flex items-center justify-center text-white shadow-xl active:scale-90 transition-all z-20 hover:bg-[#0081CC] border border-white/20"
+                    className="absolute top-3 right-3 px-5 h-9 bg-[#00A2FF] rounded-full flex items-center justify-center text-white shadow-xl active:scale-90 transition-all z-20 hover:bg-[#0081CC] border border-white/20"
                   >
                     <span className="text-[10px] font-black uppercase tracking-widest">Chat</span>
                   </div>
 
-                  <div className="absolute inset-x-0 bottom-0 p-3 text-white">
+                  <div className="absolute inset-x-0 bottom-0 p-4 text-white">
                     <div className="flex items-center gap-1.5"><h4 className="font-bold text-sm truncate">{u.name}</h4>{u.is_verified && <BadgeCheck className="w-4 h-4 text-[#00A2FF] fill-white" />}</div>
-                    <div className="flex items-center gap-1.5 mt-1"><span className="bg-[#006400] text-white font-bold text-[10px] px-2 py-0.5 rounded-full">{calculateAge(u.dob)}</span><span className="text-white/60 text-[10px] font-medium uppercase tracking-tighter">{u.country}</span></div>
+                    <div className="flex items-center gap-2 mt-1.5"><span className="bg-[#006400] text-white font-black text-[9px] px-2 py-0.5 rounded-lg">{calculateAge(u.dob)}</span><span className="text-white/60 text-[9px] font-bold uppercase tracking-tighter truncate">{u.country}</span></div>
                   </div>
                 </Card>
               ))}
