@@ -6,7 +6,6 @@ import { PESAPAL_CONFIG } from '@/lib/pesapal-config';
 
 /**
  * @fileOverview Secure PesaPal Proxies via Supabase Edge Functions.
- * These actions invoke your Edge Functions where keys are stored.
  */
 
 export async function initiatePesaPalPayment(amount: number, user: { uid: string, email: string, name: string }) {
@@ -34,7 +33,7 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
 
 export async function fulfillPaymentAction(orderTrackingId: string, merchantReference: string) {
   try {
-    // 1. Check local DB first for instant fulfillment detection
+    // 1. Instant detection: Check if the background IPN already finished
     const { data: existing } = await supabase
       .from('processed_payments')
       .select('order_tracking_id')
@@ -45,7 +44,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
       return { success: true, message: 'Payment already processed.' };
     }
 
-    // 2. Otherwise, invoke the edge function to verify with PesaPal
+    // 2. Active verification: Trigger the Edge Function to verify with PesaPal
     const { data, error } = await supabase.functions.invoke('payment-ops', {
       body: { 
         action: 'fulfill',
@@ -58,26 +57,6 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
     return data;
   } catch (err: any) { 
     console.error("[Fulfill Payment Proxy Error]", err);
-    return { success: false, error: "Verification delayed. Real-time listener active." }; 
+    return { success: false, error: "Verifying with PesaPal..." }; 
   }
-}
-
-export async function registerIPN() {
-  try {
-    const { data, error } = await supabase.functions.invoke('payment-ops', {
-      body: { action: 'register-ipn', ipn_url: PESAPAL_CONFIG.IPN_URL }
-    });
-    if (error) throw error;
-    return data;
-  } catch (error: any) { return { error: error.message }; }
-}
-
-export async function getIpnList() {
-  try {
-    const { data, error } = await supabase.functions.invoke('payment-ops', {
-      body: { action: 'get-ipn-list' }
-    });
-    if (error) throw error;
-    return data;
-  } catch (error: any) { return { error: error.message }; }
 }
