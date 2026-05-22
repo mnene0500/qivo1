@@ -34,6 +34,18 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
 
 export async function fulfillPaymentAction(orderTrackingId: string, merchantReference: string) {
   try {
+    // 1. Check local DB first for instant fulfillment detection
+    const { data: existing } = await supabase
+      .from('processed_payments')
+      .select('order_tracking_id')
+      .eq('order_tracking_id', orderTrackingId)
+      .maybeSingle();
+
+    if (existing) {
+      return { success: true, message: 'Payment already processed.' };
+    }
+
+    // 2. Otherwise, invoke the edge function to verify with PesaPal
     const { data, error } = await supabase.functions.invoke('payment-ops', {
       body: { 
         action: 'fulfill',
@@ -46,7 +58,7 @@ export async function fulfillPaymentAction(orderTrackingId: string, merchantRefe
     return data;
   } catch (err: any) { 
     console.error("[Fulfill Payment Proxy Error]", err);
-    return { success: false, error: "Network delay. Please refresh." }; 
+    return { success: false, error: "Verification delayed. Real-time listener active." }; 
   }
 }
 

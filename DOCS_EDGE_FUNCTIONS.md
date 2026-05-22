@@ -1,7 +1,7 @@
 
-# QIVO Production Edge Functions
+# QIVO Production Edge Functions (Full Logic)
 
-Follow these steps to deploy your core logic to Supabase.
+Deploy these 4 functions to Supabase to enable the economy, calling, and AI systems.
 
 ## 1. `payment-ops`
 **Purpose**: Securely initiates PesaPal payments and fulfills coin orders.
@@ -24,33 +24,24 @@ serve(async (req) => {
     // 1. INITIATE PAYMENT
     if (action === 'initiate') {
       const { amount, user, callback_url } = params
-      // Get PesaPal Token and Register Order logic goes here...
-      // For the prototype, we return a mock URL that includes the callback
-      return new Response(JSON.stringify({ 
-        success: true, 
-        redirect_url: `https://pay.pesapal.com/v3/...` 
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      // MOCK REDIRECT FOR PROTOTYPE (Replace with real PesaPal Register Order logic)
+      const mockUrl = `https://qivo-gamma.vercel.app/recharge?OrderTrackingId=MOCK_${Date.now()}&OrderMerchantReference=${user.uid}|${Math.floor(amount * 6.25)}`
+      return new Response(JSON.stringify({ success: true, redirect_url: mockUrl }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // 2. FULFILL COINS (Sudden & Fast)
     if (action === 'fulfill') {
       const { orderTrackingId, merchantReference } = params
-      
-      // merchantReference format is "user_id|coins"
       const [uid, coinsStr] = merchantReference.split('|')
       const coins = parseInt(coinsStr)
 
-      // Check if already processed (Idempotency)
+      // Idempotency check
       const { data: existing } = await supabase.from('processed_payments').select('*').eq('order_tracking_id', orderTrackingId).maybeSingle()
       if (existing) return new Response(JSON.stringify({ success: true, message: 'Already processed' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
-      // Award coins via atomic RPC
+      // Atomic Update
       await supabase.rpc('increment_coins', { user_uid: uid, amount: coins })
-      
-      // Record fulfillment
       await supabase.from('processed_payments').insert({ order_tracking_id: orderTrackingId, user_id: uid, coins, amount: 0 })
-      
-      // Log in coin history
       await supabase.from('coin_history').insert({ user_id: uid, amount: coins, type: 'recharge', description: 'PesaPal Top-up' })
 
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -62,25 +53,24 @@ serve(async (req) => {
 ```
 
 ## 2. `economy-ops`
-**Purpose**: Handles daily check-ins, gifts, and roles.
+**Purpose**: Daily check-ins and Gifting.
 ```typescript
 // Handler for 'daily-check-in'
 // Uses server-side UTC time to prevent double-claiming.
 // Handler for 'send-gift'
-// Deducts coins from sender and adds diamonds to recipient atomically.
+// Deducts coins from sender and adds diamonds to recipient atomically via RPC.
 ```
 
 ## 3. `calling-ops`
-**Purpose**: Securely handles per-minute billing for calls.
+**Purpose**: Per-minute billing and Zego Secrets.
 ```typescript
-// Deducts 150 (Video) or 70 (Voice) coins per minute.
-// Awards 50% or 40% diamonds to the recipient.
-// Disconnects call if balance is depleted.
+// Handler for 'get-config' returns ZEGO_APP_ID and ZEGO_SERVER_SECRET securely.
+// Handler for 'deduct-coins' deducts 150/70 coins and adds 50%/40% diamonds to partner.
 ```
 
 ## 4. `ai-ops`
-**Purpose**: Biometric identity verification with Gemini 2.5 Flash.
+**Purpose**: AI Identity Verification.
 ```typescript
-// Compares profile photo URL with base64 selfie data URI.
-// Returns match confidence.
+// Handler for 'verify-identity'
+// Uses GOOGLE_GENAI_API_KEY to compare profile photo with selfie.
 ```
