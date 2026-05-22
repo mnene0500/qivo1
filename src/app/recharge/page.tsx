@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, Suspense, useEffect, useRef } from "react"
@@ -47,7 +48,10 @@ function RechargeContent() {
 
   const handleRedirectHome = () => {
     successTriggeredRef.current = true;
-    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
     router.replace('/profile');
   };
 
@@ -64,7 +68,6 @@ function RechargeContent() {
     const channel = supabase.channel(`recharge-sync:${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', table: 'balances', filter: `user_id=eq.${user.id}` }, (payload) => {
         const newBal = Number(payload.new.coins) || 0
-        // Detect if balance actually increased
         if (currentCoins !== null && newBal > currentCoins && !successTriggeredRef.current) {
           setFulfillmentSuccess(true)
           setIsVerifying(false)
@@ -95,20 +98,25 @@ function RechargeContent() {
           if (res.success) {
             setFulfillmentSuccess(true);
             setIsVerifying(false);
-            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
             setTimeout(handleRedirectHome, 2500);
           } else if (res.message && !res.message.toLowerCase().includes("not completed")) {
-            // Only stop if it's a permanent error, not just 'pending'
             setErrorMessage(res.message || res.error || "Verification failed");
-            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
           }
         } catch (err) {
-          // Keep polling silently on network errors
+          // Silent retry on network errors
         }
       };
 
       runVerification();
-      pollTimerRef.current = setInterval(runVerification, 10000); 
+      pollTimerRef.current = setInterval(runVerification, 8000); 
     }
     return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
   }, [orderTrackingId, user?.id]);
