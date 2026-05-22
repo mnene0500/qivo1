@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -22,8 +23,7 @@ import {
   UserPlus,
   Wallet,
   Shield,
-  User,
-  Ban
+  User
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -68,9 +68,9 @@ function JoinAgencyDialog({ userUid }: { userUid: string }) {
   const { toast } = useToast()
   
   const handleJoin = async () => {
-    if (code.length !== 5) return
+    if (code.length !== 5 || !userUid) return
     setLoading(true)
-    const res = await joinAgencyAction(code)
+    const res = await joinAgencyAction(userUid, code)
     if (res.success) {
       toast({ title: "Success", description: "Application sent!" })
       setOpen(false)
@@ -116,9 +116,9 @@ function AgencyDashboardDialog({ user }: { user: UserProfile }) {
   const { toast } = useToast()
 
   const handleCreate = async () => {
-    if (!agencyName.trim()) return
+    if (!agencyName.trim() || !user.uid) return
     setLoading(true)
-    const res = await createAgencyAction(agencyName)
+    const res = await createAgencyAction(user.uid, agencyName)
     if (res.success) {
       toast({ title: "Agency Created", description: `Code: ${res.code}` })
     } else {
@@ -140,7 +140,7 @@ function AgencyDashboardDialog({ user }: { user: UserProfile }) {
           <DialogTitle className="text-xl font-bold">Agency Management</DialogTitle>
         </DialogHeader>
         <div className="py-6 space-y-4">
-          {user.agency_id ? (
+          {user.agency_id && user.agency_status === 'approved' ? (
             <div className="text-center space-y-4">
               <div className="bg-blue-50 p-6 rounded-3xl">
                 <p className="text-[10px] font-bold text-blue-400 uppercase mb-2">Your Agency Code</p>

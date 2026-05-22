@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
@@ -27,7 +28,7 @@ export default function MysteryNotePage() {
     if (!user?.id) return
     const fetchData = async () => {
       const { data: b } = await supabase.from('balances').select('coins').eq('user_id', user.id).maybeSingle()
-      if (b) setUserCoins(b.coins || 0)
+      if (b) setUserCoins(Number(b.coins) || 0)
     }
     fetchData()
   }, [user?.id])
@@ -35,7 +36,7 @@ export default function MysteryNotePage() {
   const totalCost = recipientCount * COST_PER_PERSON
 
   const handleSend = async () => {
-    if (!user || !message.trim()) return
+    if (!user?.id || !message.trim()) return
     
     if (userCoins < totalCost) {
       toast({ variant: "destructive", title: "Insufficient Coins", description: `You need ${totalCost} coins.` })
@@ -44,7 +45,7 @@ export default function MysteryNotePage() {
 
     setIsSending(true)
     try {
-      const res = await sendMysteryNoteAction(message, recipientCount)
+      const res = await sendMysteryNoteAction(user.id, message, recipientCount)
       if (res.success) {
         toast({ title: "Note Sent!", description: `Sent to ${recipientCount} people anonymously.` })
         router.push("/chats")

@@ -1,12 +1,14 @@
 
 # QIVO Supabase SQL Setup
 
-To enable the economy, gifting, reporting, and realtime systems, copy and run the following script in your **Supabase SQL Editor**.
+To enable the economy, gifting, reporting, and realtime systems, copy and run the following script in your **Supabase SQL Editor**. 
+
+**IMPORTANT**: If you get a "type mismatch" error, it means your old tables have different column types. In that case, run `DROP TABLE IF EXISTS public.users, public.balances, public.reports CASCADE;` first (WARNING: this deletes existing data).
 
 ## 1. Core Tables & Realtime Schema
 
 ```sql
--- 1. EXTEND USERS TABLE
+-- 1. EXTEND USERS TABLE (Ensure UID is UUID)
 CREATE TABLE IF NOT EXISTS public.users (
   uid UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE,
@@ -29,8 +31,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   agency_status TEXT, -- 'pending', 'approved', 'rejected'
   check_in_streak INTEGER DEFAULT 0,
   last_check_in_date TIMESTAMPTZ,
-  blocking TEXT[] DEFAULT '{}',
-  blocked_by TEXT[] DEFAULT '{}',
+  blocking UUID[] DEFAULT '{}',
+  blocked_by UUID[] DEFAULT '{}',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
