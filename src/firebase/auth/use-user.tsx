@@ -17,8 +17,10 @@ export function useUser() {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.error("[Auth] Session retrieval error:", error.message);
-        // If there's an explicit refresh token error, clear local storage
+        // If there's an explicit refresh token error, clear local storage to force fresh login
         if (error.message.includes("Refresh Token")) {
+          localStorage.clear();
+          sessionStorage.clear();
           supabase.auth.signOut();
         }
       }
@@ -36,7 +38,7 @@ export function useUser() {
       } else if (session?.user) {
         setUser(session.user);
       } else if (event === 'TOKEN_REFRESHED' && !session) {
-        // Edge case: refresh triggered but no session returned
+        // Clear state if refresh fails during an active session
         setUser(null);
       }
       

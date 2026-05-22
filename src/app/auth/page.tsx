@@ -49,7 +49,7 @@ export default function UnifiedAuthPage() {
   const handleGoogleLogin = async () => {
     setSocialLoading(true)
     try {
-      // Use window.location.origin for automatic environment detection (localhost vs Vercel)
+      // Robust redirect URL detection
       const redirectTo = typeof window !== 'undefined' 
         ? `${window.location.origin}/home` 
         : 'https://qivo-gamma.vercel.app/home';

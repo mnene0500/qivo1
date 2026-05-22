@@ -146,6 +146,7 @@ export default function HomePage() {
 
   return (
     <div className="flex-1 pb-24 bg-[#F9FAFB] min-h-screen relative select-none">
+      {/* BRANDING HEADER STAMP */}
       <div className="absolute top-0 left-0 right-0 z-0 flex flex-col">
         <div className="h-[100px] bg-[#00A2FF] flex items-end justify-center pb-4">
            <h1 className="text-4xl font-logo text-white drop-shadow-md">QIVO</h1>
@@ -182,6 +183,7 @@ export default function HomePage() {
                   <Image src={u.photo_url || ""} alt={u.name} fill className="object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
                   
+                  {/* QUICK CHAT BUTTON */}
                   <div 
                     onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}
                     className="absolute top-2.5 right-2.5 px-4 h-8 bg-[#00A2FF] rounded-full flex items-center justify-center text-white shadow-xl active:scale-90 transition-all z-20 hover:bg-[#0081CC] border border-white/20"
