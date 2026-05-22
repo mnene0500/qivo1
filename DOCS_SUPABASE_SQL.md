@@ -1,6 +1,7 @@
+
 # QIVO Production SQL (Secure with RLS)
 
-Run this entire script in your **Supabase SQL Editor** to initialize the economy, gifting, and calling systems. This script handles tables, real-time settings, and Row Level Security (RLS) with corrected policies for user onboarding.
+Run this entire script in your **Supabase SQL Editor** to initialize the economy, gifting, and calling systems. This script handles tables, real-time settings, and Row Level Security (RLS).
 
 ```sql
 -- 1. SETUP HELPER FUNCTIONS
@@ -11,6 +12,16 @@ BEGIN
   VALUES (user_id, amount)
   ON CONFLICT (user_id)
   DO UPDATE SET diamonds = balances.diamonds + amount, updated_at = NOW();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.increment_coins(user_uid UUID, amount BIGINT)
+RETURNS VOID AS $$
+BEGIN
+  INSERT INTO public.balances (user_id, coins)
+  VALUES (user_uid, amount)
+  ON CONFLICT (user_id)
+  DO UPDATE SET coins = balances.coins + amount, updated_at = NOW();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -142,24 +153,19 @@ ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
 -- 6. DEFINE SECURITY POLICIES
-
--- USERS
 CREATE POLICY "Public profiles are viewable by everyone" ON public.users FOR SELECT USING (true);
 CREATE POLICY "Users can insert own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = uid);
 CREATE POLICY "Users can update own profile" ON public.users FOR UPDATE USING (auth.uid() = uid);
 
--- BALANCES
 CREATE POLICY "Users can view own balance" ON public.balances FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own balance" ON public.balances FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own balance" ON public.balances FOR UPDATE USING (auth.uid() = user_id);
 
--- LEDGERS
 CREATE POLICY "Users can view own coin history" ON public.coin_history FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own coin history" ON public.coin_history FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can view own diamond history" ON public.diamond_history FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own diamond history" ON public.diamond_history FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- CHATS & MESSAGES
 CREATE POLICY "Participants can view chats" ON public.chats FOR SELECT USING (auth.uid() = ANY(participant_ids));
 CREATE POLICY "Participants can update chats" ON public.chats FOR UPDATE USING (auth.uid() = ANY(participant_ids));
 CREATE POLICY "Participants can insert chats" ON public.chats FOR INSERT WITH CHECK (auth.uid() = ANY(participant_ids));
@@ -169,7 +175,6 @@ CREATE POLICY "Participants can view messages" ON public.messages FOR SELECT USI
 ));
 CREATE POLICY "Participants can send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
--- FINANCIALS
 CREATE POLICY "Users can view own withdrawals" ON public.withdrawals FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can view own payments" ON public.processed_payments FOR SELECT USING (auth.uid() = user_id);
 
