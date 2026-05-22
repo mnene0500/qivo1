@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, useState, useEffect, useCallback } from "react"
@@ -104,7 +103,6 @@ export default function HomePage() {
     return users
   }, [users, activeTab, profile])
 
-  // NO SPINNER IF WE HAVE CACHED USERS
   if ((initialLoading && users.length === 0) && isInitialized) {
     return (
       <div className="flex-1 bg-white min-h-screen flex items-center justify-center">
@@ -118,7 +116,7 @@ export default function HomePage() {
       {/* BRANDING HEADER - THE STAMP */}
       <header className="sticky top-0 z-50 bg-white border-b shadow-sm h-20 flex items-center justify-between px-6 overflow-hidden">
         <div className="relative">
-          <h1 className="text-5xl font-logo font-black text-[#00A2FF]/30 tracking-tighter transform -rotate-12 origin-left -translate-y-1">
+          <h1 className="text-5xl font-logo font-black text-[#00A2FF]/40 tracking-tighter transform -rotate-12 origin-left -translate-y-1">
             QIVO
           </h1>
         </div>
