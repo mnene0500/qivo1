@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -182,7 +181,7 @@ export default function EditProfilePage() {
 
       toast({ title: "Profile Updated Successfully" })
       
-      // 4. Force Hard Refresh to bypass all caching
+      // 4. Force Hard Refresh to bypass all caching and session state
       window.location.replace('/profile');
     } catch (error: any) {
       console.error("[Profile Save Crash]", error);

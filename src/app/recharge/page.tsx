@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, Suspense, useEffect, useRef } from "react"
@@ -12,12 +11,14 @@ import {
   History, 
   CheckCircle2,
   Zap,
-  ShieldCheck,
   AlertCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { initiatePesaPalPayment, verifyPaymentAction } from "@/app/actions/payment-actions"
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const PACKAGES = [
   { amount: 500, price: 80.0 },
@@ -37,7 +38,6 @@ function RechargeContent() {
   
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
-  const [isVerifying, setIsVerifying] = useState(false)
   const [fulfillmentSuccess, setFulfillmentSuccess] = useState(false)
   const [currentCoins, setCurrentCoins] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -68,9 +68,8 @@ function RechargeContent() {
         const newBal = Number(payload.new.coins) || 0
         if (currentCoins !== null && newBal > currentCoins && !successTriggeredRef.current) {
           setFulfillmentSuccess(true)
-          setIsVerifying(false)
           toast({ title: "Recharge Successful!", description: "Your coins have arrived." })
-          setTimeout(handleRedirectHome, 1500);
+          setTimeout(handleRedirectHome, 2000);
         }
       })
       .subscribe()
@@ -81,24 +80,23 @@ function RechargeContent() {
     }
   }, [user?.id, currentCoins])
 
-  // 2. Poll verify action until Completed
+  // 2. Poll verify action silently in the background
   useEffect(() => {
     if (orderTrackingId && user?.id && !fulfillmentSuccess && !successTriggeredRef.current) {
-      setIsVerifying(true);
       const runVerification = async () => {
         if (successTriggeredRef.current) return;
         try {
           const res = await verifyPaymentAction(orderTrackingId, user.id);
           if (res.success && res.coins_added) {
-            // Success! The real-time listener will handle the UI/Redirect
-          } else if (res.error && !res.error.includes("not completed")) {
+            // Success will be handled by the real-time listener above
+          } else if (res.error && !res.error.toLowerCase().includes("not completed")) {
             setErrorMessage(res.error);
             if (pollTimerRef.current) clearInterval(pollTimerRef.current);
           }
         } catch (err) {}
       };
       runVerification();
-      pollTimerRef.current = setInterval(runVerification, 5000); 
+      pollTimerRef.current = setInterval(runVerification, 6000); 
     }
     return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
   }, [orderTrackingId, user?.id, fulfillmentSuccess]);
@@ -128,24 +126,24 @@ function RechargeContent() {
 
   if (authLoading || !isInitialized) return <div className="flex-1 flex items-center justify-center h-screen bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
 
-  if (isVerifying || fulfillmentSuccess || errorMessage) {
+  // Show "DONE!" or "FAILED" but not the background "Verifying" screen
+  if (fulfillmentSuccess || errorMessage) {
     return (
       <div className="flex-1 bg-white min-h-screen flex flex-col items-center justify-center p-8 space-y-10 animate-in fade-in duration-300">
         <div className="relative">
           <div className="w-32 h-32 border-4 border-blue-50 rounded-full flex items-center justify-center">
-            {fulfillmentSuccess ? <CheckCircle2 className="w-20 h-20 text-green-500 animate-in zoom-in" /> : errorMessage ? <AlertCircle className="w-16 h-16 text-red-500" /> : <Zap className="w-12 h-12 text-[#00A2FF] animate-pulse" />}
+            {fulfillmentSuccess ? <CheckCircle2 className="w-20 h-20 text-green-500 animate-in zoom-in" /> : <AlertCircle className="w-16 h-16 text-red-500" />}
           </div>
-          {!fulfillmentSuccess && !errorMessage && <div className="w-32 h-32 border-4 border-[#00A2FF] border-t-transparent rounded-full animate-spin absolute inset-0" />}
         </div>
         <div className="text-center space-y-2">
-          <h2 className={cn("text-3xl font-black italic tracking-tighter uppercase", fulfillmentSuccess ? "text-green-600" : errorMessage ? "text-red-500" : "text-black")}>
-            {fulfillmentSuccess ? "DONE!" : errorMessage ? "FAILED" : "VERIFYING..."}
+          <h2 className={cn("text-3xl font-black italic tracking-tighter uppercase", fulfillmentSuccess ? "text-green-600" : "text-red-500")}>
+            {fulfillmentSuccess ? "DONE!" : "FAILED"}
           </h2>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.4em] max-w-[280px]">
-            {fulfillmentSuccess ? "RELOADING PROFILE" : errorMessage ? errorMessage : "WAITING FOR GATEWAY APPROVAL"}
+            {fulfillmentSuccess ? "RELOADING PROFILE" : errorMessage}
           </p>
         </div>
-        {errorMessage && <Button onClick={() => router.replace('/recharge')} className="rounded-full bg-black text-white font-bold uppercase tracking-widest px-8 h-14">Try Again</Button>}
+        {errorMessage && <Button onClick={() => setErrorMessage(null)} className="rounded-full bg-black text-white font-bold uppercase tracking-widest px-8 h-14">Try Again</Button>}
       </div>
     )
   }

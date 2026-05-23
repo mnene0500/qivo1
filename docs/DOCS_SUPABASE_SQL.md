@@ -1,7 +1,7 @@
 
 # QIVO Production SQL (Run in SQL Editor)
 
-This script is idempotent. It safely sets up tables, atomic helpers, and Row Level Security (RLS) policies without throwing errors if they already exist.
+This script is idempotent. It safely sets up tables, atomic helpers, and hardened Row Level Security (RLS) policies.
 
 ```sql
 -- 1. SETUP ATOMIC HELPERS
@@ -153,16 +153,7 @@ DROP POLICY IF EXISTS "balances_self_update" ON public.balances;
 CREATE POLICY "balances_self_view" ON public.balances FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "balances_self_update" ON public.balances FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- 4. STORAGE RLS (Bucket: photos)
--- Ensure bucket exists in Supabase Dashboard
-DROP POLICY IF EXISTS "Public Photo Access" ON storage.objects;
-DROP POLICY IF EXISTS "Users Manage Own Photos" ON storage.objects;
-CREATE POLICY "Public Photo Access" ON storage.objects FOR SELECT USING (bucket_id = 'photos');
-CREATE POLICY "Users Manage Own Photos" ON storage.objects FOR ALL 
-USING (bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text)
-WITH CHECK (bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text);
-
--- 5. IDEMPOTENT REALTIME REGISTRATION (Fixes Error 42710)
+-- 4. IDEMPOTENT REALTIME REGISTRATION (Fixes Error 42710)
 DO $$ 
 BEGIN 
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
