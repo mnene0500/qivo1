@@ -57,7 +57,7 @@ export default function WelcomePage() {
     try {
       const redirectTo = typeof window !== 'undefined' 
         ? `${window.location.origin}/home` 
-        : 'https://qivo-gamma.vercel.app/home';
+        : 'https://qivo-five.vercel.app/home';
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -26,7 +26,7 @@ export async function GET() {
     if (!token) throw new Error("Could not authenticate with PesaPal. Check your Keys in Vercel.");
 
     const payload = {
-      url: "https://qivo-gamma.vercel.app/api/pesapal/callback",
+      url: "https://qivo-five.vercel.app/api/pesapal/callback",
       ipn_notification_type: "GET"
     };
 

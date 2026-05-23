@@ -37,7 +37,7 @@ export async function initiatePesaPalPayment(uid: string, amount: number, coins:
       currency: "KES",
       amount: amount,
       description: `Purchase of ${coins} QIVO Coins`,
-      callback_url: `https://qivo-gamma.vercel.app/payment-success`,
+      callback_url: `https://qivo-five.vercel.app/payment-success`,
       notification_id: process.env.PESAPAL_IPN_ID,
       billing_address: { 
         email_address: "billing@qivo.app",
