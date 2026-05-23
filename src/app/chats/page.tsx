@@ -1,17 +1,18 @@
-
 "use client"
 
-import { useEffect, useState, Suspense, useCallback, useRef } from "react"
+import { useEffect, useState, Suspense, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, Loader2, User, Phone, Video, Ban, Lock, ShieldAlert, Gem } from "lucide-react"
+import { Send, ChevronLeft, Loader2, User, Lock, ShieldAlert, Gem } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
-import { checkCallBalanceAction } from "@/app/actions/call-actions"
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface Message {
   id: string | number
@@ -49,7 +50,6 @@ function ChatsContent() {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [activeChatClearedAt, setActiveChatClearedAt] = useState<number>(0)
 
-  // Auth Guard
   useEffect(() => {
     if (isInitialized && !authLoading && !currentUser) {
       router.replace("/welcome")
@@ -151,17 +151,6 @@ function ChatsContent() {
     }
   }
 
-  const handleCall = async (type: 'voice' | 'video') => {
-    if (!currentUser || !startWithId || !partnerProfile || !chatId) return
-    const check = await checkCallBalanceAction(currentUser.id, type)
-    if (!check.success) {
-      toast({ variant: "destructive", title: "Insufficient Coins" })
-      router.push("/recharge")
-      return
-    }
-    router.push(`/call/${chatId}?type=${type}&partner=${encodeURIComponent(partnerProfile.name)}&partnerId=${startWithId}&caller=true`)
-  }
-
   const isBlocked = userProfile && partnerProfile && (
     (userProfile.blocking || []).includes(partnerProfile.uid) || 
     (userProfile.blocked_by || []).includes(partnerProfile.uid)
@@ -207,12 +196,6 @@ function ChatsContent() {
           <Avatar className="w-10 h-10 border"><AvatarImage src={partnerProfile?.photo_url} className="object-cover" /><AvatarFallback>{partnerProfile?.name?.[0]}</AvatarFallback></Avatar>
           <div><p className="font-black text-sm leading-none">{partnerProfile?.name || '...'}</p><p className="text-[9px] font-bold text-green-500 uppercase tracking-widest mt-1">{isBlocked ? "Unavailable" : "Available"}</p></div>
         </div>
-        {!isBlocked && (
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={() => handleCall('voice')} className="rounded-full"><Phone className="w-5 h-5" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => handleCall('video')} className="rounded-full"><Video className="w-5 h-5" /></Button>
-          </div>
-        )}
       </header>
 
       <main className="flex-1 overflow-y-auto p-6 flex flex-col-reverse gap-4 bg-gray-50 no-scrollbar">
@@ -231,7 +214,7 @@ function ChatsContent() {
         {isBlocked ? (
           <div className="absolute inset-0 bg-white/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
              <div className="flex items-center gap-3 bg-red-50 text-red-600 px-6 py-3 rounded-2xl border border-red-100">
-                <ShieldAlert className="w-5 h-5" /><span className="text-xs font-black uppercase tracking-widest">Communication Blocked</span>
+                <Lock className="w-5 h-5" /><span className="text-xs font-black uppercase tracking-widest">Communication Blocked</span>
              </div>
           </div>
         ) : (

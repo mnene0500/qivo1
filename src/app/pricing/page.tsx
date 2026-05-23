@@ -1,12 +1,12 @@
-
 "use client"
 
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, MessageSquare, Phone, Video, Coins, Star } from "lucide-react"
+import { ChevronLeft, MessageSquare, Coins, Star } from "lucide-react"
 
 /**
  * @fileOverview Displays the cost of interactions in QIVO.
+ * Optimized for messaging-only experience.
  */
 export default function PricingPage() {
   const router = useRouter()
@@ -19,23 +19,7 @@ export default function PricingPage() {
       unit: "Per Message", 
       color: "bg-blue-50 text-blue-600",
       desc: "Instant direct messages to any user"
-    },
-    { 
-      label: "Voice Call", 
-      icon: Phone, 
-      price: "70 Coins", 
-      unit: "Per Minute", 
-      color: "bg-emerald-50 text-emerald-600",
-      desc: "Clear audio calls with your matches"
-    },
-    { 
-      label: "Video Call", 
-      icon: Video, 
-      price: "150 Coins", 
-      unit: "Per Minute", 
-      color: "bg-purple-50 text-purple-600",
-      desc: "High-definition face-to-face video"
-    },
+    }
   ]
 
   return (
@@ -79,7 +63,7 @@ export default function PricingPage() {
 
         <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100">
           <p className="text-[10px] font-bold text-blue-600 text-center leading-relaxed uppercase tracking-widest">
-            Female users earn diamonds for receiving messages and calls.
+            Female users earn diamonds for receiving messages and gifts.
           </p>
         </div>
       </main>

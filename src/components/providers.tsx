@@ -1,11 +1,9 @@
-
 'use client';
 
 import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { usePresence } from '@/hooks/use-presence';
 import { InstallPrompt } from '@/components/layout/InstallPrompt';
-import { CallManager } from '@/components/CallManager';
 
 /**
  * Handles global user presence heartbeat via Supabase.
@@ -17,6 +15,7 @@ function PresenceManager({ children }: { children: React.ReactNode }) {
 
 /**
  * Root providers wrapper for the application.
+ * Removed CallManager to optimize performance and responsiveness.
  */
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -26,7 +25,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
       </div>
       <Toaster />
       <InstallPrompt />
-      <CallManager />
     </PresenceManager>
   );
 }
