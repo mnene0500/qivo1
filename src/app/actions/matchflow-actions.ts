@@ -1,3 +1,4 @@
+
 'use server';
 
 import { supabase } from '@/lib/supabase';
@@ -44,6 +45,16 @@ export async function submitReportAction(reporterUid: string, reportedUid: strin
   try {
     const { data, error } = await supabase.functions.invoke('economy-ops', {
       body: { action: 'submit-report', reporterUid, reportedUid, reason, description, proofUrl }
+    });
+    if (error) throw error;
+    return data;
+  } catch (error: any) { return { success: false, error: error.message }; }
+}
+
+export async function resolveReportAction(adminUid: string, reportId: string, reporterUid: string) {
+  try {
+    const { data, error } = await supabase.functions.invoke('economy-ops', {
+      body: { action: 'resolve-report', adminUid, reportId, reporterUid }
     });
     if (error) throw error;
     return data;

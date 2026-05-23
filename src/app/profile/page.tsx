@@ -22,7 +22,8 @@ import {
   UserPlus,
   Wallet,
   Shield,
-  User
+  User,
+  Flag
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -302,12 +303,20 @@ export default function MePage() {
             )}
 
             {profile?.is_admin && (
-              <Button onClick={() => router.push("/manage-roles")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-purple-600 col-span-2 mt-4">
-                <div className="flex items-center gap-2">
-                  <Users className="w-6 h-6" />
-                  <span className="text-sm font-bold uppercase tracking-widest">Manage Roles</span>
-                </div>
-              </Button>
+              <>
+                <Button onClick={() => router.push("/manage-roles")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-purple-600 col-span-2 mt-4">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-6 h-6" />
+                    <span className="text-sm font-bold uppercase tracking-widest">Manage Roles</span>
+                  </div>
+                </Button>
+                <Button onClick={() => router.push("/manage-reports")} className="h-20 bg-black rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-white col-span-2 mt-4">
+                  <div className="flex items-center gap-2">
+                    <Flag className="w-6 h-6 text-red-500" />
+                    <span className="text-sm font-bold uppercase tracking-widest">Manage Reports</span>
+                  </div>
+                </Button>
+              </>
             )}
 
             {profile?.is_agent && profile && <AgencyDashboardDialog user={profile} />}

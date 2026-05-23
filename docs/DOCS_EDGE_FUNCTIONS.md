@@ -1,4 +1,5 @@
 
+
 # QIVO Final Production Edge Functions
 
 Update your Supabase Edge Functions with these logic blocks to ensure coins, diamonds, and history are synchronized perfectly.
@@ -228,6 +229,20 @@ serve(async (req) => {
         timestamp: ts 
       })
 
+      return new Response(JSON.stringify({ success: true }), { headers: corsHeaders })
+    }
+
+    if (action === "resolve-report") {
+      const { adminUid, reportId, reporterUid } = params
+      await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId)
+      
+      const ids = [adminUid, reporterUid].sort()
+      const chatId = `direct_${ids[0]}_${ids[1]}`
+      const msg = "The QIVO team is resolving your complaint. Thank you for your patience."
+      
+      await supabase.from('chats').upsert({ id: chatId, participant_ids: ids, last_message: msg, last_message_at: ts })
+      await supabase.from('messages').insert({ chat_id: chatId, sender_id: adminUid, text: msg, timestamp: ts })
+      
       return new Response(JSON.stringify({ success: true }), { headers: corsHeaders })
     }
 
