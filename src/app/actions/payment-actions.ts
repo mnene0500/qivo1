@@ -2,6 +2,7 @@
 'use server';
 
 import { supabase } from '@/lib/supabase';
+import { PESAPAL_CONFIG } from '@/lib/pesapal-config';
 
 const PESA_ENV = "https://pay.pesapal.com/v3";
 
@@ -46,7 +47,7 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
       currency: "KES",
       amount: Number(amount),
       description: "QIVO Coins Recharge",
-      callback_url: "https://qivo-gamma.vercel.app/payment-success",
+      callback_url: PESAPAL_CONFIG.CALLBACK_URL,
       notification_id: process.env.PESAPAL_IPN_ID,
       billing_address: { email_address: user.email || "user@qivo.app" },
     };
