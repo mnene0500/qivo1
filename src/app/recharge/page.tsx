@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, Suspense, useEffect } from "react"
@@ -10,10 +9,6 @@ import { ChevronLeft, Loader2, History, CheckCircle2, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { initiatePesaPalPayment } from "@/app/actions/payment-actions"
-
-// FORCE RE-FETCH
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 const PACKAGES = [
   { amount: 500, price: 80.0 },

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useCallback } from "react"
@@ -20,9 +19,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 interface Message {
   id: string | number

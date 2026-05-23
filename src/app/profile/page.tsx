@@ -39,9 +39,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { createAgencyAction, joinAgencyAction } from "@/app/actions/matchflow-actions"
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 interface UserProfile {
   uid: string
   name: string

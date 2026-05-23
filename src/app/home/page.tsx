@@ -10,10 +10,6 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-// FORCE RE-FETCH EVERY TIME
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 interface UserProfile {
   uid: string
   name: string

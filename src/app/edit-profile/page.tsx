@@ -16,9 +16,6 @@ import Cropper from "react-easy-crop"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import Image from "next/image"
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 const AFRICAN_COUNTRIES = [
   "Kenya", "Tanzania", "Uganda", "Rwanda", "Burundi", "South Sudan", "Ethiopia", "Somalia", "Eritrea", "Djibouti", "South Africa", "Nigeria", "Ghana", "Egypt"
 ]
