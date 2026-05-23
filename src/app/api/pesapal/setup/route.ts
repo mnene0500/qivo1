@@ -23,7 +23,7 @@ async function getAuthToken() {
 export async function GET() {
   try {
     const token = await getAuthToken();
-    if (!token) throw new Error("Could not authenticate with PesaPal. Check your Keys in Vercel.");
+    if (!token) throw new Error("Could not authenticate with PesaPal. Ensure PESAPAL_CONSUMER_KEY and SECRET are set in Vercel.");
 
     const payload = {
       url: "https://qivo-five.vercel.app/api/pesapal/callback",
@@ -46,11 +46,15 @@ export async function GET() {
         success: true,
         message: "IPN Registered Successfully",
         ipn_id: data.ipn_id,
-        instruction: "Copy the 'ipn_id' above and add it to Vercel Environment Variables as PESAPAL_IPN_ID"
+        next_step: "Copy the 'ipn_id' above and add it to Vercel Environment Variables as PESAPAL_IPN_ID, then Redeploy your project."
       });
     }
 
-    return NextResponse.json({ success: false, error: data }, { status: 400 });
+    return NextResponse.json({ 
+      success: false, 
+      error: data,
+      hint: "Ensure your PesaPal keys are Production keys, not Sandbox keys."
+    }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

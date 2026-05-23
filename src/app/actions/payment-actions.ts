@@ -14,7 +14,7 @@ async function getAuthToken() {
     })
   });
   const data = await res.json();
-  if (!data.token) throw new Error("PesaPal Auth Failed");
+  if (!data.token) throw new Error("PesaPal Auth Failed. Check your Consumer Key/Secret.");
   return data.token;
 }
 
@@ -23,7 +23,6 @@ export async function initiatePesaPalPayment(uid: string, amount: number, coins:
     const token = await getAuthToken();
     const orderId = crypto.randomUUID();
     
-    // Save pending payment record
     const supabase = getSupabaseAdmin();
     await supabase.from('pending_payments').insert({
       order_id: orderId,
@@ -56,7 +55,7 @@ export async function initiatePesaPalPayment(uid: string, amount: number, coins:
     });
 
     const data = await res.json();
-    if (!data.redirect_url) throw new Error(data.message || "Failed to get redirect URL");
+    if (!data.redirect_url) throw new Error(data.message || "Failed to get redirect URL from PesaPal");
 
     return { success: true, redirect_url: data.redirect_url, orderId };
   } catch (error: any) {
@@ -74,30 +73,24 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
     
     const data = await res.json();
     
-    // Check if status is COMPLETED
     if (data.status_code === 1 || data.payment_status_description === "Completed") {
       const supabase = getSupabaseAdmin();
       
-      // Check if already processed
       const { data: existing } = await supabase.from('processed_payments').select('*').eq('order_tracking_id', orderTrackingId).maybeSingle();
       if (existing) return { success: true, message: "Already processed." };
 
-      // Get user from merchantReference
       const { data: pending } = await supabase.from('pending_payments').select('*').eq('order_id', merchantReference).single();
-      if (!pending) throw new Error("Order record not found.");
+      if (!pending) throw new Error("Payment record matching this reference not found.");
 
-      // Calculate coins based on amount
       let coins = 0;
       if (pending.amount === 1) coins = 10;
       else if (pending.amount === 50) coins = 500;
       else if (pending.amount === 200) coins = 2000;
-      else coins = Math.floor(pending.amount * 10); // Standard rate
+      else coins = Math.floor(pending.amount * 10);
 
-      // ATOMIC UPDATE
       const { error: rpcErr } = await supabase.rpc("increment_coins", { user_id: pending.user_id, amount: coins });
       if (rpcErr) throw rpcErr;
 
-      // Log success
       await Promise.all([
         supabase.from('processed_payments').insert({
           order_tracking_id: orderTrackingId,
@@ -119,7 +112,7 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       return { success: true, coins };
     }
     
-    return { success: false, error: "Payment not completed yet." };
+    return { success: false, error: "Payment is still processing at PesaPal." };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
