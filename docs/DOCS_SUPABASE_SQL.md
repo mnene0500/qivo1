@@ -1,7 +1,7 @@
 
 # QIVO Production SQL (Run in SQL Editor)
 
-This script sets up all tables and ensures history triggers and balance helpers are ready.
+This script sets up all tables and ensures history triggers, balance helpers, and security policies are ready.
 
 ```sql
 -- 1. SETUP ATOMIC HELPERS
@@ -109,15 +109,58 @@ CREATE TABLE IF NOT EXISTS public.reports (
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
--- 3. ENABLE RLS FOR 'photos' STORAGE BUCKET
--- Public read access for all photos
-CREATE POLICY "Public Read Photos" ON storage.objects FOR SELECT USING (bucket_id = 'photos');
+CREATE TABLE IF NOT EXISTS public.withdrawals (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+  agency_id TEXT,
+  diamonds NUMERIC,
+  amount_kes NUMERIC,
+  status TEXT DEFAULT 'pending',
+  timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
+);
 
--- Standard path: userId/filename.jpg
-CREATE POLICY "Users can manage own photos" ON storage.objects FOR ALL USING (
+CREATE TABLE IF NOT EXISTS public.agencies (
+  code TEXT PRIMARY KEY,
+  agent_uid UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+  name TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. ENABLE RLS & POLICIES
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.balances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.coin_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.diamond_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
+
+-- Profiles
+CREATE POLICY "Public profiles viewable" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Users insert own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = uid);
+CREATE POLICY "Users update own profile" ON public.users FOR UPDATE USING (auth.uid() = uid) WITH CHECK (auth.uid() = uid);
+
+-- Balances
+CREATE POLICY "Users view own balance" ON public.balances FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users update own balance" ON public.balances FOR UPDATE USING (auth.uid() = user_id);
+
+-- Chats & Messages
+CREATE POLICY "Participants view chats" ON public.chats FOR SELECT USING (auth.uid() = ANY(participant_ids));
+CREATE POLICY "Participants send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+CREATE POLICY "Participants view messages" ON public.messages FOR SELECT USING (EXISTS (
+  SELECT 1 FROM public.chats WHERE id = messages.chat_id AND auth.uid() = ANY(participant_ids)
+));
+
+-- Storage Bucket RLS (Bucket: photos)
+-- Public read access
+CREATE POLICY "Public Read Photos" ON storage.objects FOR SELECT USING (bucket_id = 'photos');
+-- User manage own folder
+CREATE POLICY "Users manage own photos" ON storage.objects FOR ALL USING (
   bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
 -- 4. ENABLE REALTIME
-ALTER PUBLICATION supabase_realtime ADD TABLE public.balances, public.coin_history, public.diamond_history, public.users, public.reports, public.chats, public.messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.balances, public.coin_history, public.diamond_history, public.users, public.reports, public.chats, public.messages, public.withdrawals;
 ```

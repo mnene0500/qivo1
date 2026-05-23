@@ -155,28 +155,34 @@ export default function EditProfilePage() {
         }
       }
 
-      // 3. PERSIST TO DATABASE
-      const { error: dbError } = await supabase.from('users').update({
+      // 3. PERSIST TO DATABASE (Explicit naming to ensure column match)
+      const updateData = {
         name: formData.name,
         interests: formData.interests,
-        dob: formData.dob,
+        dob: formData.dob || null,
         country: formData.country,
         looking_for: formData.looking_for,
         education_level: formData.education_level,
         photo_url: finalPhotoUrl,
         additional_photos: finalGalleryUrls,
         updated_at: new Date().toISOString()
-      }).eq('uid', user.id)
+      };
+
+      const { error: dbError } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('uid', user.id);
       
       if (dbError) throw dbError;
 
-      toast({ title: "Profile Updated", description: "Changes saved successfully." })
+      toast({ title: "Profile Updated", description: "All changes saved successfully." })
       
-      // Force navigation to clear local route cache
+      // Force refresh and navigate to clear local route cache
+      router.refresh();
       router.push('/profile');
     } catch (error: any) {
-      console.error("[Profile Update Error]", error.message);
-      toast({ variant: "destructive", title: "Update Failed", description: error.message })
+      console.error("[Profile Update Error]", error);
+      toast({ variant: "destructive", title: "Update Failed", description: error.message || "Security or network error." })
     } finally {
       setSaving(false)
     }
@@ -185,20 +191,22 @@ export default function EditProfilePage() {
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
 
   // Use unique key for the avatar preview to force re-render
-  const avatarKey = `${formData.photo_url}`;
+  const avatarKey = `${formData.photo_url}?t=${Date.now()}`;
 
   return (
     <div className="flex-1 bg-white min-h-screen flex flex-col pb-20 select-none">
       <header className="px-4 h-16 flex items-center justify-between border-b bg-white sticky top-0 z-50">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full"><ChevronLeft className="w-6 h-6 text-black" /></Button>
         <h1 className="text-base font-black text-black">Edit Profile</h1>
-        <Button variant="ghost" size="icon" onClick={handleSave} disabled={saving} className="text-[#00A2FF]">{saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}</Button>
+        <Button variant="ghost" size="icon" onClick={handleSave} disabled={saving} className="text-[#00A2FF]">
+          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+        </Button>
       </header>
       <main className="flex-1 p-6 space-y-8 overflow-y-auto no-scrollbar">
         <div className="flex flex-col items-center">
           <div className="relative group cursor-pointer" onClick={() => { setTargetPhotoIndex('profile'); fileInputRef.current?.click(); }}>
             <Avatar className="w-28 h-28 border-4 border-gray-50 shadow-xl overflow-hidden">
-              <AvatarImage key={avatarKey} src={avatarKey} className="object-cover" />
+              <AvatarImage key={avatarKey} src={formData.photo_url} className="object-cover" />
               <AvatarFallback className="bg-gray-100"><Camera className="w-8 h-8 text-gray-300" /></AvatarFallback>
             </Avatar>
             <div className="absolute bottom-0 right-0 bg-[#00A2FF] p-2 rounded-full text-white shadow-lg"><Camera className="w-4 h-4" /></div>
@@ -213,7 +221,7 @@ export default function EditProfilePage() {
               <div key={i} className="relative aspect-square rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => { setTargetPhotoIndex(i); fileInputRef.current?.click(); }}>
                 {formData.additional_photos[i] ? (
                   <>
-                    <Image key={formData.additional_photos[i]} src={formData.additional_photos[i]} alt={`P${i}`} fill className="object-cover" sizes="25vw" />
+                    <Image key={`${formData.additional_photos[i]}-${i}`} src={formData.additional_photos[i]} alt={`P${i}`} fill className="object-cover" sizes="25vw" />
                     <button onClick={(e) => { e.stopPropagation(); const n = [...formData.additional_photos]; n.splice(i,1); setFormData({...formData, additional_photos: n}); }} className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white"><X className="w-3 h-3" /></button>
                   </>
                 ) : (<Plus className="w-6 h-6 text-gray-300" />)}
@@ -223,9 +231,18 @@ export default function EditProfilePage() {
         </div>
 
         <div className="space-y-6">
-          <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Full Name</Label><Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="rounded-2xl h-14 border-gray-100 bg-gray-50 font-bold" /></div>
-          <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-gray-400 ml-1">DOB</Label><Input type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="rounded-2xl h-14 border-gray-100 bg-gray-50 font-bold" /></div>
-          <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Bio</Label><Textarea value={formData.interests} onChange={(e) => setFormData({...formData, interests: e.target.value})} className="rounded-2xl min-h-[120px] border-gray-100 bg-gray-50 font-medium" /></div>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Full Name</Label>
+            <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="rounded-2xl h-14 border-gray-100 bg-gray-50 font-bold" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">DOB</Label>
+            <Input type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} className="rounded-2xl h-14 border-gray-100 bg-gray-50 font-bold" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Bio</Label>
+            <Textarea value={formData.interests} onChange={(e) => setFormData({...formData, interests: e.target.value})} className="rounded-2xl min-h-[120px] border-gray-100 bg-gray-50 font-medium" />
+          </div>
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
