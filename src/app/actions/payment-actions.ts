@@ -1,14 +1,14 @@
 
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { PESAPAL_CONFIG } from '@/lib/pesapal-config';
 
 const PESA_ENV = "https://pay.pesapal.com/v3";
 
 /**
  * @fileOverview Native PesaPal Integration for Vercel.
- * Phishing protected via direct S2S verification and processed_payments ledger.
+ * Purely server-side. No public keys used.
  */
 
 async function getPesapalToken() {
@@ -30,6 +30,7 @@ async function getPesapalToken() {
 }
 
 export async function initiatePesaPalPayment(amount: number, user: { uid: string, email: string, name: string }) {
+  const supabase = getSupabaseAdmin();
   try {
     const token = await getPesapalToken();
     const orderId = crypto.randomUUID();
@@ -68,6 +69,7 @@ export async function initiatePesaPalPayment(amount: number, user: { uid: string
 }
 
 export async function verifyPaymentAction(orderTrackingId: string, user_id: string) {
+  const supabase = getSupabaseAdmin();
   try {
     const token = await getPesapalToken();
     

@@ -2,33 +2,44 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * @fileOverview Standardized Supabase Client.
- * Uses public variables for browser and service role for server actions.
+ * @fileOverview Private Supabase Client.
+ * All NEXT_PUBLIC_ prefixes removed. 
+ * This client is designed for use in Server Actions and Route Handlers.
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder';
-
-// Client for Browser use
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
-});
-
-// Admin Client for Server Actions (Phishing protected)
-export const getSupabaseAdmin = () => {
+const getSupabaseConfig = () => {
+  const url = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  
-  if (!serviceKey || !url) {
-    // Fallback to standard client if secrets are missing during build
-    return supabase;
+
+  // Fallback for build time safety
+  return {
+    url: url || 'https://placeholder.supabase.co',
+    anonKey: anonKey || 'placeholder',
+    serviceKey: serviceKey || 'placeholder'
+  };
+};
+
+// Standard client using private env vars
+export const supabase = createClient(
+  getSupabaseConfig().url, 
+  getSupabaseConfig().anonKey,
+  {
+    auth: {
+      persistSession: false // Server-side environment
+    }
   }
-  
-  return createClient(url, serviceKey);
+);
+
+// Admin Client for critical financial/admin tasks
+export const getSupabaseAdmin = () => {
+  const config = getSupabaseConfig();
+  return createClient(config.url, config.serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
 };
 
 export function base64ToBlob(base64: string): { blob: Blob, contentType: string } {
@@ -59,20 +70,22 @@ export function base64ToBlob(base64: string): { blob: Blob, contentType: string 
 }
 
 export async function uploadProfilePhoto(file: File | Blob, userId: string) {
+  const admin = getSupabaseAdmin();
   const timestamp = Date.now();
   const filePath = `${userId}/${timestamp}.jpg`;
-  const { error } = await supabase.storage.from('photos').upload(filePath, file, { cacheControl: '0', upsert: true });
+  const { error } = await admin.storage.from('photos').upload(filePath, file, { cacheControl: '0', upsert: true });
   if (error) throw error;
-  const { data } = supabase.storage.from('photos').getPublicUrl(filePath);
+  const { data } = admin.storage.from('photos').getPublicUrl(filePath);
   return data.publicUrl;
 }
 
 export async function uploadPostPhoto(file: File | Blob, userId: string, bucket = 'photos') {
+  const admin = getSupabaseAdmin();
   const timestamp = Date.now();
   const uuid = crypto.randomUUID();
   const filePath = `${userId}/gallery-${timestamp}-${uuid}.jpg`;
-  const { error } = await supabase.storage.from(bucket).upload(filePath, file, { cacheControl: '0', upsert: true });
+  const { error } = await admin.storage.from(bucket).upload(filePath, file, { cacheControl: '0', upsert: true });
   if (error) throw error;
-  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+  const { data } = admin.storage.from(bucket).getPublicUrl(filePath);
   return data.publicUrl;
 }

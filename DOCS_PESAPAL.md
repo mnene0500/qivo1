@@ -1,21 +1,19 @@
 
-# QIVO PesaPal Production Secrets (Vercel Native)
+# QIVO PesaPal Production (Vercel Private)
 
-Add these variables to your **Vercel Dashboard > Settings > Environment Variables** to enable live payments.
+All PesaPal secrets are now stored as **Private Environment Variables** in Vercel. 
+They do NOT have the `NEXT_PUBLIC_` prefix.
 
-| Variable | Value | Description |
+| Variable | Importance | Description |
 | :--- | :--- | :--- |
-| `PESAPAL_CONSUMER_KEY` | *Your Key* | From PesaPal Live Dashboard |
-| `PESAPAL_CONSUMER_SECRET` | *Your Secret* | From PesaPal Live Dashboard |
-| `PESAPAL_IPN_ID` | *Unique ID* | Retrieve from `https://qivo-gamma.vercel.app/api/pesapal/setup` |
+| `PESAPAL_CONSUMER_KEY` | Critical | From PesaPal Dashboard |
+| `PESAPAL_CONSUMER_SECRET` | Critical | From PesaPal Dashboard |
+| `PESAPAL_IPN_ID` | Critical | Retrieve via `/api/pesapal/setup` |
 
-## ✅ Production URLs for PesaPal Dashboard
-When configuring your PesaPal merchant account, use these URLs:
-
-1. **Merchant IPN URL**: `https://qivo-gamma.vercel.app/api/pesapal/callback`
-2. **Callback URL**: `https://qivo-gamma.vercel.app/payment-success`
-
-## ✅ Phishing Protection
-- **S2S (Server-to-Server) Verification**: We only trust PesaPal's API directly from Vercel, not user input.
-- **Idempotency**: Every transaction is recorded in `processed_payments` to prevent double-awarding of coins.
-- **Zero Latency**: No more cold starts from Edge Functions.
+## 🛡️ Phishing Protection
+QIVO uses **Server-to-Server (S2S)** verification. 
+1. The user pays on PesaPal.
+2. PesaPal redirects the user back to QIVO.
+3. QIVO's **Server Action** calls PesaPal's API directly using your secret keys to confirm the payment.
+4. Coins are only awarded if PesaPal confirms the status is "Completed".
+5. Every transaction is recorded in `processed_payments` to prevent double-awarding (Idempotency).

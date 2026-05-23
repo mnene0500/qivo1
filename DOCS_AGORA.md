@@ -1,18 +1,16 @@
 
-# Agora Production Secrets (Vercel Native)
+# Agora Production Secrets (Vercel Private)
 
-Add these variables to your **Vercel Dashboard > Settings > Environment Variables** to enable secure calling.
+Agora credentials are now strictly private. No more `NEXT_PUBLIC_` prefixes.
 
-| Variable | Value | Importance |
-| :--- | :--- | :--- |
-| `AGORA_APP_ID` | From Agora Console | Critical |
-| `AGORA_APP_CERTIFICATE` | From Agora Console | **SECRET (Keep Private)** |
+| Variable | Importance |
+| :--- | :--- |
+| `AGORA_APP_ID` | Critical |
+| `AGORA_APP_CERTIFICATE` | **SECRET (Private)** |
 
 ## ✅ Security Model
-Agora is now configured with **S2S Token Verification**. 
-1. When a call starts, the client requests a token from Vercel via a Server Action.
-2. Vercel generates the token using your `AGORA_APP_CERTIFICATE`.
-3. The secret certificate never reaches the user's device.
-
-## 💎 Native Billing
-Calling is handled via **Server Actions** in `src/app/actions/call-actions.ts`. This ensures that coin deductions and diamond rewards are calculated securely on Vercel's infrastructure.
+QIVO generates **Dynamic Tokens** on the server for every call. 
+1. The client requests a call.
+2. Vercel uses the `AGORA_APP_CERTIFICATE` (which never reaches the user's phone) to sign an encrypted token.
+3. The client joins the call using this secure token.
+4. Billing (Coin deductions) happens atomically on Vercel via Server Actions.
