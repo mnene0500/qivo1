@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from "react"
@@ -11,6 +10,7 @@ import { initiatePesaPalPayment } from "@/app/actions/payment-actions"
 import { cn } from "@/lib/utils"
 
 const PACKAGES = [
+  { id: "micro", label: "Micro Pack", coins: 10, price: 1, color: "bg-rose-50", text: "text-rose-600" },
   { id: "test", label: "Test Package", coins: 500, price: 50, color: "bg-green-50", text: "text-green-600", popular: true },
   { id: "starter", label: "Starter Pack", coins: 2000, price: 200, color: "bg-blue-50", text: "text-blue-600" },
   { id: "pro", label: "Pro Value", coins: 5500, price: 500, color: "bg-purple-50", text: "text-purple-600" },

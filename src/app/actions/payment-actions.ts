@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -38,7 +37,7 @@ export async function initiatePesaPalPayment(uid: string, amount: number, coins:
       currency: "KES",
       amount: amount,
       description: `Purchase of ${coins} QIVO Coins`,
-      callback_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://qivo-five.vercel.app'}/payment-success`,
+      callback_url: `https://qivo-gamma.vercel.app/payment-success`,
       notification_id: process.env.PESAPAL_IPN_ID,
       billing_address: { email_address: "user@qivo.app" }
     };
@@ -83,8 +82,14 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       const { data: pending } = await supabase.from('pending_payments').select('*').eq('order_id', merchantReference).single();
       if (!pending) throw new Error("Order record not found.");
 
-      // Calculate coins (Test package is 50 KES = 500 Coins)
-      const coins = pending.amount === 50 ? 500 : Math.floor(pending.amount * 5); 
+      // Calculate coins based on amount
+      let coins = 0;
+      if (pending.amount === 1) coins = 10;
+      else if (pending.amount === 50) coins = 500;
+      else if (pending.amount === 200) coins = 2000;
+      else if (pending.amount === 500) coins = 5500;
+      else if (pending.amount === 1000) coins = 12000;
+      else coins = Math.floor(pending.amount * 5); // Fallback multiplier
 
       // ATOMIC UPDATE
       const { error: rpcErr } = await supabase.rpc("increment_coins", { user_id: pending.user_id, amount: coins });
