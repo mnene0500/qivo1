@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 /**
  * @fileOverview Native Economy Actions on Vercel.
- * Purely server-side atomic transactions.
+ * Purely server-side atomic transactions using private secrets.
  */
 
 export async function dailyCheckInAction(uid: string) {
@@ -56,7 +56,8 @@ export async function dailyCheckInAction(uid: string) {
 
     return { success: true, amount, day: streak };
   } catch (err: any) {
-    return { success: false, error: err.message };
+    console.error("[Checkin Error]:", err.message);
+    return { success: false, error: "Network Error: Please check your connection." };
   }
 }
 
@@ -64,33 +65,15 @@ export async function convertDiamondsToCoinsAction(user_id: string, diamonds: nu
   const supabase = getSupabaseAdmin();
   try {
     const ts = Date.now();
-
-    // 1. Deduct Diamonds
     const { error: deductErr } = await supabase.rpc("increment_diamonds", { user_id, amount: -diamonds });
     if (deductErr) throw new Error("Insufficient diamonds for conversion.");
-
-    // 2. Award Coins
     const { error: awardErr } = await supabase.rpc("increment_coins", { user_id, amount: coins });
     if (awardErr) throw new Error("Failed to credit coins.");
 
-    // 3. Log History
     await Promise.all([
-      supabase.from('diamond_history').insert({
-        user_id: user_id,
-        amount: -diamonds,
-        type: 'conversion',
-        description: `Exchanged for ${coins} coins`,
-        timestamp: ts
-      }),
-      supabase.from('coin_history').insert({
-        user_id: user_id,
-        amount: coins,
-        type: 'conversion',
-        description: `Exchanged from ${diamonds} diamonds`,
-        timestamp: ts
-      })
+      supabase.from('diamond_history').insert({ user_id, amount: -diamonds, type: 'conversion', description: `Exchanged for ${coins} coins`, timestamp: ts }),
+      supabase.from('coin_history').insert({ user_id, amount: coins, type: 'conversion', description: `Exchanged from ${diamonds} diamonds`, timestamp: ts })
     ]);
-
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -102,20 +85,9 @@ export async function sendMysteryNoteAction(user_id: string, message: string, re
   try {
     const cost = recipientCount * 10;
     const ts = Date.now();
-
-    // 1. Deduct Coins
     const { error: deductErr } = await supabase.rpc("increment_coins", { user_id, amount: -cost });
-    if (deductErr) throw new Error("Insufficient coins to blast note.");
-
-    // 2. Log History
-    await supabase.from('coin_history').insert({
-      user_id: user_id,
-      amount: -cost,
-      type: 'mystery_note',
-      description: `Mystery Note to ${recipientCount} people`,
-      timestamp: ts
-    });
-
+    if (deductErr) throw new Error("Insufficient coins.");
+    await supabase.from('coin_history').insert({ user_id, amount: -cost, type: 'mystery_note', description: `Note to ${recipientCount} people`, timestamp: ts });
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -128,37 +100,21 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
     const ts = Date.now();
     const ids = [senderUid, recipientUid].sort();
     const chatId = `direct_${ids[0]}_${ids[1]}`;
-
     const { error: deductErr } = await supabase.rpc("increment_coins", { user_id: senderUid, amount: -coinAmount });
     if (deductErr) throw new Error("Insufficient coins.");
 
-    await supabase.from("coin_history").insert({
-      user_id: senderUid,
-      amount: -coinAmount,
-      type: "gift_sent",
-      description: `Sent ${giftName}`,
-      timestamp: ts
-    });
-
     const { data: rec } = await supabase.from('users').select('gender, name').eq('uid', recipientUid).single();
     const { data: sender } = await supabase.from('users').select('name').eq('uid', senderUid).single();
-    
     const rate = rec?.gender === 'female' ? 0.5 : 0.4;
-    const diamondReward = Math.floor(coinAmount * rate);
+    const reward = Math.floor(coinAmount * rate);
 
-    await supabase.rpc("increment_diamonds", { user_id: recipientUid, amount: diamondReward });
-    await supabase.from("diamond_history").insert({ 
-      user_id: recipientUid, 
-      amount: diamondReward, 
-      type: "gift_received", 
-      description: `Gift from ${sender?.name || 'User'}`, 
-      timestamp: ts 
-    });
-
-    const giftMsg = `[Gift: ${giftName}]`;
-    await supabase.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text: giftMsg, is_gift: true, timestamp: ts });
-    await supabase.from('chats').upsert({ id: chatId, last_message: giftMsg, last_message_at: ts, participant_ids: [senderUid, recipientUid] });
-
+    await supabase.rpc("increment_diamonds", { user_id: recipientUid, amount: reward });
+    await Promise.all([
+      supabase.from("coin_history").insert({ user_id: senderUid, amount: -coinAmount, type: "gift_sent", description: `Sent ${giftName}`, timestamp: ts }),
+      supabase.from("diamond_history").insert({ user_id: recipientUid, amount: reward, type: "gift_received", description: `Gift from ${sender?.name || 'User'}`, timestamp: ts }),
+      supabase.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text: `[Gift: ${giftName}]`, is_gift: true, timestamp: ts }),
+      supabase.from('chats').upsert({ id: chatId, last_message: `[Gift: ${giftName}]`, last_message_at: ts, participant_ids: [senderUid, recipientUid] })
+    ]);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -169,19 +125,9 @@ export async function awardCoinsAction(merchantUid: string, targetMatchFlowId: s
   const supabase = getSupabaseAdmin();
   try {
     const { data: target } = await supabase.from('users').select('uid').eq('match_flow_id', targetMatchFlowId).single();
-    if (!target) throw new Error("User ID not found.");
-    
-    const { error: rpcError } = await supabase.rpc("increment_coins", { user_id: target.uid, amount });
-    if (rpcError) throw rpcError;
-
-    await supabase.from("coin_history").insert({ 
-      user_id: target.uid, 
-      amount, 
-      type: "merchant_award", 
-      description: "Merchant Load", 
-      timestamp: Date.now() 
-    });
-    
+    if (!target) throw new Error("User not found.");
+    await supabase.rpc("increment_coins", { user_id: target.uid, amount });
+    await supabase.from("coin_history").insert({ user_id: target.uid, amount, type: "merchant_award", description: "Merchant Load", timestamp: Date.now() });
     return { success: true, message: `Awarded ${amount} coins.` };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -194,17 +140,7 @@ export async function requestWithdrawalAction(userUid: string, diamonds: number,
     const ts = Date.now();
     const { error: rpcError } = await supabase.rpc("increment_diamonds", { user_id: userUid, amount: -diamonds });
     if (rpcError) throw rpcError;
-
-    const { error } = await supabase.from('withdrawals').insert({ 
-      user_id: userUid, 
-      agency_id: agencyId, 
-      diamonds, 
-      amount_kes, 
-      status: 'pending', 
-      timestamp: ts 
-    });
-    if (error) throw error;
-    
+    await supabase.from('withdrawals').insert({ user_id: userUid, agency_id: agencyId, diamonds, amount_kes, status: 'pending', timestamp: ts });
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

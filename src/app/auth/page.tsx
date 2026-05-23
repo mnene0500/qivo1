@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -9,10 +10,6 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { ChevronLeft, Mail, Loader2, ShieldCheck } from "lucide-react"
 
-/**
- * @fileOverview Unified Auth page for Email and Google Login.
- * Simplified to remove OTP verification for faster onboarding.
- */
 export default function UnifiedAuthPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -39,11 +36,15 @@ export default function UnifiedAuthPage() {
     if (!email || !password) return
     setLoading(true)
     try {
+      // This now hits /api/supabase/auth/v1/... instead of the real URL
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
+      
+      toast({ title: "Welcome Back!" })
       router.push("/home")
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Login failed", description: error.message })
+      console.error("[Login Error]:", error.message)
+      toast({ variant: "destructive", title: "Login failed", description: "Verify your credentials and network connection." })
     } finally {
       setLoading(false)
     }
@@ -52,10 +53,7 @@ export default function UnifiedAuthPage() {
   const handleGoogleLogin = async () => {
     setSocialLoading(true)
     try {
-      const redirectTo = typeof window !== 'undefined' 
-        ? `${window.location.origin}/home` 
-        : 'https://qivo-gamma.vercel.app/home';
-
+      const redirectTo = `${window.location.origin}/home`
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

@@ -2,39 +2,49 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * @fileOverview Private Supabase Client.
- * All NEXT_PUBLIC_ prefixes removed. 
- * This client is designed for use in Server Actions and Route Handlers.
+ * @fileOverview Secure Supabase Client with Zero NEXT_PUBLIC requirement.
+ * On the server: Uses real environment variables.
+ * On the client: Routes requests through a secure local API proxy.
  */
 
-const getSupabaseConfig = () => {
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const isServer = typeof window === 'undefined';
 
-  // Fallback for build time safety
-  return {
-    url: url || 'https://placeholder.supabase.co',
-    anonKey: anonKey || 'placeholder',
-    serviceKey: serviceKey || 'placeholder'
-  };
+const getSupabaseConfig = () => {
+  if (isServer) {
+    // SERVER SIDE: Access real secrets
+    return {
+      url: process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+      anonKey: process.env.SUPABASE_ANON_KEY || 'placeholder',
+      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'placeholder'
+    };
+  } else {
+    // CLIENT SIDE: Use the secure local proxy
+    // This hides your real Supabase URL and Key from the browser
+    return {
+      url: `${window.location.origin}/api/supabase`,
+      anonKey: 'proxy-auth-active', // The proxy will inject the real key on the server
+      serviceKey: 'proxy-auth-active'
+    };
+  }
 };
 
-// Standard client using private env vars
-export const supabase = createClient(
-  getSupabaseConfig().url, 
-  getSupabaseConfig().anonKey,
-  {
-    auth: {
-      persistSession: false // Server-side environment
-    }
-  }
-);
+const config = getSupabaseConfig();
 
-// Admin Client for critical financial/admin tasks
+// Main Client
+export const supabase = createClient(config.url, config.anonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: !isServer ? window.localStorage : undefined
+  }
+});
+
+// Admin Client (Server Only)
 export const getSupabaseAdmin = () => {
-  const config = getSupabaseConfig();
-  return createClient(config.url, config.serviceKey, {
+  if (!isServer) throw new Error("Admin client can only be used on the server.");
+  const cfg = getSupabaseConfig();
+  return createClient(cfg.url, cfg.serviceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
