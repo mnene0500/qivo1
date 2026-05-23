@@ -201,11 +201,20 @@ export async function requestWithdrawalAction(userUid: string, diamonds: number,
 
 export async function sendMysteryNoteAction(senderUid: string, message: string, recipientCount: number) {
   try {
-    const cost = recipientCount * 10;
-    const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', senderUid).single();
-    if ((bal?.coins || 0) < cost) throw new Error("Insufficient coins");
+    const cost = Number(recipientCount) * 10;
+    const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', senderUid).maybeSingle();
+    
+    // Explicit coercion to Number to fix "insufficient coins" bug for small balances
+    const currentBal = Number(bal?.coins || 0);
 
-    await supabase.rpc("increment_coins", { user_uid: senderUid, amount: -cost });
+    if (currentBal < cost) {
+      throw new Error(`Insufficient coins. You have ${currentBal} but need ${cost}.`);
+    }
+
+    // Use RPC for atomic deduction
+    const { error: rpcErr } = await supabase.rpc("increment_coins", { user_uid: senderUid, amount: -cost });
+    if (rpcErr) throw rpcErr;
+
     await supabase.from('coin_history').insert({
       user_id: senderUid,
       amount: -cost,
@@ -216,6 +225,7 @@ export async function sendMysteryNoteAction(senderUid: string, message: string, 
 
     return { success: true };
   } catch (error: any) {
+    console.error("[Mystery Note Logic Error]", error.message);
     return { success: false, error: error.message };
   }
 }

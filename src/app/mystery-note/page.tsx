@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
@@ -34,7 +34,6 @@ export default function MysteryNotePage() {
 
     fetchBalance()
 
-    // REALTIME: keep balance synced
     const channel = supabase.channel(`mystery-note-bal:${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', table: 'balances', filter: `user_id=eq.${user.id}` }, (payload) => {
         setUserCoins(Number(payload.new.coins) || 0)
@@ -49,9 +48,12 @@ export default function MysteryNotePage() {
   const handleSend = async () => {
     if (!user?.id || !message.trim()) return
     
-    // Safety check client side
-    if (userCoins < totalCost) {
-      toast({ variant: "destructive", title: "Insufficient Coins", description: `You need ${totalCost} coins.` })
+    // Safety check client side with strict number casting
+    const currentCoins = Number(userCoins);
+    const requiredCoins = Number(totalCost);
+
+    if (currentCoins < requiredCoins) {
+      toast({ variant: "destructive", title: "Insufficient Coins", description: `You have ${currentCoins} but need ${requiredCoins}.` })
       return
     }
 

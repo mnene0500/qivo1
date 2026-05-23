@@ -1,7 +1,7 @@
 
 # QIVO Production SQL (Run in SQL Editor)
 
-This script is idempotent. It will set up all tables and security without crashing if run multiple times.
+This script is idempotent. It safely sets up tables, atomic helpers, and Row Level Security (RLS) policies.
 
 ```sql
 -- 1. SETUP ATOMIC HELPERS
@@ -148,50 +148,46 @@ ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
 -- CLEANUP OLD POLICIES
-DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.users;
-DROP POLICY IF EXISTS "Users can insert own profile" ON public.users;
-DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
-DROP POLICY IF EXISTS "Public profiles viewable" ON public.users;
-DROP POLICY IF EXISTS "Users insert own profile" ON public.users;
-DROP POLICY IF EXISTS "Users view own balance" ON public.balances;
-DROP POLICY IF EXISTS "Users update own balance" ON public.balances;
-DROP POLICY IF EXISTS "Participants view chats" ON public.chats;
-DROP POLICY IF EXISTS "Participants send messages" ON public.messages;
 DROP POLICY IF EXISTS "users_read_all" ON public.users;
-DROP POLICY IF EXISTS "users_insert_self" ON public.users;
-DROP POLICY IF EXISTS "users_update_self" ON public.users;
+DROP POLICY IF EXISTS "users_self_manage" ON public.users;
+DROP POLICY IF EXISTS "balances_self_view" ON public.balances;
+DROP POLICY IF EXISTS "balances_self_update" ON public.balances;
 
 -- RE-APPLY HARDENED POLICIES
 CREATE POLICY "users_read_all" ON public.users FOR SELECT USING (true);
-CREATE POLICY "users_insert_self" ON public.users FOR INSERT WITH CHECK (auth.uid() = uid);
-CREATE POLICY "users_update_self" ON public.users FOR UPDATE USING (auth.uid() = uid) WITH CHECK (auth.uid() = uid);
+-- Combine INSERT and UPDATE into one policy logic for UPSERT support
+CREATE POLICY "users_self_manage" ON public.users FOR ALL USING (auth.uid() = uid) WITH CHECK (auth.uid() = uid);
 
-CREATE POLICY "Users view own balance" ON public.balances FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users update own balance" ON public.balances FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "balances_self_view" ON public.balances FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "balances_self_update" ON public.balances FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Participants view chats" ON public.chats FOR SELECT USING (auth.uid() = ANY(participant_ids));
-CREATE POLICY "Participants send messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
-CREATE POLICY "Participants view messages" ON public.messages FOR SELECT USING (EXISTS (
+CREATE POLICY "chats_participant_view" ON public.chats FOR SELECT USING (auth.uid() = ANY(participant_ids));
+CREATE POLICY "messages_participant_view" ON public.messages FOR SELECT USING (EXISTS (
   SELECT 1 FROM public.chats WHERE id = messages.chat_id AND auth.uid() = ANY(participant_ids)
 ));
+CREATE POLICY "messages_self_send" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
--- 4. ENABLE REALTIME (IDEMPOTENT - FIXES ERROR 42710)
+-- 4. STORAGE RLS (Bucket: photos)
+-- Make sure you have created a public bucket named 'photos'
+DROP POLICY IF EXISTS "Public Photo Access" ON storage.objects;
+DROP POLICY IF EXISTS "Users Manage Own Photos" ON storage.objects;
+
+CREATE POLICY "Public Photo Access" ON storage.objects FOR SELECT USING (bucket_id = 'photos');
+CREATE POLICY "Users Manage Own Photos" ON storage.objects FOR ALL 
+USING (bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text)
+WITH CHECK (bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 5. ENABLE REALTIME (IDEMPOTENT - FIXES ERROR 42710)
 DO $$ 
 BEGIN 
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
     CREATE PUBLICATION supabase_realtime;
   END IF;
   
-  -- Use pg_publication_tables to check if table is already registered
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' 
-    AND tablename = 'users' 
-    AND schemaname = 'public'
-  ) THEN 
+  -- SAFELY ADD TABLES IF NOT PRESENT
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'users') THEN 
     ALTER PUBLICATION supabase_realtime ADD TABLE public.users; 
   END IF;
-
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'balances') THEN 
     ALTER PUBLICATION supabase_realtime ADD TABLE public.balances; 
   END IF;
@@ -206,12 +202,6 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'diamond_history') THEN 
     ALTER PUBLICATION supabase_realtime ADD TABLE public.diamond_history; 
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'withdrawals') THEN 
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.withdrawals; 
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'reports') THEN 
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.reports; 
   END IF;
 END $$;
 ```

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -62,7 +63,6 @@ export default function EditProfilePage() {
   useEffect(() => {
     if (!user?.id) return
     const fetchProfile = async () => {
-      // Force fresh fetch
       const { data } = await supabase.from('users').select('*').eq('uid', user.id).maybeSingle()
       if (data) {
         setFormData({
@@ -171,21 +171,20 @@ export default function EditProfilePage() {
         updated_at: new Date().toISOString()
       };
 
+      // USE UPSERT TO ENSURE PERSISTENCE
       const { error: dbError } = await supabase
         .from('users')
         .upsert(updateData, { onConflict: 'uid' });
       
       if (dbError) throw dbError;
 
-      toast({ title: "Profile Saved", description: "Your details have been updated." })
+      toast({ title: "Saved Successfully" })
       
-      // PURGE CACHE AND NAVIGATE
-      router.refresh();
-      window.location.href = '/profile';
+      // FORCE CACHE PURGE
+      window.location.replace('/profile');
     } catch (error: any) {
       console.error("[Profile Save Crash]", error);
       toast({ variant: "destructive", title: "Save Failed", description: error.message })
-    } finally {
       setSaving(false)
     }
   }
