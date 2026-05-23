@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
@@ -49,13 +50,9 @@ export default function TaskCenterPage() {
 
   const hasCheckedInToday = useMemo(() => {
     if (!profile?.last_check_in_date) return false
-    const lastDate = new Date(profile.last_check_in_date)
-    const today = new Date()
-    return (
-      lastDate.getDate() === today.getDate() &&
-      lastDate.getMonth() === today.getMonth() &&
-      lastDate.getFullYear() === today.getFullYear()
-    )
+    const lastDate = new Date(profile.last_check_in_date).toDateString();
+    const today = new Date().toDateString();
+    return lastDate === today;
   }, [profile?.last_check_in_date])
 
   const currentStreak = profile?.check_in_streak || 0
@@ -111,8 +108,8 @@ export default function TaskCenterPage() {
             <div className="grid grid-cols-4 gap-3">
               {days.map((d, i) => {
                 const dayNumber = i + 1
-                const streakCycle = (currentStreak % 7) === 0 && currentStreak > 0 ? 7 : currentStreak % 7
-                const isCollected = dayNumber <= streakCycle && hasCheckedInToday
+                const streakInCycle = (currentStreak % 7) || (currentStreak > 0 ? 7 : 0);
+                const isCollected = dayNumber <= streakInCycle && hasCheckedInToday;
                 
                 return (
                   <div 

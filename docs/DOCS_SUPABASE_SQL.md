@@ -80,15 +80,44 @@ CREATE TABLE IF NOT EXISTS public.diamond_history (
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
+CREATE TABLE IF NOT EXISTS public.chats (
+  id TEXT PRIMARY KEY,
+  participant_ids UUID[] NOT NULL,
+  last_message TEXT,
+  last_message_at BIGINT,
+  cleared_at JSONB DEFAULT '{}'::jsonb,
+  last_seen_at JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS public.messages (
+  id BIGSERIAL PRIMARY KEY,
+  chat_id TEXT REFERENCES public.chats(id) ON DELETE CASCADE,
+  sender_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+  text TEXT,
+  timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000),
+  is_gift BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS public.reports (
+  id BIGSERIAL PRIMARY KEY,
+  reporter_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+  reported_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+  reason TEXT,
+  description TEXT,
+  proof_photo_url TEXT,
+  status TEXT DEFAULT 'pending',
+  timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
+);
+
 -- 3. ENABLE RLS FOR 'photos' STORAGE BUCKET
 -- Public read access for all photos
 CREATE POLICY "Public Read Photos" ON storage.objects FOR SELECT USING (bucket_id = 'photos');
 
--- Standard path: userId/timestamp.jpg
+-- Standard path: userId/filename.jpg
 CREATE POLICY "Users can manage own photos" ON storage.objects FOR ALL USING (
   bucket_id = 'photos' AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
 -- 4. ENABLE REALTIME
-ALTER PUBLICATION supabase_realtime ADD TABLE public.balances, public.coin_history, public.diamond_history, public.users, public.reports;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.balances, public.coin_history, public.diamond_history, public.users, public.reports, public.chats, public.messages;
 ```

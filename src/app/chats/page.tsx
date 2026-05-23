@@ -219,7 +219,7 @@ function ChatsContent() {
         {messages.map(m => (
           <div key={m.id} className={cn("max-w-[80%] p-4 rounded-[2rem] text-sm font-medium shadow-sm animate-in zoom-in-95 relative", 
             m.sender_id === currentUser?.id ? "bg-[#00A2FF] text-white self-end rounded-br-none" : "bg-white text-black self-start rounded-bl-none border",
-            m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-600 text-white border-none"
+            m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-600 text-white border-none shadow-pink-100"
           )}>
             {m.is_gift && <Gem className="w-4 h-4 text-white/40 absolute -top-2 -right-1" />}
             {m.text}

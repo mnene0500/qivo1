@@ -27,15 +27,18 @@ export async function dailyCheckInAction(uid: string) {
     }
 
     const streak = (user.check_in_streak || 0) + 1;
+    // Reward Cycle: 2, 2, 5, 2, 2, 2, 10
     const rewards = [2, 2, 5, 2, 2, 2, 10];
     const amount = rewards[(streak - 1) % 7];
     const ts = Date.now();
 
     // 1. Update User Streak
-    await supabase.from('users').update({
+    const { error: updateError } = await supabase.from('users').update({
       last_check_in_date: new Date().toISOString(),
       check_in_streak: streak
     }).eq('uid', uid);
+    
+    if (updateError) throw updateError;
 
     // 2. Add Coins
     await supabase.rpc("increment_coins", { user_uid: uid, amount });
@@ -51,6 +54,7 @@ export async function dailyCheckInAction(uid: string) {
 
     return { success: true, amount, day: streak };
   } catch (error: any) {
+    console.error("[Check-in Error]", error.message);
     return { success: false, error: error.message };
   }
 }
@@ -62,7 +66,9 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
     const chatId = `direct_${ids[0]}_${ids[1]}`;
 
     // 1. Deduct Sender
-    await supabase.rpc("increment_coins", { user_uid: senderUid, amount: -coinAmount });
+    const { error: deductErr } = await supabase.rpc("increment_coins", { user_uid: senderUid, amount: -coinAmount });
+    if (deductErr) throw new Error("Insufficient coins.");
+
     await supabase.from("coin_history").insert({
       user_id: senderUid,
       amount: -coinAmount,
@@ -71,12 +77,12 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
       timestamp: ts
     });
 
-    // 2. Fetch Recipient Rates
+    // 2. Fetch Recipient Rates (50% for Females, 40% for Males)
     const { data: rec } = await supabase.from('users').select('gender, name').eq('uid', recipientUid).single();
     const { data: sender } = await supabase.from('users').select('name').eq('uid', senderUid).single();
     
     const rate = rec?.gender === 'female' ? 0.5 : 0.4;
-    const diamondReward = coinAmount * rate;
+    const diamondReward = Math.floor(coinAmount * rate);
 
     // 3. Award Recipient
     await supabase.rpc("increment_diamonds", { user_id: recipientUid, amount: diamondReward });
@@ -88,10 +94,23 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
       timestamp: ts 
     });
 
-    // 4. Insert into Chat
+    // 4. Insert into Chat as a message bubble
     const giftMsg = `[Gift: ${giftName}]`;
-    await supabase.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text: giftMsg, is_gift: true, timestamp: ts });
-    await supabase.from('chats').upsert({ id: chatId, last_message: giftMsg, last_message_at: ts, participant_ids: [senderUid, recipientUid] });
+    await supabase.from('messages').insert({ 
+      chat_id: chatId, 
+      sender_id: senderUid, 
+      text: giftMsg, 
+      is_gift: true, 
+      timestamp: ts 
+    });
+
+    // 5. Update Chat Summary
+    await supabase.from('chats').upsert({ 
+      id: chatId, 
+      last_message: giftMsg, 
+      last_message_at: ts, 
+      participant_ids: [senderUid, recipientUid] 
+    });
 
     return { success: true };
   } catch (error: any) {
