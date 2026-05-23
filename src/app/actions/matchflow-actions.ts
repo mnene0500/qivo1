@@ -19,31 +19,47 @@ export async function dailyCheckInAction(uid: string) {
 
     if (userError || !user) throw new Error("Profile not found");
 
-    // Check if already checked in today
+    const now = new Date();
+    const today = now.toDateString();
+    
+    // 1. Check if already claimed today
     if (user.last_check_in_date) {
       const lastDate = new Date(user.last_check_in_date).toDateString();
-      const today = new Date().toDateString();
-      if (lastDate === today) return { success: false, error: "Already claimed today." };
+      if (lastDate === today) {
+        return { success: false, error: "Already claimed today." };
+      }
     }
 
-    const streak = (user.check_in_streak || 0) + 1;
-    // Reward Cycle: 2, 2, 5, 2, 2, 2, 10
+    // 2. Calculate Streak
+    let streak = 1;
+    if (user.last_check_in_date) {
+      const lastCheckIn = new Date(user.last_check_in_date);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // If last check-in was yesterday, increment streak. Otherwise, reset to 1.
+      if (lastCheckIn.toDateString() === yesterday.toDateString()) {
+        streak = (user.check_in_streak || 0) + 1;
+      }
+    }
+
+    // 3. Determine Reward: Cycle: 2, 2, 5, 2, 2, 2, 10
     const rewards = [2, 2, 5, 2, 2, 2, 10];
     const amount = rewards[(streak - 1) % 7];
     const ts = Date.now();
 
-    // 1. Update User Streak
+    // 4. Atomic Updates
     const { error: updateError } = await supabase.from('users').update({
-      last_check_in_date: new Date().toISOString(),
+      last_check_in_date: now.toISOString(),
       check_in_streak: streak
     }).eq('uid', uid);
     
     if (updateError) throw updateError;
 
-    // 2. Add Coins
+    // Award Coins via RPC
     await supabase.rpc("increment_coins", { user_uid: uid, amount });
 
-    // 3. Log History
+    // Log History
     await supabase.from('coin_history').insert({
       user_id: uid,
       amount: amount,

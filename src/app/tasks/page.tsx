@@ -68,6 +68,8 @@ export default function TaskCenterPage() {
           title: "Check-in Successful!", 
           description: `You earned ${res.amount} coins. Day ${res.day} collected!` 
         })
+        // Optimistic UI lock
+        setProfile({ ...profile, last_check_in_date: new Date().toISOString() })
       } else {
         toast({ variant: "destructive", title: "Wait", description: res.error || "System busy" })
       }
@@ -102,25 +104,31 @@ export default function TaskCenterPage() {
                 <Trophy className="w-5 h-5 text-yellow-500" />
                 <h2 className="text-xs font-bold text-black uppercase tracking-widest">Daily Rewards</h2>
               </div>
-              <span className="text-[10px] font-semibold text-gray-400">Total Check-ins: {currentStreak}</span>
+              <span className="text-[10px] font-semibold text-gray-400">Streak: {currentStreak} Days</span>
             </div>
             
             <div className="grid grid-cols-4 gap-3">
               {days.map((d, i) => {
                 const dayNumber = i + 1
-                const streakInCycle = (currentStreak % 7) || (currentStreak > 0 ? 7 : 0);
-                const isCollected = dayNumber <= streakInCycle && hasCheckedInToday;
+                const currentCycleDay = (currentStreak % 7) || (currentStreak > 0 ? 7 : 0);
+                
+                // BOX STATUS:
+                // 1. If today is claimed, box is green if dayNumber <= currentCycleDay
+                // 2. If today is NOT claimed, box is green if dayNumber < currentCycleDay
+                const isCollected = hasCheckedInToday 
+                  ? dayNumber <= currentCycleDay
+                  : dayNumber <= (currentStreak % 7);
                 
                 return (
                   <div 
                     key={i} 
                     className={cn(
-                      "aspect-square rounded-2xl flex flex-col items-center justify-center border-2 transition-all", 
+                      "aspect-square rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-500", 
                       isCollected ? "bg-green-50 border-green-200" : "bg-gray-50 border-transparent"
                     )}
                   >
                     {isCollected ? (
-                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                      <CheckCircle2 className="w-6 h-6 text-green-500 animate-in zoom-in" />
                     ) : (
                       <>
                         <Coins className="w-5 h-5 text-yellow-500 mb-1" />
@@ -138,10 +146,10 @@ export default function TaskCenterPage() {
               disabled={hasCheckedInToday || isProcessing}
               className={cn(
                 "w-full mt-6 h-14 rounded-full text-white font-bold uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all", 
-                hasCheckedInToday ? "bg-gray-200 text-gray-400 shadow-none cursor-default" : "bg-[#00A2FF] shadow-blue-100"
+                hasCheckedInToday ? "bg-gray-100 text-gray-400 shadow-none cursor-default" : "bg-[#00A2FF] shadow-blue-100"
               )}
             >
-              {isProcessing ? <Loader2 className="animate-spin" /> : hasCheckedInToday ? "Claimed Today" : "Claim Day " + ((currentStreak % 7) + 1) + " Reward"}
+              {isProcessing ? <Loader2 className="animate-spin" /> : hasCheckedInToday ? "Already Claimed" : "Claim Day " + ((currentStreak % 7) + 1) + " Reward"}
             </Button>
           </section>
         )}
