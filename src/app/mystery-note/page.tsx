@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -34,8 +33,7 @@ export default function MysteryNotePage() {
 
     fetchBalance()
 
-    // REALTIME: Keep local balance synced during blast operations
-    const channel = supabase.channel(`mystery-note-bal-live:${user.id}`)
+    const channel = supabase.channel(`mystery-note-sync:${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', table: 'balances', filter: `user_id=eq.${user.id}` }, (payload) => {
         setUserCoins(Number(payload.new.coins) || 0)
       })
@@ -53,7 +51,7 @@ export default function MysteryNotePage() {
     const requiredCoins = Number(totalCost);
 
     if (userCoins === null) {
-      toast({ title: "Checking balance...", description: "Please wait a moment." })
+      toast({ title: "Checking wallet..." })
       return
     }
 
@@ -61,7 +59,7 @@ export default function MysteryNotePage() {
       toast({ 
         variant: "destructive", 
         title: "Insufficient Coins", 
-        description: `You need ${requiredCoins} coins. Your balance: ${currentCoins} coins.` 
+        description: `You need ${requiredCoins} coins.` 
       })
       return
     }
@@ -70,13 +68,13 @@ export default function MysteryNotePage() {
     try {
       const res = await sendMysteryNoteAction(user.id, message, recipientCount)
       if (res.success) {
-        toast({ title: "Mystery Note Sent!", description: "Message has been blasted anonymously." })
+        toast({ title: "Message Blasted!", description: "Sent to anonymous recipients." })
         router.push("/chats")
       } else {
-        toast({ variant: "destructive", title: "Submission Error", description: res.error })
+        toast({ variant: "destructive", title: "Error", description: res.error })
       }
     } catch (error: any) {
-      toast({ variant: "destructive", title: "System Error", description: "Failed to connect to the secure line." })
+      toast({ variant: "destructive", title: "Connection Error" })
     } finally {
       setIsSending(false)
     }
@@ -93,7 +91,7 @@ export default function MysteryNotePage() {
       <main className="flex-1 px-6 pt-4 pb-10 space-y-12 overflow-y-auto no-scrollbar relative z-10">
         <div className="space-y-2 px-2">
           <h1 className="text-5xl font-black text-white tracking-tighter leading-tight">Mystery<br/>Note</h1>
-          <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em] ml-1">Secure Anonymous Channel</p>
+          <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em] ml-1">Universal Anonymous Blast</p>
         </div>
 
         <div className="bg-white/15 backdrop-blur-3xl border border-white/20 rounded-[3rem] p-8 shadow-2xl space-y-8">
@@ -109,7 +107,7 @@ export default function MysteryNotePage() {
                </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-               <div className="flex items-center gap-2 px-4 py-1.5 bg-yellow-400 rounded-full shadow-lg border border-yellow-300"><Coins className="w-3.5 h-3.5 text-yellow-800" /><span className="text-[10px] font-black text-yellow-900 tracking-tighter">{COST_PER_PERSON} coins / user</span></div>
+               <div className="flex items-center gap-2 px-4 py-1.5 bg-yellow-400 rounded-full shadow-lg border border-yellow-300"><Coins className="w-3.5 h-3.5 text-yellow-800" /><span className="text-[10px] font-black text-yellow-900 tracking-tighter">{COST_PER_PERSON} / user</span></div>
                <div className="flex items-center gap-2 px-4 py-1.5 bg-white/10 rounded-full border border-white/20">
                   <Users className="w-3.5 h-3.5 text-white/80" />
                   <select 

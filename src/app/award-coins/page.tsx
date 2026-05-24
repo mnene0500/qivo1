@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronLeft, Coins, Trophy, Loader2, AlertCircle, Wallet } from "lucide-react"
+import { ChevronLeft, Coins, Trophy, Loader2, Wallet } from "lucide-react"
 import { useUser } from "@/firebase/auth/use-user"
 import { useToast } from "@/hooks/use-toast"
 import { awardCoinsAction } from "@/app/actions/matchflow-actions"
@@ -41,16 +41,16 @@ export default function AwardCoinsPage() {
   }, [user?.id])
 
   const handleAward = async () => {
-    if (!user || !targetId || !amount || isNaN(Number(amount))) return
+    if (!user || !targetId || !amount) return
     
     const numAmount = Number(amount);
-    if (numAmount < 1) {
-      toast({ variant: "destructive", title: "Error", description: "Invalid amount." });
+    if (numAmount < 1 || isNaN(numAmount)) {
+      toast({ variant: "destructive", title: "Invalid amount." });
       return;
     }
 
     if (!profile?.is_admin && balance < numAmount) {
-      toast({ variant: "destructive", title: "Insufficient Balance", description: "You don't have enough coins to transfer." });
+      toast({ variant: "destructive", title: "Insufficient Balance" });
       return;
     }
 
@@ -62,10 +62,10 @@ export default function AwardCoinsPage() {
         setTargetId("")
         setAmount("")
       } else {
-        toast({ variant: "destructive", title: "Transfer Error", description: result.error })
+        toast({ variant: "destructive", title: "Error", description: result.error })
       }
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Critical Error", description: "Profile resolution failed." })
+      toast({ variant: "destructive", title: "Operation failed." })
     } finally {
       setLoading(false)
     }
@@ -74,12 +74,12 @@ export default function AwardCoinsPage() {
   const isAdmin = profile?.is_admin
 
   return (
-    <div className="flex-1 bg-white min-h-screen flex flex-col">
+    <div className="flex-1 bg-white min-h-screen flex flex-col select-none">
       <header className="px-4 h-16 flex items-center justify-between border-b bg-white sticky top-0 z-50">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full text-black">
           <ChevronLeft className="w-6 h-6" />
         </Button>
-        <h1 className="text-sm font-black text-black uppercase tracking-widest">Coin Merchant</h1>
+        <h1 className="text-sm font-black text-black uppercase tracking-widest">Coin Center</h1>
         <div className="w-10" />
       </header>
 
@@ -91,7 +91,7 @@ export default function AwardCoinsPage() {
           <div className="space-y-1">
             <h2 className="text-2xl font-black text-black tracking-tight">Transfer Coins</h2>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              {isAdmin ? "Admin Console" : "Certified Merchant Portal"}
+              {isAdmin ? "Master Admin Terminal" : "Merchant Sales Portal"}
             </p>
           </div>
         </div>
@@ -100,31 +100,31 @@ export default function AwardCoinsPage() {
           <div className="w-full max-w-sm p-6 bg-gray-50 rounded-3xl border border-black/5 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
               <div className="bg-white p-2 rounded-xl"><Wallet className="w-5 h-5 text-[#00A2FF]" /></div>
-              <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Your Wallet</span>
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Available Wallet</span>
             </div>
-            <span className="text-lg font-black text-black">{balance} <span className="text-[10px] text-gray-400 font-bold">COINS</span></span>
+            <span className="text-lg font-black text-black">{balance} <span className="text-[10px] text-gray-400 font-bold uppercase">Coins</span></span>
           </div>
         )}
 
         <div className="w-full max-w-sm space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Target Numeric ID</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Recipient Numeric ID</label>
             <Input 
               placeholder="e.g. 1234567" 
               value={targetId} 
               onChange={(e) => setTargetId(e.target.value)} 
-              className="rounded-2xl h-16 text-center text-xl font-bold tracking-widest border-gray-100 bg-gray-50 text-black placeholder:text-gray-300"
+              className="rounded-2xl h-16 text-center text-xl font-bold tracking-widest border-gray-100 bg-gray-50 text-black"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Transfer Amount</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Amount to Send</label>
             <Input 
               type="number"
               placeholder="0" 
               value={amount} 
               onChange={(e) => setAmount(e.target.value)} 
-              className="rounded-2xl h-16 text-center text-xl font-bold border-gray-100 bg-gray-50 text-black placeholder:text-gray-300"
+              className="rounded-2xl h-16 text-center text-xl font-bold border-gray-100 bg-gray-50 text-black"
             />
           </div>
 
