@@ -25,14 +25,19 @@ export default function RechargePage() {
   const { toast } = useToast()
   const { coins } = useBalance()
   
-  const [selectedId, setSelectedId] = useState<string>("p3")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const selectedPackage = PACKAGES.find(p => p.id === selectedId) || PACKAGES[2]
+  const selectedPackage = PACKAGES.find(p => p.id === selectedId)
 
   const handleRecharge = async () => {
     if (!user) {
       router.push("/auth")
+      return
+    }
+
+    if (!selectedPackage) {
+      toast({ title: "Select a package first" })
       return
     }
     
@@ -134,13 +139,13 @@ export default function RechargePage() {
       <footer className="fixed bottom-0 inset-x-0 p-6 bg-white/90 backdrop-blur-md border-t border-gray-50 z-40 flex flex-col gap-4">
         <Button 
           onClick={handleRecharge}
-          disabled={isProcessing}
+          disabled={isProcessing || !selectedId}
           className="w-full h-16 rounded-full bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all"
         >
           {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : (
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 fill-current text-yellow-300" />
-              Recharge Now (KES {selectedPackage.price})
+              {selectedPackage ? `Recharge Now (KES ${selectedPackage.price})` : "Select a Package"}
             </div>
           )}
         </Button>

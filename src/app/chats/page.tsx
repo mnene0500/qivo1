@@ -114,7 +114,6 @@ function ChatsContent() {
         const pId = c.participant_ids.find((id: string) => id !== currentUser.id)
         if (!pId || blockedUids.has(pId)) return null;
 
-        // SOFT DELETE: If chat was cleared, don't show it if there are no new messages since clearing
         const myClearedAt = c.cleared_at?.[currentUser.id] || 0;
         if (c.last_message_at <= myClearedAt) return null;
 
@@ -183,8 +182,9 @@ function ChatsContent() {
       hasSentAutoMsg.current = true;
       const text = "I want to buy coins. Please guide me on the payment process.";
       const ts = Date.now();
-      supabase.from('messages').insert({ chat_id: chatId, text, sender_id: currentUser.id, timestamp: ts }).then(() => {
-        supabase.from('chats').upsert({ id: chatId, last_message: text, last_message_at: ts, participant_ids: [currentUser.id, startWithId] })
+      // UPSERT CHAT FIRST to avoid FK issues
+      supabase.from('chats').upsert({ id: chatId, last_message: text, last_message_at: ts, participant_ids: [currentUser.id, startWithId] }).then(() => {
+        supabase.from('messages').insert({ chat_id: chatId, text, sender_id: currentUser.id, timestamp: ts })
       });
     }
   }, [chatId, autoMsg, currentUser?.id, startWithId])
@@ -198,13 +198,29 @@ function ChatsContent() {
     setMessages(prev => [optimisticMsg, ...prev])
     setNewMessage("")
 
-    const { error } = await supabase.from('messages').insert({ chat_id: chatId, text, sender_id: currentUser.id, timestamp })
-    if (!error) {
-      await supabase.from('chats').upsert({ id: chatId, last_message: text, last_message_at: timestamp, participant_ids: [currentUser.id, startWithId] })
+    // 1. Create or Update the Chat record FIRST (Crucial for Foreign Key constraints)
+    const { error: chatError } = await supabase.from('chats').upsert({ 
+      id: chatId, 
+      last_message: text, 
+      last_message_at: timestamp, 
+      participant_ids: [currentUser.id, startWithId] 
+    })
+
+    if (chatError) {
+      console.error("Chat upsert failed:", chatError.message);
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
+      toast({ variant: "destructive", title: "Chat failed to initialize" })
+      return
+    }
+
+    // 2. Insert the message
+    const { error: msgError } = await supabase.from('messages').insert({ chat_id: chatId, text, sender_id: currentUser.id, timestamp })
+    if (!msgError) {
       await markAsSeen(chatId, timestamp)
     } else {
+      console.error("Message insert failed:", msgError.message);
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
-      toast({ variant: "destructive", title: "Failed to send" })
+      toast({ variant: "destructive", title: "Failed to send message" })
     }
   }
 
@@ -259,7 +275,7 @@ function ChatsContent() {
         <h1 className="text-3xl font-logo text-[#00A2FF]">Chats</h1>
       </header>
       <main className="flex flex-col">
-        {loading ? (<div className="py-20 flex justify-center"><Loader2 className="animate-spin text-[#00A2FF]" /></div>) : chatSummaries.length === 0 ? (
+        {loading ? (<div className="py-20 flex justify-center"><Loader2 className="animate-spin text-[#00A2FF] font-black" /></div>) : chatSummaries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-40 opacity-40 px-12 text-center">
             <User className="w-12 h-12 mb-4 text-gray-300" />
             <p className="font-bold text-xs uppercase tracking-[0.2em]">No conversations</p>
@@ -304,10 +320,10 @@ function ChatsContent() {
                 <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none select-none">
                   <AlertDialogHeader className="items-center text-center">
                     <AlertDialogTitle className="text-xl font-bold">Clear conversation?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed">This will hide this chat from your list until a new message is sent.</AlertDialogDescription>
+                    <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed text-center">This will hide this chat from your list until a new message is sent.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">
-                    <AlertDialogCancel className="flex-1 h-14 rounded-full border-gray-100 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-widest hover:bg-gray-100">Cancel</AlertDialogCancel>
+                    <AlertDialogCancel className="flex-1 h-14 rounded-full border-gray-100 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-widest">Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleClearChat} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100">Clear</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

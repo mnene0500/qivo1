@@ -19,6 +19,55 @@ async function getAuthToken() {
   return data.token;
 }
 
+/**
+ * Initiates a PesaPal Payment
+ */
+export async function initiatePesaPalPayment(userId: string, amount: number, coins: number) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const token = await getAuthToken();
+    const orderId = crypto.randomUUID();
+
+    // 1. Create a tracking record
+    await supabase.from('pending_payments').insert({
+      order_id: orderId,
+      user_id: userId,
+      amount: amount,
+      status: 'pending'
+    });
+
+    const payload = {
+      id: orderId,
+      currency: "KES",
+      amount: amount,
+      description: `Purchase of ${coins} Coins`,
+      callback_url: `${APP_URL}/payment-success`,
+      notification_id: process.env.PESAPAL_IPN_ID,
+      billing_address: {
+        email_address: "user@qivo.com"
+      }
+    };
+
+    const res = await fetch(`${PESAPAL_BASE_URL}/api/Transactions/SubmitOrderRequest`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (data.redirect_url) {
+      return { success: true, redirect_url: data.redirect_url };
+    }
+    throw new Error(data.error?.message || "Gateway response invalid.");
+  } catch (err: any) {
+    console.error("[PesaPal Initiation Error]:", err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function verifyPaymentAction(orderTrackingId: string, merchantReference: string) {
   try {
     const token = await getAuthToken();
@@ -48,7 +97,6 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       else if (amt === 600) coins = 5000;
       else coins = Math.floor(amt * 8.33);
 
-      // Use standard p_user_id and p_amount keys
       const { error: rpcErr } = await supabase.rpc("increment_coins", { p_user_id: pending.user_id, p_amount: coins });
       if (rpcErr) throw rpcErr;
 
