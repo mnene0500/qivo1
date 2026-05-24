@@ -63,7 +63,11 @@ export async function dailyCheckInAction(uid: string) {
   }
 }
 
-export async function awardCoinsAction(merchantUid: string, targetMatchFlowId: string, amount: number) {
+/**
+ * Award Coins Action
+ * Hardened to use UID for the final transfer to ensure 100% accuracy.
+ */
+export async function awardCoinsAction(merchantUid: string, targetUid: string, amount: number) {
   const supabase = getSupabaseAdmin();
   try {
     // 1. Authorize the sender
@@ -76,14 +80,14 @@ export async function awardCoinsAction(merchantUid: string, targetMatchFlowId: s
     if (authErr || !merchant) throw new Error("Authorization failed.");
     if (!merchant.is_admin && !merchant.is_coin_seller) throw new Error("Unauthorized.");
 
-    // 2. Resolve target by MatchFlow ID
+    // 2. Resolve target recipient
     const { data: target, error: targetErr } = await supabase
       .from('users')
       .select('uid, name')
-      .eq('match_flow_id', targetMatchFlowId.trim())
+      .eq('uid', targetUid.trim())
       .maybeSingle();
     
-    if (targetErr || !target) throw new Error("Recipient ID not found.");
+    if (targetErr || !target) throw new Error("Recipient UID not found.");
 
     const ts = Date.now();
 
@@ -106,7 +110,7 @@ export async function awardCoinsAction(merchantUid: string, targetMatchFlowId: s
       });
     }
 
-    // 4. Award target
+    // 4. Award target atomically
     const { error: awardErr } = await supabase.rpc("increment_coins", { p_user_id: target.uid, p_amount: amount });
     if (awardErr) throw awardErr;
 

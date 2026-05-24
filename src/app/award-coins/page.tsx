@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronLeft, Coins, Trophy, Loader2, Wallet, UserCheck, Search } from "lucide-react"
+import { ChevronLeft, Coins, Trophy, Loader2, Wallet, UserCheck, Search, Copy, Check } from "lucide-react"
 import { useUser } from "@/firebase/auth/use-user"
 import { useToast } from "@/hooks/use-toast"
 import { awardCoinsAction } from "@/app/actions/matchflow-actions"
@@ -18,11 +18,13 @@ export default function AwardCoinsPage() {
   const { coins } = useBalance();
   
   const [targetId, setTargetId] = useState("")
+  const [manualUid, setManualUid] = useState("")
   const [resolvedUser, setResolvedUser] = useState<{ uid: string, name: string } | null>(null)
   const [searching, setSearching] = useState(false)
   const [amount, setAmount] = useState("")
   const [loading, setLoading] = useState(false)
   const [profile, setProfile] = useState<any>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
@@ -33,7 +35,7 @@ export default function AwardCoinsPage() {
     fetchData()
   }, [user?.id])
 
-  // AUTOMATIC USER LOOKUP
+  // AUTOMATIC USER LOOKUP BY MATCHFLOW ID
   useEffect(() => {
     const lookupUser = async () => {
       if (targetId.length < 5) {
@@ -42,7 +44,7 @@ export default function AwardCoinsPage() {
       }
       setSearching(true)
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('users')
           .select('uid, name')
           .eq('match_flow_id', targetId.trim())
@@ -64,8 +66,20 @@ export default function AwardCoinsPage() {
     return () => clearTimeout(timer)
   }, [targetId])
 
+  const handleCopyUid = () => {
+    if (resolvedUser?.uid) {
+      navigator.clipboard.writeText(resolvedUser.uid)
+      setCopied(true)
+      toast({ title: "UID Copied" })
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
   const handleAward = async () => {
-    if (!user || !resolvedUser || !amount) return
+    if (!user || !manualUid || !amount) {
+      toast({ variant: "destructive", title: "Fill all fields." });
+      return
+    }
     
     const numAmount = Number(amount);
     if (numAmount < 1 || isNaN(numAmount)) {
@@ -80,10 +94,11 @@ export default function AwardCoinsPage() {
 
     setLoading(true)
     try {
-      const result = await awardCoinsAction(user.id, targetId, numAmount)
+      const result = await awardCoinsAction(user.id, manualUid.trim(), numAmount)
       if (result.success) {
         toast({ title: "Transfer Successful", description: result.message })
         setTargetId("")
+        setManualUid("")
         setAmount("")
         setResolvedUser(null)
       } else {
@@ -108,7 +123,7 @@ export default function AwardCoinsPage() {
         <div className="w-10" />
       </header>
 
-      <main className="flex-1 p-8 flex flex-col items-center space-y-8">
+      <main className="flex-1 p-8 flex flex-col items-center space-y-8 overflow-y-auto no-scrollbar">
         <div className="text-center space-y-4">
           <div className="w-20 h-20 bg-yellow-50 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
             <Coins className="w-10 h-10 text-yellow-500" />
@@ -133,7 +148,7 @@ export default function AwardCoinsPage() {
 
         <div className="w-full max-w-sm space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Recipient Numeric ID</label>
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Search Recipient (Numeric ID)</label>
             <div className="relative">
               <Input 
                 placeholder="e.g. 1234567" 
@@ -148,19 +163,35 @@ export default function AwardCoinsPage() {
           </div>
 
           {resolvedUser && (
-            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl animate-in zoom-in-95">
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl animate-in zoom-in-95 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm">
                   <UserCheck className="w-5 h-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest">Recipient Found</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black uppercase text-blue-400 tracking-widest">User Found</p>
                   <p className="text-sm font-bold text-blue-900 truncate">{resolvedUser.name}</p>
-                  <p className="text-[9px] font-mono text-blue-400 truncate">UID: {resolvedUser.uid}</p>
                 </div>
+                <Button variant="ghost" size="icon" onClick={handleCopyUid} className="rounded-full text-blue-500 hover:bg-blue-100">
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+              <div className="bg-white/50 p-2 rounded-lg border border-blue-100/50">
+                <p className="text-[8px] font-black uppercase text-blue-300 tracking-widest">Internal UID</p>
+                <p className="text-[9px] font-mono text-blue-400 break-all">{resolvedUser.uid}</p>
               </div>
             </div>
           )}
+
+          <div className="space-y-2 pt-2">
+            <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Input Recipient UID</label>
+            <Input 
+              placeholder="Paste UID here" 
+              value={manualUid} 
+              onChange={(e) => setManualUid(e.target.value)} 
+              className="rounded-2xl h-14 text-center text-xs font-mono border-gray-100 bg-gray-50 text-black"
+            />
+          </div>
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">Amount to Send</label>
@@ -175,7 +206,7 @@ export default function AwardCoinsPage() {
 
           <Button 
             onClick={handleAward} 
-            disabled={loading || !resolvedUser || !amount}
+            disabled={loading || !manualUid || !amount}
             className="w-full h-16 rounded-full bg-black text-white font-black uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all"
           >
             {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
