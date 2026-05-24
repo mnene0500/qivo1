@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -100,9 +101,10 @@ export default function SettingsPage() {
     try {
       const res = await deleteUserCompletelyAction(user.id);
       if (res.success) {
+        // Sign out locally and replace location to purge the session completely
         await supabase.auth.signOut();
         window.location.replace("/welcome");
-        toast({ title: "Account Deleted", description: "All data has been removed." });
+        toast({ title: "Account Deleted", description: "All data and auth records have been removed." });
       } else {
         throw new Error(res.error);
       }
@@ -149,7 +151,7 @@ export default function SettingsPage() {
                   </div>
                   <AlertDialogTitle className="text-xl font-bold">Delete Everything?</AlertDialogTitle>
                   <AlertDialogDescription className="text-[10px] font-bold pt-2 uppercase tracking-widest leading-relaxed text-center text-gray-400">
-                    This will remove your Auth account, profile, coins, and history from our systems. Type <span className="text-red-600 font-black">DELETE</span> to confirm:
+                    This will remove your Auth account, profile, chats, coins, and history from our systems. Type <span className="text-red-600 font-black">DELETE</span> to confirm:
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="py-4">

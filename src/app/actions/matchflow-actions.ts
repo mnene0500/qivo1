@@ -89,14 +89,28 @@ export async function completeOnboardingAction(payload: {
   }
 }
 
+/**
+ * NUCLEAR DELETION
+ * Scrubs Auth, DB, and Chats completely.
+ */
 export async function deleteUserCompletelyAction(uid: string) {
   const supabase = getSupabaseAdmin();
   try {
+    // 1. Manually scrub chats where the user was a participant 
+    // (Postgres Array columns don't support standard FK cascade)
+    await supabase
+      .from('chats')
+      .delete()
+      .contains('participant_ids', [uid]);
+
+    // 2. Delete the Auth User
+    // This triggers the database CASCADE for public.users, balances, history, etc.
     const { error } = await supabase.auth.admin.deleteUser(uid);
+    
     if (error) throw error;
     return { success: true };
   } catch (err: any) {
-    console.error("[Delete Account Error]:", err.message);
+    console.error("[Delete Account Nuclear Error]:", err.message);
     return { success: false, error: err.message };
   }
 }
