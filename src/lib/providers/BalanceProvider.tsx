@@ -6,6 +6,11 @@ import { supabase } from '@/lib/supabase';
 
 const BalanceContext = createContext({ coins: 0, diamonds: 0 });
 
+/**
+ * @fileOverview Global Balance Provider.
+ * Connects directly to Supabase Realtime to ensure the UI balance
+ * matches the database value at all times.
+ */
 export const BalanceProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useUser();
   const [balances, setBalances] = useState({ coins: 0, diamonds: 0 });
@@ -19,6 +24,7 @@ export const BalanceProvider = ({ children }: { children: React.ReactNode }) => 
     let balanceChannel: any;
 
     const fetchAndSubscribe = async () => {
+      // 1. Fetch current balance from source of truth
       const { data, error } = await supabase
         .from('balances')
         .select('coins, diamonds')
@@ -26,29 +32,33 @@ export const BalanceProvider = ({ children }: { children: React.ReactNode }) => 
         .maybeSingle();
 
       if (error) {
-        console.error("Error fetching balance:", error.message);
-        setBalances({ coins: 0, diamonds: 0 });
-      } else {
-        setBalances({ coins: Number(data?.coins) || 0, diamonds: Number(data?.diamonds) || 0 });
+        console.error("[Balance Sync Error]:", error.message);
+      } else if (data) {
+        setBalances({ 
+          coins: Number(data.coins) || 0, 
+          diamonds: Number(data.diamonds) || 0 
+        });
       }
 
+      // 2. Subscribe to Realtime changes for this specific user
       balanceChannel = supabase
-        .channel(`global-balance-sync:${user.id}`)
+        .channel(`balance-realtime:${user.id}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'balances', filter: `user_id=eq.${user.id}` },
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'balances', 
+            filter: `user_id=eq.${user.id}` 
+          },
           (payload) => {
             if (payload.eventType === 'DELETE') {
               setBalances({ coins: 0, diamonds: 0 });
-              return;
-            }
-            
-            if (payload.new) {
-              setBalances(current => ({
-                ...current,
-                ...(payload.new.coins !== undefined && { coins: Number(payload.new.coins) || 0 }),
-                ...(payload.new.diamonds !== undefined && { diamonds: Number(payload.new.diamonds) || 0 }),
-              }));
+            } else if (payload.new) {
+              setBalances({
+                coins: Number(payload.new.coins) || 0,
+                diamonds: Number(payload.new.diamonds) || 0,
+              });
             }
           }
         )

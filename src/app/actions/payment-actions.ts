@@ -19,52 +19,6 @@ async function getAuthToken() {
   return data.token;
 }
 
-export async function initiatePesaPalPayment(uid: string, amount: number, coins: number) {
-  try {
-    const token = await getAuthToken();
-    const orderId = crypto.randomUUID();
-    
-    const supabase = getSupabaseAdmin();
-    await supabase.from('pending_payments').insert({
-      order_id: orderId,
-      user_id: uid,
-      amount,
-      status: 'pending'
-    });
-
-    const payload = {
-      id: orderId,
-      currency: "KES",
-      amount: amount,
-      description: `Purchase of ${coins} QIVO Coins`,
-      callback_url: `${APP_URL}/payment-success`,
-      notification_id: process.env.PESAPAL_IPN_ID,
-      billing_address: { 
-        email_address: "billing@qivo.app",
-        first_name: "QIVO",
-        last_name: "User"
-      }
-    };
-
-    const res = await fetch(`${PESAPAL_BASE_URL}/api/Transactions/SubmitOrderRequest`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-    if (!data.redirect_url) throw new Error(data.message || "Failed to get redirect URL from PesaPal");
-
-    return { success: true, redirect_url: data.redirect_url, orderId };
-  } catch (error: any) {
-    console.error("[PesaPal Error]:", error.message);
-    return { success: false, error: error.message };
-  }
-}
-
 export async function verifyPaymentAction(orderTrackingId: string, merchantReference: string) {
   try {
     const token = await getAuthToken();
@@ -94,7 +48,8 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       else if (amt === 600) coins = 5000;
       else coins = Math.floor(amt * 8.33);
 
-      const { error: rpcErr } = await supabase.rpc("increment_coins", { user_id: pending.user_id, amount: coins });
+      // Use standard p_user_id and p_amount keys
+      const { error: rpcErr } = await supabase.rpc("increment_coins", { p_user_id: pending.user_id, p_amount: coins });
       if (rpcErr) throw rpcErr;
 
       await Promise.all([
