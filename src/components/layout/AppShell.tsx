@@ -1,4 +1,3 @@
-
 "use client"
 
 import { usePathname, useSearchParams } from "next/navigation"
@@ -42,7 +41,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { 
+      supabase.removeChannel(channel)
+      setIncomingCall(null) 
+    }
   }, [user?.id])
 
   const handleAccept = () => {
@@ -69,7 +71,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       </main>
       {isVisible && <BottomNav />}
 
-      {/* INCOMING CALL DIALOG */}
+      {/* INCOMING CALL DIALOG (Global Overlay) */}
       <Dialog open={!!incomingCall} onOpenChange={(open) => !open && handleReject()}>
         <DialogContent className="rounded-[2.5rem] p-8 max-w-[85vw] border-none shadow-2xl bg-zinc-900 text-white overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-blue-500/10 to-transparent pointer-events-none" />

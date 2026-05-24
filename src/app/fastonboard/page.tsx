@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Heart, Loader2, RefreshCw } from "lucide-react"
@@ -21,20 +22,26 @@ const LOOKING_FOR_OPTIONS = [
 
 /**
  * @fileOverview Instant onboarding for both Email and Social Login users.
- * Robust profile creation using UPSERT to handle missing records.
+ * Robust profile creation using UPSERT with age verification.
  */
 export default function FastOnboardingPage() {
   const [gender, setGender] = useState("")
   const [country, setCountry] = useState("")
   const [lookingFor, setLookingFor] = useState("")
+  const [dob, setDob] = useState("")
   const [loading, setLoading] = useState(false)
   
   const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
 
+  const maxDate = useMemo(() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 18)
+    return d.toISOString().split('T')[0]
+  }, [])
+
   const handleClearCache = () => {
-    // SAFE CLEAR: Preserving Auth tokens
     const keys = Object.keys(localStorage);
     for (const key of keys) {
       if (!key.includes('auth-token')) {
@@ -59,12 +66,13 @@ export default function FastOnboardingPage() {
       const socialName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "User";
       const socialPhoto = user.user_metadata?.avatar_url || user.user_metadata?.picture || `https://picsum.photos/seed/${user.id}/400/400`;
 
-      // 1. Create Profile (Upsert ensures we create if missing)
+      // 1. Create Profile
       const { error: profileErr } = await supabase.from('users').upsert({
         uid: user.id,
         email: user.email,
         name: socialName,
         gender,
+        dob,
         country,
         looking_for: lookingFor,
         onboarding_complete: true,
@@ -82,7 +90,6 @@ export default function FastOnboardingPage() {
         diamonds: initialDiamonds
       }, { onConflict: 'user_id' })
 
-      // 3. Log initial bonus
       if (initialCoins > 0) {
         await supabase.from('coin_history').insert({
           user_id: user.id,
@@ -103,7 +110,7 @@ export default function FastOnboardingPage() {
     }
   }
 
-  const canContinue = () => !!gender && !!country && !!lookingFor
+  const canContinue = () => !!gender && !!country && !!lookingFor && !!dob
 
   return (
     <div className="flex-1 flex flex-col bg-white min-h-screen relative">
@@ -117,12 +124,12 @@ export default function FastOnboardingPage() {
           Instant Setup
         </h1>
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-          Complete your profile
+          Complete your profile (18+)
         </p>
       </header>
 
       <main className="flex-1 px-8 pt-8 pb-20 max-w-md mx-auto w-full space-y-8">
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Your Gender</Label>
@@ -143,6 +150,11 @@ export default function FastOnboardingPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Date of Birth</Label>
+              <Input type="date" max={maxDate} value={dob} onChange={(e) => setDob(e.target.value)} className="rounded-2xl h-14 border-gray-100 bg-gray-50 text-lg font-bold" />
             </div>
 
             <div className="space-y-2">
@@ -176,7 +188,7 @@ export default function FastOnboardingPage() {
 
           <div className="pt-10 flex justify-center">
              <Button variant="ghost" size="sm" onClick={handleClearCache} className="text-[9px] font-bold text-gray-300 uppercase tracking-[0.2em] gap-2 hover:bg-transparent">
-               <RefreshCw className="w-3 h-3" /> Optimize Storage & Reload
+               <RefreshCw className="w-3 h-3" /> Optimize Storage
              </Button>
           </div>
         </div>

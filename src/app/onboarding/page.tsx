@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
@@ -43,6 +42,7 @@ export default function OnboardingPage() {
   }, [user, name])
 
   const maxDate = useMemo(() => {
+    // RESTRICT TO 18+ ONLY
     const d = new Date()
     d.setFullYear(d.getFullYear() - 18)
     return d.toISOString().split('T')[0]
@@ -148,7 +148,7 @@ export default function OnboardingPage() {
             </div>
             <div className="pt-10 flex justify-center">
                <Button variant="ghost" size="sm" onClick={handleClearCache} className="text-[9px] font-bold text-gray-300 uppercase tracking-[0.2em] gap-2 hover:bg-transparent hover:text-gray-400">
-                 <RefreshCw className="w-3 h-3" /> Clear App Cache (Temporary)
+                 <RefreshCw className="w-3 h-3" /> Clear App Cache
                </Button>
             </div>
           </div>
@@ -157,7 +157,7 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Date of Birth</Label>
+              <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Date of Birth (18+)</Label>
               <Input type="date" max={maxDate} value={dob} onChange={(e) => setDob(e.target.value)} className="rounded-2xl h-14 border-gray-100 bg-gray-50 focus:bg-white text-lg font-bold" />
             </div>
             <div className="space-y-2">

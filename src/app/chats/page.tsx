@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -7,7 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, Loader2, User, Lock, Gem, Gift, Video, Phone, Trash2, MoreVertical } from "lucide-react"
+import { Send, ChevronLeft, Loader2, User, Lock, Gem, Gift, Video, Phone, Trash2, MoreVertical, Heart } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
@@ -85,6 +84,7 @@ function ChatsContent() {
   const [activeChatClearedAt, setActiveChatClearedAt] = useState<number>(0)
   const [isGifting, setIsGifting] = useState(false)
   const [giftDialogOpen, setGiftDialogOpen] = useState(false)
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
 
   const hasSentAutoMsg = useRef(false)
 
@@ -220,12 +220,15 @@ function ChatsContent() {
     }
   }
 
-  const handleClearChat = async () => {
-    if (!currentUser || !chatId) return
-    const res = await clearChatAction(currentUser.id, chatId)
+  const handleClearChat = async (id?: string) => {
+    const targetId = id || chatId
+    if (!currentUser || !targetId) return
+    const res = await clearChatAction(currentUser.id, targetId)
     if (res.success) {
       toast({ title: "Chat Cleared" })
-      router.push("/chats")
+      if (!id) router.push("/chats")
+      else fetchSummaries()
+      setDeletingChatId(null)
     }
   }
 
@@ -284,7 +287,12 @@ function ChatsContent() {
             <p className="font-bold text-xs uppercase tracking-[0.2em]">No conversations</p>
           </div>
         ) : chatSummaries.map(s => (
-          <div key={s.id} onClick={() => router.push(`/chats?startWith=${s.partner_id}`)} className="p-5 border-b flex items-center gap-4 active:bg-gray-50 cursor-pointer">
+          <div 
+            key={s.id} 
+            onContextMenu={(e) => { e.preventDefault(); setDeletingChatId(s.id); }}
+            onClick={() => router.push(`/chats?startWith=${s.partner_id}`)} 
+            className="p-5 flex items-center gap-4 active:bg-gray-50 cursor-pointer"
+          >
             <div className="relative">
               <Avatar className="w-14 h-14 border"><AvatarImage src={`${s.partner_photo}?t=${Date.now()}`} className="object-cover" /><AvatarFallback>{s.partner_name[0]}</AvatarFallback></Avatar>
               {s.unread_count > 0 && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-in zoom-in">{s.unread_count}</div>}
@@ -299,6 +307,15 @@ function ChatsContent() {
           </div>
         ))}
       </main>
+
+      <AlertDialog open={!!deletingChatId} onOpenChange={(open) => !open && setDeletingChatId(null)}>
+        <AlertDialogContent className="rounded-[2rem] max-w-[70vw] p-8 border-none select-none">
+          <AlertDialogFooter className="flex flex-row items-center justify-center gap-6">
+            <AlertDialogCancel className="flex-1 h-14 rounded-full border-gray-100 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-widest border-none">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleClearChat(deletingChatId!)} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 
@@ -326,8 +343,8 @@ function ChatsContent() {
                     <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed text-center">This will hide this chat from your list until a new message is sent.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">
-                    <AlertDialogCancel className="flex-1 h-14 rounded-full border-gray-100 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-widest">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearChat} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100">Clear</AlertDialogAction>
+                    <AlertDialogCancel className="flex-1 h-14 rounded-full border-gray-100 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-widest border-none">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleClearChat()} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100">Clear</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -337,15 +354,33 @@ function ChatsContent() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-6 flex flex-col-reverse gap-4 bg-gray-50 no-scrollbar">
-        {messages.map(m => (
-          <div key={m.id} className={cn("max-w-[80%] p-4 rounded-[2rem] text-sm font-medium shadow-sm animate-in zoom-in-95 relative", 
-            m.sender_id === currentUser?.id ? "bg-[#00A2FF] text-white self-end rounded-br-none" : "bg-white text-black self-start rounded-bl-none border",
-            m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-600 text-white border-none shadow-pink-100"
-          )}>
-            {m.is_gift && <Gem className="w-4 h-4 text-white/40 absolute -top-2 -right-1" />}
-            {m.text}
-          </div>
-        ))}
+        {messages.map(m => {
+          const isMe = m.sender_id === currentUser?.id;
+          const gift = m.is_gift ? GIFTS.find(g => m.text.includes(g.name)) : null;
+
+          return (
+            <div key={m.id} className={cn("max-w-[80%] p-4 rounded-[2rem] text-sm font-medium shadow-sm animate-in zoom-in-95 relative", 
+              isMe ? "bg-[#00A2FF] text-white self-end rounded-br-none" : "bg-white text-black self-start rounded-bl-none border",
+              m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-600 text-white border-none shadow-pink-100 p-6 flex flex-col items-center text-center gap-3"
+            )}>
+              {m.is_gift ? (
+                <>
+                  <div className="text-5xl animate-bounce">{gift?.icon || "🎁"}</div>
+                  <p className="font-black uppercase tracking-widest text-[10px]">{gift?.name || "Premium Gift"}</p>
+                  {isMe && (
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleSendGift(gift!)} 
+                      className="mt-2 h-8 rounded-full bg-white/20 backdrop-blur-md text-white font-black text-[9px] uppercase tracking-widest border border-white/20 hover:bg-white/30"
+                    >
+                      Send One More
+                    </Button>
+                  )}
+                </>
+              ) : m.text}
+            </div>
+          )
+        })}
       </main>
 
       <footer className="relative p-4 border-t bg-white">

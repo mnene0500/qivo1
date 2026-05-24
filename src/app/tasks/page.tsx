@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
@@ -40,7 +39,6 @@ export default function TaskCenterPage() {
     }
     fetchProfile()
 
-    // REALTIME: Sync streak and check-in dates
     const channel = supabase.channel(`task-user-live:${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', table: 'users', filter: `uid=eq.${user.id}` }, (payload) => {
         setProfile(payload.new)
