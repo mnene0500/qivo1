@@ -113,12 +113,15 @@ function ChatsContent() {
       const blockedUids = new Set([...(userProfile.blocking || []), ...(userProfile.blocked_by || [])]);
       const enhanced = await Promise.all(chatsData.map(async (c) => {
         const pId = c.participant_ids.find((id: string) => id !== currentUser.id)
+        
+        // FILTER: Remove from list if either party has blocked the other
         if (!pId || blockedUids.has(pId)) return null;
 
         const myClearedAt = c.cleared_at?.[currentUser.id] || 0;
         if (c.last_message_at <= myClearedAt) return null;
 
         const { data: p } = await supabase.from('users').select('name, photo_url').eq('uid', pId).maybeSingle()
+        if (!p) return null; // User might be deleted
         
         const mySeenAt = c.last_seen_at?.[currentUser.id] || 0;
         const isUnread = c.last_message_at > mySeenAt && c.participant_ids[0] !== currentUser.id;
@@ -225,7 +228,7 @@ function ChatsContent() {
     if (!currentUser || !targetId) return
     const res = await clearChatAction(currentUser.id, targetId)
     if (res.success) {
-      toast({ title: "Chat Cleared" })
+      toast({ title: "Chat Deleted" })
       if (!id) router.push("/chats")
       else fetchSummaries()
       setDeletingChatId(null)
@@ -335,16 +338,16 @@ function ChatsContent() {
             <DropdownMenuContent align="end" className="rounded-2xl min-w-[160px]">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-500 font-bold gap-2"><Trash2 className="w-4 h-4" /> Clear Chat</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-500 font-bold gap-2"><Trash2 className="w-4 h-4" /> Delete Chat</DropdownMenuItem>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none select-none">
                   <AlertDialogHeader className="items-center text-center">
-                    <AlertDialogTitle className="text-xl font-bold">Clear conversation?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed text-center">This will hide this chat from your list until a new message is sent.</AlertDialogDescription>
+                    <AlertDialogTitle className="text-xl font-bold">Delete conversation?</AlertDialogTitle>
+                    <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed text-center">This will remove this chat from your list.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">
                     <AlertDialogCancel className="flex-1 h-14 rounded-full border-gray-100 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-widest border-none">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleClearChat()} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100">Clear</AlertDialogAction>
+                    <AlertDialogAction onClick={() => handleClearChat()} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100">Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>

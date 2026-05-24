@@ -4,16 +4,14 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 /**
  * @fileOverview Native Economy Actions on Vercel.
- * Hardened to use standardized p_user_id and p_amount parameters.
+ * Hardened for strict bidirectional blocking and correct targeting.
  */
 
 export async function deleteUserCompletelyAction(uid: string) {
   const supabase = getSupabaseAdmin();
   try {
-    // 1. Delete from Auth (Triggers cascade delete in public.users)
     const { error } = await supabase.auth.admin.deleteUser(uid);
     if (error) throw error;
-
     return { success: true };
   } catch (err: any) {
     console.error("[Delete Account Error]:", err.message);
@@ -80,7 +78,6 @@ export async function dailyCheckInAction(uid: string) {
 export async function awardCoinsAction(merchantUid: string, targetUid: string, amount: number) {
   const supabase = getSupabaseAdmin();
   try {
-    // RESOLVE MERCHANT AUTH
     const { data: merchant, error: authErr } = await supabase
       .from('users')
       .select('uid, name, is_admin, is_coin_seller')
@@ -90,7 +87,6 @@ export async function awardCoinsAction(merchantUid: string, targetUid: string, a
     if (authErr || !merchant) throw new Error("Authorization failed.");
     if (!merchant.is_admin && !merchant.is_coin_seller) throw new Error("Unauthorized.");
 
-    // RESOLVE RECIPIENT
     const { data: target, error: targetErr } = await supabase
       .from('users')
       .select('uid, name')
@@ -101,7 +97,6 @@ export async function awardCoinsAction(merchantUid: string, targetUid: string, a
 
     const ts = Date.now();
 
-    // DEDUCT FROM MERCHANT IF NOT ADMIN
     if (!merchant.is_admin && merchant.is_coin_seller) {
       const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', merchantUid).single();
       const currentBal = Number(bal?.coins) || 0;
@@ -119,7 +114,6 @@ export async function awardCoinsAction(merchantUid: string, targetUid: string, a
       });
     }
 
-    // AWARD TO TARGET
     const { error: awardErr } = await supabase.rpc("increment_coins", { p_user_id: target.uid, p_amount: amount });
     if (awardErr) throw awardErr;
 
@@ -191,18 +185,30 @@ export async function sendMysteryNoteAction(user_id: string, message: string, re
     const cost = count * 10;
     const ts = Date.now();
     
+    const { data: user } = await supabase.from('users').select('gender, blocking, blocked_by').eq('uid', user_id).single();
     const { data: balance } = await supabase.from('balances').select('coins').eq('user_id', user_id).maybeSingle();
+    
     if ((Number(balance?.coins) || 0) < cost) {
       throw new Error("Insufficient coins.");
     }
 
-    const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: user_id, p_amount: -cost });
-    if (deductErr) throw deductErr;
+    // Filter recipients: Opposite gender, active, and NOT blocked/blocking
+    const targetGender = user?.gender === 'male' ? 'female' : 'male';
+    const blockedList = [...(user?.blocking || []), ...(user?.blocked_by || [])];
 
-    // FIND RECIPIENTS (EXCLUDING SENDER)
-    const { data: targets } = await supabase.from('users').select('uid').neq('uid', user_id).limit(count);
+    const { data: targets } = await supabase
+      .from('users')
+      .select('uid')
+      .eq('gender', targetGender)
+      .eq('onboarding_complete', true)
+      .neq('uid', user_id)
+      .not('uid', 'in', `(${blockedList.join(',')})`)
+      .limit(count);
     
     if (targets && targets.length > 0) {
+      const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: user_id, p_amount: -cost });
+      if (deductErr) throw deductErr;
+
       for (const target of targets) {
         const chatId = `direct_${[user_id, target.uid].sort()[0]}_${[user_id, target.uid].sort()[1]}`;
         await supabase.from('chats').upsert({ 
@@ -218,17 +224,19 @@ export async function sendMysteryNoteAction(user_id: string, message: string, re
           timestamp: ts 
         });
       }
+      
+      await supabase.from('coin_history').insert({ 
+        user_id, 
+        amount: -cost, 
+        type: 'mystery_note', 
+        description: `Mystery Note Blast (${targets.length} people)`,
+        timestamp: ts 
+      });
+      
+      return { success: true };
     }
-
-    await supabase.from('coin_history').insert({ 
-      user_id, 
-      amount: -cost, 
-      type: 'mystery_note', 
-      description: `Mystery Note Blast (${count} people)`,
-      timestamp: ts 
-    });
     
-    return { success: true };
+    throw new Error("No active users matching your blast criteria.");
   } catch (err: any) {
     return { success: false, error: err.message };
   }

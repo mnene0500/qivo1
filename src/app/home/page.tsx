@@ -76,6 +76,7 @@ export default function HomePage() {
       const { data } = await supabase.from('users').select('*').eq('onboarding_complete', true).eq('gender', oppositeGender).or('is_deleted.is.null,is_deleted.eq.false').limit(60);
 
       if (data) {
+        // FILTER: Remove users that blocked the sender OR the sender blocked
         const blockedUids = new Set([...(profile.blocking || []), ...(profile.blocked_by || [])]);
         const filtered = (data as UserProfile[]).filter(u => u.uid !== currentUser?.id && !blockedUids.has(u.uid))
         setUsers(filtered.sort(() => Math.random() - 0.5))

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, use, useState, useEffect, useRef } from "react"
@@ -61,6 +60,7 @@ interface UserProfile {
   match_flow_id?: string
   is_verified?: boolean
   blocking?: string[]
+  blocked_by?: string[]
   education_level?: string
   looking_for?: string
 }
@@ -130,16 +130,20 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
 
   const handleBlock = async () => {
     if (!currentUser || !profile) return
+    
+    // Bidirectional Blocking:
+    // 1. Update My 'blocking' list
     const { data: myData } = await supabase.from('users').select('blocking').eq('uid', currentUser.id).single()
     const myBlocking = Array.from(new Set([...(myData?.blocking || []), profile.uid]))
     await supabase.from('users').update({ blocking: myBlocking }).eq('uid', currentUser.id)
     
+    // 2. Update Target's 'blocked_by' list
     const { data: targetData } = await supabase.from('users').select('blocked_by').eq('uid', profile.uid).single()
     const targetBlockedBy = Array.from(new Set([...(targetData?.blocked_by || []), currentUser.id]))
     await supabase.from('users').update({ blocked_by: targetBlockedBy }).eq('uid', profile.uid)
     
     toast({ title: "User Blocked" })
-    router.push("/home")
+    router.replace("/home")
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,18 +188,19 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
 
   if (loading) return <div className="flex items-center justify-center min-h-screen bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
 
-  if (!profile) return (
+  const isBlocked = myProfile && (
+    (myProfile.blocking || []).includes(userId) || 
+    (myProfile.blocked_by || []).includes(userId)
+  );
+
+  // Profile Not Found if user is blocked or blocking
+  if (!profile || isBlocked) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-white p-8 text-center space-y-4">
       <div className="bg-gray-100 p-6 rounded-full"><Ban className="w-10 h-10 text-gray-400" /></div>
       <h2 className="text-xl font-bold text-black">Profile Not Found</h2>
       <Button onClick={() => router.back()} variant="outline" className="rounded-full">Go Back</Button>
     </div>
   )
-
-  const isBlocked = myProfile && (
-    (myProfile.blocking || []).includes(profile.uid) || 
-    (myProfile.blocked_by || []).includes(profile.uid)
-  );
 
   const age = calculateAge(profile.dob)
   const allPhotos = Array.from(new Set([profile.photo_url, ...(profile.additional_photos || [])].filter(Boolean)));
@@ -217,7 +222,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
             </DropdownMenu>
           </div>
         </div>
-        {presence?.state === 'online' && !isBlocked && (
+        {presence?.state === 'online' && (
           <div className="absolute bottom-16 left-8 bg-green-500/90 backdrop-blur-md text-white px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl flex items-center gap-2 animate-in slide-in-from-left-4 duration-500"><div className="w-2 h-2 bg-white rounded-full animate-pulse" />Live Online</div>
         )}
       </div>
@@ -286,7 +291,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
       </Dialog>
 
       <div className="fixed bottom-0 inset-x-0 p-8 bg-gradient-to-t from-white via-white/95 to-transparent z-50">
-        <Button disabled={isBlocked} className={cn("w-full h-20 rounded-[2.5rem] text-white text-base font-black flex items-center justify-center gap-4 shadow-[0_20px_50px_rgba(0,162,255,0.3)] uppercase tracking-[0.2em] active:scale-95 transition-all", isBlocked ? "bg-gray-200 shadow-none cursor-not-allowed text-gray-400" : "bg-[#00A2FF] hover:bg-[#0081CC] border-none")} onClick={() => router.push(`/chats?startWith=${profile.uid}`)}>{isBlocked ? <><Ban className="w-6 h-6" /> Blocked</> : <><MessageSquare className="w-6 h-6 fill-white" />Send Message</>}</Button>
+        <Button className="w-full h-20 rounded-[2.5rem] bg-[#00A2FF] hover:bg-[#0081CC] text-white text-base font-black flex items-center justify-center gap-4 shadow-[0_20px_50px_rgba(0,162,255,0.3)] uppercase tracking-[0.2em] active:scale-95 transition-all border-none" onClick={() => router.push(`/chats?startWith=${profile.uid}`)}><MessageSquare className="w-6 h-6 fill-white" />Send Message</Button>
       </div>
     </div>
   )
