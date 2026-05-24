@@ -66,17 +66,30 @@ export async function dailyCheckInAction(uid: string) {
 export async function awardCoinsAction(merchantUid: string, targetMatchFlowId: string, amount: number) {
   const supabase = getSupabaseAdmin();
   try {
-    // 1. Verify Caller Authority strictly via Table Query
+    // 1. HARDENED AUTHORIZATION LOOKUP
     const { data: merchant, error: authErr } = await supabase
       .from('users')
-      .select('uid, name, is_admin, is_coin_seller')
+      .select('uid, email, is_admin, is_coin_seller, name')
       .eq('uid', merchantUid)
       .maybeSingle();
 
-    if (authErr || !merchant) throw new Error("Authorization lookup failed.");
+    console.log("merchantUid:", merchantUid);
+    console.log("merchant:", merchant);
+    console.log("authErr:", authErr);
+
+    if (authErr) {
+      throw new Error("Authorization lookup failed.");
+    }
+
+    if (!merchant) {
+      throw new Error("Merchant profile not found.");
+    }
 
     const canTransfer = merchant.is_admin || merchant.is_coin_seller;
-    if (!canTransfer) throw new Error("Unauthorized to award coins.");
+
+    if (!canTransfer) {
+      throw new Error("Unauthorized to award coins.");
+    }
 
     // 2. Resolve Recipient by Numeric ID
     const cleanedId = targetMatchFlowId.trim();
@@ -211,8 +224,13 @@ export async function clearChatAction(uid: string, chatId: string) {
 export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId: string, role: string, value: boolean) {
   const supabase = getSupabaseAdmin();
   try {
-    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', callerUid).maybeSingle();
-    if (!admin?.is_admin) throw new Error("Unauthorized: Admin access required.");
+    const { data: admin, error: authErr } = await supabase
+      .from('users')
+      .select('uid, is_admin')
+      .eq('uid', callerUid)
+      .maybeSingle();
+
+    if (authErr || !admin?.is_admin) throw new Error("Unauthorized: Admin access required.");
     
     const validRoles = ['is_coin_seller', 'is_agent', 'is_verified', 'is_admin'];
     if (!validRoles.includes(role)) throw new Error("Invalid authority role.");
@@ -242,8 +260,13 @@ export async function submitReportAction(reporterUid: string, reportedUid: strin
 export async function resolveReportAction(adminUid: string, reportId: string, reporterUid: string) {
   const supabase = getSupabaseAdmin();
   try {
-    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', adminUid).single();
-    if (!admin?.is_admin) throw new Error("Unauthorized.");
+    const { data: admin, error: authErr } = await supabase
+      .from('users')
+      .select('uid, is_admin')
+      .eq('uid', adminUid)
+      .maybeSingle();
+
+    if (authErr || !admin?.is_admin) throw new Error("Unauthorized.");
 
     await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
     return { success: true };
