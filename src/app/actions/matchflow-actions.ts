@@ -161,8 +161,6 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
   const supabase = getSupabaseAdmin();
   try {
     const ts = Date.now();
-    const ids = [senderUid, recipientUid].sort();
-    const chatId = `direct_${ids[0]}_${ids[1]}`;
     
     const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', senderUid).single();
     if ((Number(bal?.coins) || 0) < coinAmount) throw new Error("Insufficient coins.");
@@ -182,8 +180,8 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
     await Promise.all([
       supabase.from("coin_history").insert({ user_id: senderUid, amount: -coinAmount, type: "gift_sent", description: `Sent ${giftName}`, timestamp: ts }),
       supabase.from("diamond_history").insert({ user_id: recipientUid, amount: reward, type: "gift_received", description: `Gift from ${sender?.name || 'User'}`, timestamp: ts }),
-      supabase.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text: `[Gift: ${giftName}]`, is_gift: true, timestamp: ts }),
-      supabase.from('chats').upsert({ id: chatId, last_message: `[Gift: ${giftName}]`, last_message_at: ts, participant_ids: [senderUid, recipientUid] })
+      supabase.from('messages').insert({ chat_id: `direct_${[senderUid, recipientUid].sort()[0]}_${[senderUid, recipientUid].sort()[1]}`, sender_id: senderUid, text: `[Gift: ${giftName}]`, is_gift: true, timestamp: ts }),
+      supabase.from('chats').upsert({ id: `direct_${[senderUid, recipientUid].sort()[0]}_${[senderUid, recipientUid].sort()[1]}`, last_message: `[Gift: ${giftName}]`, last_message_at: ts, participant_ids: [senderUid, recipientUid] })
     ]);
     
     return { success: true };
@@ -222,6 +220,111 @@ export async function requestWithdrawalAction(userUid: string, diamonds: number,
       supabase.from('withdrawals').insert({ user_id: userUid, agency_id: agencyId, diamonds, amount_kes, status: 'pending', timestamp: ts }),
       supabase.from('diamond_history').insert({ user_id: userUid, amount: -diamonds, type: 'withdrawal', description: `Payout Request KES ${amount_kes}`, timestamp: ts })
     ]);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function createAgencyAction(agentUid: string, name: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    const { error: agencyErr } = await supabase.from('agencies').insert({ code, agent_uid: agentUid, name });
+    if (agencyErr) throw agencyErr;
+    await supabase.from('users').update({ agency_id: code, agency_status: 'approved', is_agent: true }).eq('uid', agentUid);
+    return { success: true, code };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function joinAgencyAction(userUid: string, code: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: agency } = await supabase.from('agencies').select('code').eq('code', code).single();
+    if (!agency) throw new Error("Invalid Agency Code.");
+    const { error } = await supabase.from('users').update({ agency_id: code, agency_status: 'pending' }).eq('uid', userUid);
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function reviewRecruitmentAction(agentUid: string, applicantUid: string, status: 'approved' | 'rejected') {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error } = await supabase.from('users').update({ agency_status: status }).eq('uid', applicantUid);
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateWithdrawalStatusAction(agentUid: string, agencyId: string, requestId: string, status: 'paid' | 'rejected') {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error } = await supabase.from('withdrawals').update({ status }).eq('id', requestId).eq('agency_id', agencyId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function toggleUserRoleAction(adminUid: string, targetMatchFlowId: string, role: 'is_coin_seller' | 'is_agent' | 'is_admin', value: boolean) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', adminUid).single();
+    if (!admin?.is_admin) throw new Error("Unauthorized.");
+    const { error } = await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchFlowId);
+    if (error) throw error;
+    return { success: true, message: "Authority status updated." };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function clearChatAction(uid: string, chatId: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data } = await supabase.from('chats').select('cleared_at').eq('id', chatId).single();
+    const newClearedAt = { ...(data?.cleared_at || {}), [uid]: Date.now() };
+    const { error } = await supabase.from('chats').update({ cleared_at: newClearedAt }).eq('id', chatId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function submitReportAction(reporterId: string, reportedId: string, reason: string, description: string, proofUrl: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: reporterId,
+      reported_id: reportedId,
+      reason,
+      description,
+      proof_photo_url: proofUrl,
+      timestamp: Date.now()
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resolveReportAction(adminUid: string, reportId: string, reporterId: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', adminUid).single();
+    if (!admin?.is_admin) throw new Error("Unauthorized.");
+    const { error } = await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
+    if (error) throw error;
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

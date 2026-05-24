@@ -80,7 +80,6 @@ export default function AwardCoinsPage() {
 
     setLoading(true)
     try {
-      // Use the resolved UID directly for the award action
       const result = await awardCoinsAction(user.id, targetId, numAmount)
       if (result.success) {
         toast({ title: "Transfer Successful", description: result.message })
@@ -140,7 +139,7 @@ export default function AwardCoinsPage() {
                 placeholder="e.g. 1234567" 
                 value={targetId} 
                 onChange={(e) => setTargetId(e.target.value)} 
-                className="rounded-2xl h-16 text-center text-xl font-bold tracking-widest border-gray-100 bg-gray-50 text-black"
+                className="rounded-2xl h-14 text-center text-xl font-bold tracking-widest border-gray-100 bg-gray-50 text-black"
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2">
                 {searching ? <Loader2 className="w-4 h-4 animate-spin text-gray-300" /> : <Search className="w-4 h-4 text-gray-200" />}
@@ -170,7 +169,7 @@ export default function AwardCoinsPage() {
               placeholder="0" 
               value={amount} 
               onChange={(e) => setAmount(e.target.value)} 
-              className="rounded-2xl h-16 text-center text-xl font-bold border-gray-100 bg-gray-50 text-black"
+              className="rounded-2xl h-14 text-center text-xl font-bold border-gray-100 bg-gray-50 text-black"
             />
           </div>
 
