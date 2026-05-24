@@ -1,184 +1,19 @@
+
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { 
-  Settings, 
-  ChevronRight, 
-  Copy, 
-  Check, 
-  BadgeCheck, 
-  Headphones, 
-  Pencil,
-  Gem,
-  Loader2,
-  Trophy,
-  Users,
-  Briefcase,
-  UserPlus,
-  Wallet,
-  Shield,
-  User,
-  Flag,
-  PlusCircle,
-  History,
-  Zap
-} from "lucide-react"
+import { Settings, ChevronRight, Copy, Check, BadgeCheck, Headphones, Pencil, Gem, Loader2, Trophy, Users, Briefcase, UserPlus, Wallet, Shield, User, Flag, PlusCircle, History, Zap } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase/auth/use-user"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { createAgencyAction, joinAgencyAction } from "@/app/actions/matchflow-actions"
 import { useBalance } from "@/lib/providers/BalanceProvider"
-
-interface UserProfile {
-  uid: string
-  name: string
-  photo_url: string
-  match_flow_id?: string
-  is_verified?: boolean
-  is_admin?: boolean
-  is_coin_seller?: boolean
-  is_agent?: boolean
-  gender?: string
-  agency_id?: string
-  agency_status?: string
-}
-
-function JoinAgencyDialog({ userUid }: { userUid: string }) {
-  const [code, setCode] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
-  const { toast } = useToast()
-  
-  const handleJoin = async () => {
-    if (code.length !== 5 || !userUid) return
-    setLoading(true)
-    const res = await joinAgencyAction(userUid, code)
-    if (res.success) {
-      toast({ title: "Success", description: "Application sent!" })
-      setOpen(false)
-    } else {
-      toast({ variant: "destructive", title: "Error", description: res.error })
-    }
-    setLoading(false)
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="h-20 bg-pink-500 rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-white col-span-2 mt-4">
-          <UserPlus className="w-6 h-6" />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Join Agency</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="rounded-3xl p-8 max-w-[90vw]">
-        <DialogHeader className="items-center text-center">
-          <DialogTitle className="text-xl font-bold">Enter Agency Code</DialogTitle>
-          <DialogDescription className="text-xs">Ask your agent for their 5-digit code.</DialogDescription>
-        </DialogHeader>
-        <div className="py-6">
-          <Input 
-            maxLength={5} 
-            placeholder="e.g. 54321" 
-            value={code} 
-            onChange={(e) => setCode(e.target.value)}
-            className="rounded-2xl h-16 text-center text-2xl font-bold tracking-[0.5em]" 
-          />
-        </div>
-        <Button onClick={handleJoin} disabled={loading} className="w-full h-14 bg-pink-500 rounded-full font-bold uppercase shadow-lg">
-          Apply Now
-        </Button>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function AgencyDashboardDialog({ user }: { user: UserProfile }) {
-  const [agencyName, setAgencyName] = useState("")
-  const [loading, setLoading] = useState(false)
-  const { toast } = useToast()
-  const router = useRouter()
-
-  const handleCreate = async () => {
-    if (!agencyName.trim() || !user.uid) return
-    setLoading(true)
-    const res = await createAgencyAction(user.uid, agencyName)
-    if (res.success) {
-      toast({ title: "Agency Created", description: `Code: ${res.code}` })
-    } else {
-      toast({ variant: "destructive", title: "Error", description: res.error })
-    }
-    setLoading(false)
-  }
-
-  const copyCode = () => {
-    if (user.agency_id) {
-      navigator.clipboard.writeText(user.agency_id);
-      toast({ title: "Agency Code Copied" })
-    }
-  }
-
-  const hasAgency = user.agency_id && user.agency_status === 'approved' && user.is_agent;
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button className="h-20 bg-blue-600 rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-white col-span-2 mt-4">
-          <Briefcase className="w-6 h-6" />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Agency Center</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="rounded-3xl p-8 max-w-[90vw]">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Agency Management</DialogTitle>
-        </DialogHeader>
-        <div className="py-6 space-y-4">
-          {hasAgency ? (
-            <div className="text-center space-y-4">
-              <div 
-                onClick={copyCode}
-                className="bg-blue-50 p-6 rounded-3xl cursor-pointer active:scale-95 transition-all border border-blue-100"
-              >
-                <p className="text-[10px] font-black text-blue-400 uppercase mb-2 tracking-widest">Tap to Copy Agency Code</p>
-                <h3 className="text-4xl font-black text-blue-600 tracking-[0.2em]">{user.agency_id}</h3>
-              </div>
-              <Button asChild className="w-full h-16 bg-blue-600 rounded-full font-black uppercase tracking-widest text-xs shadow-xl">
-                <Link href="/agency-manage">Manage Agency Team</Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase text-gray-400 ml-1">Agency Brand Name</p>
-                <Input 
-                  placeholder="e.g. QIVO Elite" 
-                  value={agencyName} 
-                  onChange={(e) => setAgencyName(e.target.value)} 
-                  className="rounded-2xl h-14 border-gray-100 bg-gray-50 font-bold" 
-                />
-              </div>
-              <Button onClick={handleCreate} disabled={loading} className="w-full h-16 bg-blue-600 rounded-full font-black uppercase tracking-widest text-xs">
-                {loading ? <Loader2 className="animate-spin" /> : "Establish Agency"}
-              </Button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 export default function MePage() {
   const router = useRouter()
@@ -187,194 +22,63 @@ export default function MePage() {
   const { coins, diamonds } = useBalance();
   
   const [copied, setCopied] = useState(false)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [isReady, setIsReady] = useState(false)
+
+  const fetchProfile = useCallback(async () => {
+    if (!user?.id) return
+    const { data } = await supabase
+      .from('users')
+      .select('uid, name, photo_url, match_flow_id, is_verified, is_admin, is_coin_seller, is_agent, gender, agency_id, agency_status')
+      .eq('uid', user.id)
+      .maybeSingle();
+    if (data) setProfile(data)
+    setIsReady(true)
+  }, [user?.id])
 
   useEffect(() => {
     if (!user && isInitialized && !authLoading) router.replace("/welcome")
-    if (!user?.id) return
+    if (user?.id) fetchProfile()
+  }, [user, isInitialized, authLoading, fetchProfile, router])
 
-    const fetchInitialData = async () => {
-      const { data } = await supabase.from('users').select('*').eq('uid', user.id).maybeSingle();
-      if (data) setProfile(data as any)
-      setIsReady(true)
-    }
-    fetchInitialData()
+  if (!isReady && (authLoading || !profile)) return <div className="h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
 
-    const profileChannel = supabase.channel(`profile-sync:${user.id}`)
-      .on('postgres_changes', { event: '*', table: 'users', filter: `uid=eq.${user.id}` }, (payload) => {
-        setProfile(payload.new as any)
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(profileChannel) }
-  }, [user?.id, isInitialized, authLoading, router])
-
-  const handleCopyId = () => {
-    if (profile?.match_flow_id) { 
-      navigator.clipboard.writeText(profile.match_flow_id); 
-      setCopied(true); 
-      toast({ title: "ID Copied" }); 
-      setTimeout(() => setCopied(false), 2000); 
-    }
-  }
-
-  if (!isReady && (authLoading || !profile)) {
-    return <div className="flex-1 bg-[#F8F9FA] min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
-  }
-
-  const freshPhotoUrl = profile?.photo_url ? `${profile.photo_url}?t=${Date.now()}` : null;
-  
   return (
-    <div className="flex-1 pb-24 bg-[#F8F9FA] min-h-screen relative select-none animate-in fade-in duration-300">
-      <div className="absolute top-0 left-0 w-full h-[280px] bg-[#00A2FF] z-0" />
-      
+    <div className="flex-1 pb-24 bg-[#F8F9FA] min-h-screen relative animate-in fade-in duration-300">
+      <div className="absolute top-0 left-0 w-full h-[280px] bg-[#00A2FF]" />
       <div className="relative z-10">
-        <header className="relative pt-12 pb-10 px-6 flex flex-col items-center text-center">
-          <div className="absolute top-6 right-6">
-            <div className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 flex items-center gap-1.5">
-              <span className="text-[9px] font-black text-white uppercase tracking-widest">
-                {profile?.is_admin ? "ADMIN" : (profile?.is_agent ? "AGENT" : (profile?.is_verified ? "VERIFIED" : "MEMBER"))}
-              </span>
-            </div>
-          </div>
-
+        <header className="pt-12 pb-10 px-6 flex flex-col items-center text-center">
           <div className="relative mb-4">
-            <div className="relative w-28 h-28 rounded-full shadow-2xl overflow-hidden bg-muted border-none">
-              {freshPhotoUrl ? (
-                <Image 
-                  key={freshPhotoUrl} 
-                  src={freshPhotoUrl} 
-                  alt={profile?.name || "User"} 
-                  fill 
-                  className="object-cover" 
-                  priority 
-                  sizes="112px" 
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                  <User className="w-12 h-12 text-gray-300" />
-                </div>
-              )}
+            <div className="relative w-28 h-28 rounded-full shadow-2xl overflow-hidden bg-white border-4 border-white/20">
+              <Image src={`${profile?.photo_url}?t=${profile?.updated_at || Date.now()}`} alt={profile?.name || "Me"} fill className="object-cover" sizes="112px" />
             </div>
-            <button 
-              className="absolute bottom-1 right-1 bg-white p-3 rounded-full shadow-xl border border-black/5 active:scale-90 transition-all" 
-              onClick={() => router.push('/edit-profile')}
-            >
-              <Pencil className="w-4 h-4 text-[#00A2FF]" />
-            </button>
+            <button className="absolute bottom-1 right-1 bg-white p-3 rounded-full shadow-xl" onClick={() => router.push('/edit-profile')}><Pencil className="w-4 h-4 text-[#00A2FF]" /></button>
           </div>
-
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <h2 className="text-xl font-bold text-white tracking-tight">{profile?.name || '...'}</h2>
-            {profile?.is_verified && <BadgeCheck className="w-4 h-4 text-white fill-blue-500" />}
-          </div>
-          
-          <div className="inline-flex items-center gap-1.5 cursor-pointer" onClick={handleCopyId}>
-            <p className="text-white/70 font-semibold text-[9px] uppercase tracking-widest">ID: {profile?.match_flow_id}</p>
-            {copied ? <Check className="w-2.5 h-2.5 text-green-300" /> : <Copy className="w-2.5 h-2.5 text-white/50" />}
-          </div>
+          <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">{profile?.name} {profile?.is_verified && <BadgeCheck className="w-4 h-4 text-white fill-blue-500" />}</h2>
+          <p onClick={() => { navigator.clipboard.writeText(profile?.match_flow_id); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="text-white/70 font-semibold text-[9px] uppercase tracking-widest mt-1 cursor-pointer">ID: {profile?.match_flow_id} {copied ? <Check className="w-2.5 h-2.5 inline text-green-300" /> : <Copy className="w-2.5 h-2.5 inline opacity-50" />}</p>
         </header>
 
         <main className="px-6 space-y-6">
-          <div className="grid grid-cols-2 gap-4 relative z-20 -mt-6">
-            <Button className="h-24 bg-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center gap-1 text-[#00A2FF] relative overflow-hidden group" onClick={() => router.push('/recharge')}>
-              <div className="flex items-center gap-2">
-                <div className="bg-blue-50 p-2 rounded-xl group-hover:scale-110 transition-transform"><PlusCircle className="w-5 h-5" /></div>
-                <span className="text-lg font-black">{coins}</span>
-              </div>
-              <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Recharge Coins</span>
-              <div className="absolute top-0 right-0 p-1.5"><Zap className="w-3 h-3 text-yellow-400 fill-current" /></div>
+          <div className="grid grid-cols-2 gap-4 -mt-6">
+            <Button className="h-24 bg-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center text-[#00A2FF]" onClick={() => router.push('/recharge')}>
+              <div className="flex items-center gap-2"><PlusCircle className="w-5 h-5" /><span className="text-lg font-black">{coins}</span></div>
+              <span className="text-[8px] font-black uppercase opacity-60">Coins</span>
             </Button>
-            <Button className="h-24 bg-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center gap-1 text-black" onClick={() => router.push("/income")}>
-              <div className="flex items-center gap-2">
-                <div className="bg-purple-50 p-2 rounded-xl"><Gem className="w-5 h-5 text-[#4285F4]" /></div>
-                <span className="text-lg font-black">{diamonds.toFixed(0)}</span>
-              </div>
-              <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Diamond Income</span>
+            <Button className="h-24 bg-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center text-black" onClick={() => router.push("/income")}>
+              <div className="flex items-center gap-2"><Gem className="w-5 h-5 text-blue-500" /><span className="text-lg font-black">{diamonds.toFixed(0)}</span></div>
+              <span className="text-[8px] font-black uppercase opacity-60">Diamonds</span>
             </Button>
-
-            {!profile?.is_verified && !profile?.is_admin && (
-              <Button onClick={() => router.push("/verify-identity")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-indigo-600 col-span-2 mt-2">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-6 h-6" />
-                  <span className="text-sm font-bold uppercase tracking-widest">Verify Identity</span>
-                </div>
-              </Button>
-            )}
-
-            {(profile?.is_admin || profile?.is_coin_seller) && (
-              <Button onClick={() => router.push("/award-coins")} className="h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-white col-span-2 mt-4">
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-6 h-6" />
-                  <span className="text-sm font-bold uppercase tracking-widest">Award Coins</span>
-                </div>
-              </Button>
-            )}
-
-            {profile?.is_admin && (
-              <>
-                <Button onClick={() => router.push("/manage-roles")} className="h-20 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-purple-600 col-span-2 mt-4">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-6 h-6" />
-                    <span className="text-sm font-bold uppercase tracking-widest">Manage Roles</span>
-                  </div>
-                </Button>
-                <Button onClick={() => router.push("/manage-reports")} className="h-20 bg-black rounded-2xl shadow-xl flex flex-col items-center justify-center gap-1 text-white col-span-2 mt-4">
-                  <div className="flex items-center gap-2">
-                    <Flag className="w-6 h-6 text-red-500" />
-                    <span className="text-sm font-bold uppercase tracking-widest">Manage Reports</span>
-                  </div>
-                </Button>
-              </>
-            )}
-
-            {(profile?.gender === 'female' || profile?.is_admin || profile?.is_agent) && (
-              <>
-                {profile?.is_agent && profile && <AgencyDashboardDialog user={profile} />}
-                {profile?.gender === 'female' && profile?.agency_status !== 'approved' && !profile?.is_agent && !profile?.is_admin && <JoinAgencyDialog userUid={user?.id || ""} />}
-                
-                {profile?.agency_status === 'approved' && !profile?.is_agent && (
-                  <Button onClick={() => router.push("/agency-wallet")} className="h-24 bg-gradient-to-br from-indigo-700 via-blue-600 to-blue-500 rounded-[2.2rem] shadow-2xl flex flex-col items-center justify-center text-white col-span-2 mt-4">
-                    <div className="flex items-center gap-4">
-                      <div className="bg-white/15 p-3 rounded-2xl">
-                        <Wallet className="w-7 h-7 text-white" />
-                      </div>
-                      <span className="text-base font-black uppercase tracking-widest">Agency Wallet</span>
-                    </div>
-                  </Button>
-                )}
-              </>
-            )}
           </div>
 
           <div className="bg-white rounded-3xl p-2 shadow-sm border border-black/5 flex flex-col overflow-hidden">
             <Button variant="ghost" className="h-16 justify-between px-5 rounded-none border-b border-gray-50" asChild>
-              <Link href="/coin-history">
-                <div className="flex items-center gap-4">
-                  <div className="bg-amber-50 p-2.5 rounded-xl"><History className="w-5 h-5 text-amber-600" /></div>
-                  <span className="font-semibold text-xs text-black">Coin History</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-300" />
-              </Link>
+              <Link href="/coin-history"><div className="flex items-center gap-4"><div className="bg-amber-50 p-2.5 rounded-xl"><History className="w-5 h-5 text-amber-600" /></div><span className="font-semibold text-xs text-black">Coin History</span></div><ChevronRight className="w-4 h-4 text-gray-300" /></Link>
             </Button>
             <Button variant="ghost" className="h-16 justify-between px-5 rounded-none border-b border-gray-50" asChild>
-              <Link href="/support">
-                <div className="flex items-center gap-4">
-                  <div className="bg-blue-50 p-2.5 rounded-xl"><Headphones className="w-5 h-5 text-blue-600" /></div>
-                  <span className="font-semibold text-xs text-black">Support Center</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-300" />
-              </Link>
+              <Link href="/support"><div className="flex items-center gap-4"><div className="bg-blue-50 p-2.5 rounded-xl"><Headphones className="w-5 h-5 text-blue-600" /></div><span className="font-semibold text-xs text-black">Support Center</span></div><ChevronRight className="w-4 h-4 text-gray-300" /></Link>
             </Button>
             <Button variant="ghost" className="h-16 justify-between px-5 rounded-none" asChild>
-              <Link href="/settings">
-                <div className="flex items-center gap-4">
-                  <div className="bg-gray-50 p-2.5 rounded-xl"><Settings className="w-5 h-5 text-gray-600" /></div>
-                  <span className="font-semibold text-xs text-black">Settings</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-300" />
-              </Link>
+              <Link href="/settings"><div className="flex items-center gap-4"><div className="bg-gray-50 p-2.5 rounded-xl"><Settings className="w-5 h-5 text-gray-600" /></div><span className="font-semibold text-xs text-black">Settings</span></div><ChevronRight className="w-4 h-4 text-gray-300" /></Link>
             </Button>
           </div>
         </main>

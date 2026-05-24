@@ -1,12 +1,12 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, Gem, ArrowUpRight, ArrowDownRight, Loader2, History } from "lucide-react"
+import { ChevronLeft, Gem, ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
@@ -18,37 +18,51 @@ interface Transaction {
   timestamp: number
 }
 
+const PAGE_SIZE = 20;
+
 export default function DiamondHistoryPage() {
   const router = useRouter()
   const { user } = useUser()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async (pageNum = 0) => {
     if (!user?.id) return
-    const { data } = await supabase
+    if (pageNum === 0) setLoading(true);
+    else setLoadingMore(true);
+
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
       .from('diamond_history')
-      .select('*')
+      .select('id, amount, type, description, timestamp')
       .eq('user_id', user.id)
       .order('timestamp', { ascending: false })
-      .limit(100)
+      .range(from, to);
     
-    if (data) setTransactions(data)
-    setLoading(false)
-  }
+    if (!error && data) {
+      if (pageNum === 0) setTransactions(data);
+      else setTransactions(prev => [...prev, ...data]);
+      setHasMore(data.length === PAGE_SIZE);
+    }
+    setLoading(false);
+    setLoadingMore(false);
+  }, [user?.id])
 
   useEffect(() => {
-    fetchHistory()
+    fetchHistory(0);
+  }, [fetchHistory])
 
-    if (!user?.id) return
-
-    // REALTIME: Synchronize all diamond ledger events
-    const channel = supabase.channel(`diamond-history-live:${user.id}`)
-      .on('postgres_changes', { event: '*', table: 'diamond_history', filter: `user_id=eq.${user.id}` }, () => fetchHistory())
-      .subscribe()
-    
-    return () => { supabase.removeChannel(channel) }
-  }, [user?.id])
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchHistory(nextPage);
+  };
 
   return (
     <div className="flex-1 bg-white min-h-screen flex flex-col select-none">
@@ -60,57 +74,52 @@ export default function DiamondHistoryPage() {
         <div className="w-10" />
       </header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar">
+      <main className="flex-1 overflow-y-auto no-scrollbar pb-20">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-20">
+          <div className="flex flex-col items-center justify-center py-20 opacity-20">
             <Loader2 className="w-8 h-8 animate-spin text-[#00A2FF]" />
-            <p className="text-[10px] font-bold uppercase tracking-widest mt-4">Syncing Ledger...</p>
           </div>
         ) : transactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 opacity-40 px-12 text-center space-y-4">
-            <div className="w-20 h-20 bg-blue-50 rounded-[2.5rem] flex items-center justify-center">
-              <Gem className="w-10 h-10 text-blue-200" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-black text-sm uppercase tracking-widest text-black">Empty Vault</p>
-              <p className="text-[10px] font-bold text-gray-400">Your diamond earnings will appear here.</p>
-            </div>
+            <Gem className="w-10 h-10 text-blue-200" />
+            <p className="font-black text-xs uppercase tracking-widest">Empty Vault</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {transactions.map((tx) => {
-              const isCredit = tx.amount > 0
-              return (
-                <div key={tx.id} className="flex items-center justify-between p-6 hover:bg-gray-50/50 transition-colors animate-in fade-in">
-                  <div className="flex items-center gap-4">
-                    <div className={cn(
-                      "w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", 
-                      isCredit ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
-                    )}>
-                      {isCredit ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
+          <>
+            <div className="divide-y divide-gray-50">
+              {transactions.map((tx) => {
+                const isCredit = tx.amount > 0
+                return (
+                  <div key={tx.id} className="flex items-center justify-between p-6 hover:bg-gray-50/50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", isCredit ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600")}>
+                        {isCredit ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-[13px] text-black truncate">{tx.description}</span>
+                        <span className="text-[9px] font-black text-gray-300 uppercase">{format(tx.timestamp, "MMM d, HH:mm")}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-[13px] text-black tracking-tight truncate">{tx.description}</span>
-                      <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                        {format(tx.timestamp, "MMM d, HH:mm")} • {tx.type}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn(
-                        "text-lg font-black tracking-tighter", 
-                        isCredit ? "text-blue-600" : "text-purple-600"
-                      )}>
-                        {isCredit ? '+' : ''}{tx.amount.toFixed(0)}
-                      </span>
-                      <Gem className={cn("w-3.5 h-3.5 fill-current", isCredit ? "text-blue-600" : "text-purple-600")} />
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn("text-lg font-black tracking-tighter", isCredit ? "text-blue-600" : "text-purple-600")}>
+                          {isCredit ? '+' : ''}{tx.amount.toFixed(0)}
+                        </span>
+                        <Gem className={cn("w-3.5 h-3.5 fill-current", isCredit ? "text-blue-600" : "text-purple-600")} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+            {hasMore && (
+              <div className="p-10 flex justify-center">
+                <Button onClick={loadMore} disabled={loadingMore} variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-[#00A2FF]">
+                  {loadingMore ? <Loader2 className="animate-spin" /> : "Load More"}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
