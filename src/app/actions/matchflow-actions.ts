@@ -17,7 +17,6 @@ export async function dailyCheckInAction(uid: string) {
     const now = new Date();
     const todayStr = now.toDateString();
     
-    // Check if last check-in was today in current server time
     if (user.last_check_in_date) {
       const lastCheckIn = new Date(user.last_check_in_date);
       if (lastCheckIn.toDateString() === todayStr) {
@@ -31,7 +30,6 @@ export async function dailyCheckInAction(uid: string) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       
-      // If last check-in was yesterday, increment streak. Otherwise reset to 1.
       if (last.toDateString() === yesterday.toDateString()) {
         streak = (user.check_in_streak || 0) + 1;
       }
@@ -66,6 +64,99 @@ export async function dailyCheckInAction(uid: string) {
   }
 }
 
+export async function awardCoinsAction(merchantUid: string, targetMatchFlowId: string, amount: number) {
+  const supabase = getSupabaseAdmin();
+  try {
+    // 1. Verify Caller Authority
+    const { data: merchant } = await supabase.from('users').select('uid, is_admin, is_coin_seller, name').eq('uid', merchantUid).single();
+    if (!merchant?.is_admin && !merchant?.is_coin_seller) throw new Error("Unauthorized to award coins.");
+
+    // 2. Find Target User
+    const { data: target } = await supabase.from('users').select('uid, name').eq('match_flow_id', targetMatchFlowId).single();
+    if (!target) throw new Error("Recipient user not found.");
+
+    const ts = Date.now();
+
+    // 3. Logic for Merchant (Deduction Required) vs Admin (Unlimited)
+    if (merchant.is_coin_seller && !merchant.is_admin) {
+      const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', merchantUid).single();
+      const currentBal = Number(bal?.coins) || 0;
+      if (currentBal < amount) throw new Error(`Insufficient coins. Your balance: ${currentBal}`);
+
+      // Deduct from Merchant
+      const { error: deductErr } = await supabase.rpc("increment_coins", { user_id: merchantUid, amount: -amount });
+      if (deductErr) throw deductErr;
+
+      await supabase.from("coin_history").insert({
+        user_id: merchantUid,
+        amount: -amount,
+        type: "merchant_sale",
+        description: `Transferred to ${target.name}`,
+        timestamp: ts
+      });
+    }
+
+    // 4. Award Recipient
+    const { error: awardErr } = await supabase.rpc("increment_coins", { user_id: target.uid, amount });
+    if (awardErr) throw awardErr;
+
+    await supabase.from("coin_history").insert({
+      user_id: target.uid,
+      amount,
+      type: "merchant_award",
+      description: merchant.is_admin ? "System Award (Admin)" : "Merchant Load",
+      timestamp: ts
+    });
+
+    return { success: true, message: `Successfully transferred ${amount} coins to ${target.name}.` };
+  } catch (err: any) {
+    console.error("[Award Logic Error]:", err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId: string, role: string, value: boolean) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', callerUid).single();
+    if (!admin?.is_admin) throw new Error("Unauthorized.");
+    
+    // Explicitly cast role name to ensure we only update allowed fields
+    const validRoles = ['is_coin_seller', 'is_agent', 'is_verified'];
+    if (!validRoles.includes(role)) throw new Error("Invalid role.");
+
+    const { error } = await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchFlowId);
+    if (error) throw error;
+    
+    return { success: true, message: "Authority updated successfully." };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function submitReportAction(reporterUid: string, reportedUid: string, reason: string, description: string, proofUrl: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    await supabase.from('reports').insert({ reporter_id: reporterUid, reported_id: reportedUid, reason, description, proof_photo_url: proofUrl, timestamp: Date.now() });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resolveReportAction(adminUid: string, reportId: string, reporterUid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', adminUid).single();
+    if (!admin?.is_admin) throw new Error("Unauthorized.");
+
+    await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function convertDiamondsToCoinsAction(user_id: string, diamonds: number, coins: number) {
   const supabase = getSupabaseAdmin();
   try {
@@ -91,7 +182,6 @@ export async function sendMysteryNoteAction(user_id: string, message: string, re
     const cost = Number(recipientCount) * 10;
     const ts = Date.now();
     
-    // Server-side double check of balance
     const { data: balance } = await supabase.from('balances').select('coins').eq('user_id', user_id).single();
     if ((Number(balance?.coins) || 0) < cost) {
       throw new Error("Insufficient coins for this operation.");
@@ -121,15 +211,12 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
     const ids = [senderUid, recipientUid].sort();
     const chatId = `direct_${ids[0]}_${ids[1]}`;
     
-    // 1. Double check balance
     const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', senderUid).single();
     if ((Number(bal?.coins) || 0) < coinAmount) throw new Error("Insufficient coins.");
 
-    // 2. Deduct Sender
     const { error: deductErr } = await supabase.rpc("increment_coins", { user_id: senderUid, amount: -coinAmount });
     if (deductErr) throw deductErr;
 
-    // 3. Reward Recipient
     const { data: rec } = await supabase.from('users').select('gender, name').eq('uid', recipientUid).single();
     const { data: sender } = await supabase.from('users').select('name').eq('uid', senderUid).single();
     
@@ -138,7 +225,6 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
 
     await supabase.rpc("increment_diamonds", { user_id: recipientUid, amount: reward });
     
-    // 4. Record everything
     await Promise.all([
       supabase.from("coin_history").insert({ user_id: senderUid, amount: -coinAmount, type: "gift_sent", description: `Sent ${giftName}`, timestamp: ts }),
       supabase.from("diamond_history").insert({ user_id: recipientUid, amount: reward, type: "gift_received", description: `Gift from ${sender?.name || 'User'}`, timestamp: ts }),
@@ -149,19 +235,6 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
     return { success: true };
   } catch (err: any) {
     console.error("[Gift Error]:", err.message);
-    return { success: false, error: err.message };
-  }
-}
-
-export async function awardCoinsAction(merchantUid: string, targetMatchFlowId: string, amount: number) {
-  const supabase = getSupabaseAdmin();
-  try {
-    const { data: target } = await supabase.from('users').select('uid').eq('match_flow_id', targetMatchFlowId).single();
-    if (!target) throw new Error("User not found.");
-    await supabase.rpc("increment_coins", { user_id: target.uid, amount });
-    await supabase.from("coin_history").insert({ user_id: target.uid, amount, type: "merchant_award", description: "Merchant Load", timestamp: Date.now() });
-    return { success: true, message: `Awarded ${amount} coins.` };
-  } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
@@ -215,38 +288,6 @@ export async function updateWithdrawalStatusAction(agentUid: string, agencyId: s
   const supabase = getSupabaseAdmin();
   try {
     await supabase.from('withdrawals').update({ status }).eq('id', requestId);
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
-}
-
-export async function toggleUserRoleAction(callerUid: string, targetMatchFlowId: string, role: string, value: boolean) {
-  const supabase = getSupabaseAdmin();
-  try {
-    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', callerUid).single();
-    if (!admin?.is_admin) throw new Error("Unauthorized.");
-    await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchFlowId);
-    return { success: true, message: "Role updated." };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
-}
-
-export async function submitReportAction(reporterUid: string, reportedUid: string, reason: string, description: string, proofUrl: string) {
-  const supabase = getSupabaseAdmin();
-  try {
-    await supabase.from('reports').insert({ reporter_id: reporterUid, reported_id: reportedUid, reason, description, proof_photo_url: proofUrl, timestamp: Date.now() });
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
-}
-
-export async function resolveReportAction(adminUid: string, reportId: string, reporterUid: string) {
-  const supabase = getSupabaseAdmin();
-  try {
-    await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
