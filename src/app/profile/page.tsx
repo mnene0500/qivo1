@@ -73,7 +73,8 @@ export default function MePage() {
 
   const isAdmin = profile?.is_admin
   const isMerchant = profile?.is_coin_seller || isAdmin
-  const isAgent = profile?.is_agent || isAdmin
+  const isAgent = profile?.is_agent
+  const isFemale = profile?.gender === 'female'
 
   return (
     <div className="flex-1 pb-24 bg-[#F8F9FA] min-h-screen relative animate-in fade-in duration-300">
@@ -87,7 +88,7 @@ export default function MePage() {
             <button className="absolute bottom-1 right-1 bg-white p-3 rounded-full shadow-xl" onClick={() => router.push('/edit-profile')}><Pencil className="w-4 h-4 text-[#00A2FF]" /></button>
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">{profile?.name} {profile?.is_verified && <BadgeCheck className="w-4 h-4 text-white fill-blue-500" />}</h2>
-          <p onClick={() => { navigator.clipboard.writeText(profile?.match_flow_id); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="text-white/70 font-semibold text-[9px] uppercase tracking-widest mt-1 cursor-pointer">ID: {profile?.match_flow_id} {copied ? <Check className="w-2.5 h-2.5 inline text-green-300" /> : <Copy className="w-2.5 h-2.5 inline opacity-50" />}</p>
+          <p onClick={() => { navigator.clipboard.writeText(profile?.match_flow_id); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="text-white/70 font-semibold text-[9px] uppercase tracking-widest mt-1 cursor-pointer">ID: {profile?.match_flow_id} {copied ? <Check className="w-2.5 h-2.5 inline text-green-300" /> : <div className="inline-block"><Copy className="w-2.5 h-2.5 opacity-50" /></div>}</p>
         </header>
 
         <main className="px-6 space-y-6">
@@ -119,66 +120,85 @@ export default function MePage() {
             </section>
           )}
 
-          {/* AGENT / AGENCY CONSOLE */}
-          <section className="space-y-3">
-            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Agency Console</h3>
-            <div className="bg-white rounded-3xl p-2 shadow-sm border border-black/5 flex flex-col overflow-hidden">
-              {isAgent && (
-                <Button variant="ghost" className="h-16 justify-between px-5 rounded-none border-b border-gray-50" onClick={() => router.push('/agency-manage')}>
+          {/* AGENT / AGENCY CONSOLE - Restricted to Female accounts per policy */}
+          {isFemale && (
+            <section className="space-y-3">
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Agency Console</h3>
+              <div className="bg-white rounded-3xl p-2 shadow-sm border border-black/5 flex flex-col overflow-hidden">
+                {isAgent && (
+                  <Button variant="ghost" className="h-16 justify-between px-5 rounded-none border-b border-gray-50" onClick={() => router.push('/agency-manage')}>
+                    <div className="flex items-center gap-4">
+                      <div className="bg-purple-50 p-2.5 rounded-xl"><Briefcase className="w-5 h-5 text-purple-600" /></div>
+                      <span className="font-semibold text-xs text-black">Agency Center</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                  </Button>
+                )}
+                
+                <Button variant="ghost" className="h-16 justify-between px-5 rounded-none border-b border-gray-50" onClick={() => router.push('/agency-wallet')}>
                   <div className="flex items-center gap-4">
-                    <div className="bg-purple-50 p-2.5 rounded-xl"><Briefcase className="w-5 h-5 text-purple-600" /></div>
-                    <span className="font-semibold text-xs text-black">Agency Center</span>
+                    <div className="bg-emerald-50 p-2.5 rounded-xl"><Wallet className="w-5 h-5 text-emerald-600" /></div>
+                    <span className="font-semibold text-xs text-black">Agency Wallet</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300" />
                 </Button>
-              )}
-              
-              <Button variant="ghost" className="h-16 justify-between px-5 rounded-none border-b border-gray-50" onClick={() => router.push('/agency-wallet')}>
-                <div className="flex items-center gap-4">
-                  <div className="bg-emerald-50 p-2.5 rounded-xl"><Wallet className="w-5 h-5 text-emerald-600" /></div>
-                  <span className="font-semibold text-xs text-black">Agency Wallet</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-300" />
-              </Button>
 
-              {!profile?.agency_id ? (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" className="h-16 justify-between px-5 rounded-none">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-blue-50 p-2.5 rounded-xl"><UserPlus className="w-5 h-5 text-blue-600" /></div>
-                        <span className="font-semibold text-xs text-black">Join Agency Program</span>
+                {!profile?.agency_id ? (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" className="h-16 justify-between px-5 rounded-none">
+                        <div className="flex items-center gap-4">
+                          <div className="bg-blue-50 p-2.5 rounded-xl"><UserPlus className="w-5 h-5 text-blue-600" /></div>
+                          <span className="font-semibold text-xs text-black">Join Agency Program</span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-300" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="rounded-[2rem] p-8">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-bold">Agency Access</DialogTitle>
+                        <DialogDescription className="text-xs">Join an agency to unlock diamond withdrawals.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-gray-400">Join via Code</label>
+                          <Input placeholder="5-digit code" value={agencyCode} onChange={(e) => setAgencyCode(e.target.value)} className="rounded-2xl h-12" />
+                        </div>
+                        <Button onClick={handleJoinAgency} disabled={isProcessing || !agencyCode} className="w-full h-12 rounded-full bg-[#00A2FF]">Join Now</Button>
+                        
+                        {/* Only show "Create Agency" if Admin has appointed this user as an Agent */}
+                        {isAgent && (
+                          <div className="pt-4 border-t mt-4 space-y-4">
+                            <div className="text-center">
+                              <span className="text-[8px] font-bold uppercase text-gray-400">Initialize Your Agency</span>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase text-gray-400">Agency Name</label>
+                              <Input placeholder="Enter agency name" value={agencyName} onChange={(e) => setAgencyName(e.target.value)} className="rounded-2xl h-12" />
+                            </div>
+                            <Button onClick={handleCreateAgency} disabled={isProcessing || !agencyName} variant="outline" className="w-full h-12 rounded-full border-purple-200 text-purple-600">Create My Agency</Button>
+                          </div>
+                        )}
                       </div>
-                      <ChevronRight className="w-4 h-4 text-gray-300" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="rounded-[2rem] p-8">
-                    <DialogHeader><DialogTitle className="text-xl font-bold">Join Agency</DialogTitle><DialogDescription className="text-xs">Enter a code or apply to be an agent.</DialogDescription></DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2"><label className="text-[10px] font-black uppercase text-gray-400">Join via Code</label><Input placeholder="5-digit code" value={agencyCode} onChange={(e) => setAgencyCode(e.target.value)} className="rounded-2xl h-12" /></div>
-                      <Button onClick={handleJoinAgency} disabled={isProcessing || !agencyCode} className="w-full h-12 rounded-full bg-[#00A2FF]">Join Now</Button>
-                      <div className="relative py-2"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-[8px] font-bold uppercase"><span className="bg-white px-2 text-gray-400">OR</span></div></div>
-                      <div className="space-y-2"><label className="text-[10px] font-black uppercase text-gray-400">Apply to be Agent</label><Input placeholder="Agency Name" value={agencyName} onChange={(e) => setAgencyName(e.target.value)} className="rounded-2xl h-12" /></div>
-                      <Button onClick={handleCreateAgency} disabled={isProcessing || !agencyName} variant="outline" className="w-full h-12 rounded-full">Apply for Agent Role</Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              ) : (
-                <div className="h-16 flex items-center justify-between px-5">
-                   <div className="flex items-center gap-4">
-                     <div className="bg-blue-50 p-2.5 rounded-xl"><Briefcase className="w-5 h-5 text-blue-600" /></div>
-                     <div className="flex flex-col">
-                        <span className="font-semibold text-xs text-black">Member Status</span>
-                        <span className="text-[9px] font-bold text-[#00A2FF] uppercase">{profile.agency_status}</span>
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <div className="h-16 flex items-center justify-between px-5">
+                     <div className="flex items-center gap-4">
+                       <div className="bg-blue-50 p-2.5 rounded-xl"><Briefcase className="w-5 h-5 text-blue-600" /></div>
+                       <div className="flex flex-col">
+                          <span className="font-semibold text-xs text-black">Member Status</span>
+                          <span className="text-[9px] font-bold text-[#00A2FF] uppercase">{profile.agency_status}</span>
+                       </div>
                      </div>
-                   </div>
-                   <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-full border">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">ID: {profile.agency_id}</span>
-                   </div>
-                </div>
-              )}
-            </div>
-          </section>
+                     <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-full border">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">ID: {profile.agency_id}</span>
+                     </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* ADMIN CONSOLE */}
           {isAdmin && (
