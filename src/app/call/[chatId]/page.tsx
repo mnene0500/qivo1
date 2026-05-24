@@ -13,8 +13,7 @@ import { cn } from "@/lib/utils"
 
 /**
  * @fileOverview Hardened Agora Call Page.
- * Implemented 10-second free grace period.
- * Deduction happens at the 11th second for the first minute.
+ * Fixed crashing during 'securing connection' by improving initialization sequence.
  */
 
 export default function CallPage({ params }: { params: Promise<{ chatId: string }> }) {
@@ -46,13 +45,13 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
   useEffect(() => {
     if (!partnerId) return
-    supabase.from('users').select('*').eq('uid', partnerId).single().then(({ data }) => setPartnerProfile(data))
+    supabase.from('users').select('uid, name, photo_url').eq('uid', partnerId).single().then(({ data }) => setPartnerProfile(data))
   }, [partnerId])
 
   // REALTIME SIGNALING: End call on both sides
   useEffect(() => {
     if (!callId) return
-    const channel = supabase.channel(`call-signaling-${callId}`)
+    const channel = supabase.channel(`call-sig-${callId}`)
       .on('postgres_changes', { event: 'UPDATE', table: 'calls', filter: `id=eq.${callId}` }, (payload) => {
         if (payload.new.status === 'ended') {
           handleEndCall(false)
@@ -62,17 +61,12 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     return () => { supabase.removeChannel(channel) }
   }, [callId])
 
-  // BILLING TIMER (Runs every second)
+  // BILLING TIMER (Only starts AFTER joined is true)
   useEffect(() => {
     if (joined && user?.id && partnerId) {
       billingTimer.current = setInterval(async () => {
         setDuration(prev => {
           const next = prev + 1
-          
-          // BILLING LOGIC: 
-          // 1. First 10 seconds are free.
-          // 2. At 11 seconds, deduct for the first minute.
-          // 3. Every 60 seconds thereafter (71s, 131s, etc.), deduct again.
           
           const isFirstMinuteDeduction = next === 11;
           const isSubsequentMinuteDeduction = next > 11 && (next - 11) % 60 === 0;
@@ -91,13 +85,16 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   }, [joined, user?.id, partnerId, type])
 
   useEffect(() => {
+    let mounted = true;
     const init = async () => {
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined' || !user?.id || !chatId) return
       try {
         const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
-        const tokenData = await generateAgoraTokenAction(chatId, user!.id)
+        const tokenData = await generateAgoraTokenAction(chatId, user.id)
         
+        if (!mounted) return;
+
         await client.join(tokenData.appId, tokenData.channelName, tokenData.token, tokenData.uid)
         
         const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
@@ -141,9 +138,10 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
       }
     }
 
-    if (user?.id && chatId) init()
+    init()
     
     return () => { 
+      mounted = false;
       if (rtc.client) {
         rtc.localAudioTrack?.stop()
         rtc.localAudioTrack?.close()
@@ -164,7 +162,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
       rtc.localVideoTrack.close()
     }
     if (rtc.client) {
-      await rtc.client.leave()
+      try { await rtc.client.leave() } catch (e) {}
     }
     if (manual && callId) {
       await endCallAction(callId)

@@ -1,3 +1,4 @@
+
 'use client'
 
 import { createContext, useContext, useState, useEffect } from 'react';
@@ -8,8 +9,7 @@ const BalanceContext = createContext({ coins: 0, diamonds: 0 });
 
 /**
  * @fileOverview Global Balance Provider.
- * Connects directly to Supabase Realtime to ensure the UI balance
- * matches the database value at all times.
+ * Optimized to be event-driven. Fetches once, then listens for precise changes.
  */
 export const BalanceProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useUser();
@@ -24,7 +24,7 @@ export const BalanceProvider = ({ children }: { children: React.ReactNode }) => 
     let balanceChannel: any;
 
     const fetchAndSubscribe = async () => {
-      // 1. Initial Fetch
+      // 1. Initial Fetch (Explicit columns only)
       const { data, error } = await supabase
         .from('balances')
         .select('coins, diamonds')
@@ -40,21 +40,19 @@ export const BalanceProvider = ({ children }: { children: React.ReactNode }) => 
         });
       }
 
-      // 2. Realtime Listener
+      // 2. Realtime Listener (Filtered to this user only)
       balanceChannel = supabase
-        .channel(`balance-realtime:${user.id}`)
+        .channel(`bal-${user.id}`)
         .on(
           'postgres_changes',
           { 
-            event: '*', 
+            event: 'UPDATE', 
             schema: 'public', 
             table: 'balances', 
             filter: `user_id=eq.${user.id}` 
           },
           (payload) => {
-            if (payload.eventType === 'DELETE') {
-              setBalances({ coins: 0, diamonds: 0 });
-            } else if (payload.new) {
+            if (payload.new) {
               setBalances({
                 coins: Number(payload.new.coins) || 0,
                 diamonds: Number(payload.new.diamonds) || 0,

@@ -18,51 +18,34 @@ interface Transaction {
   timestamp: number
 }
 
-const PAGE_SIZE = 20;
+const HARD_LIMIT = 40;
 
 export default function DiamondHistoryPage() {
   const router = useRouter()
   const { user } = useUser()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
 
-  const fetchHistory = useCallback(async (pageNum = 0) => {
+  const fetchHistory = useCallback(async () => {
     if (!user?.id) return
-    if (pageNum === 0) setLoading(true);
-    else setLoadingMore(true);
-
-    const from = pageNum * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    setLoading(true);
 
     const { data, error } = await supabase
       .from('diamond_history')
       .select('id, amount, type, description, timestamp')
       .eq('user_id', user.id)
       .order('timestamp', { ascending: false })
-      .range(from, to);
+      .limit(HARD_LIMIT);
     
     if (!error && data) {
-      if (pageNum === 0) setTransactions(data);
-      else setTransactions(prev => [...prev, ...data]);
-      setHasMore(data.length === PAGE_SIZE);
+      setTransactions(data);
     }
     setLoading(false);
-    setLoadingMore(false);
   }, [user?.id])
 
   useEffect(() => {
-    fetchHistory(0);
+    fetchHistory();
   }, [fetchHistory])
-
-  const loadMore = () => {
-    if (loadingMore || !hasMore) return;
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchHistory(nextPage);
-  };
 
   return (
     <div className="flex-1 bg-white min-h-screen flex flex-col select-none">
@@ -85,41 +68,35 @@ export default function DiamondHistoryPage() {
             <p className="font-black text-xs uppercase tracking-widest">Empty Vault</p>
           </div>
         ) : (
-          <>
-            <div className="divide-y divide-gray-50">
-              {transactions.map((tx) => {
-                const isCredit = tx.amount > 0
-                return (
-                  <div key={tx.id} className="flex items-center justify-between p-6 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", isCredit ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600")}>
-                        {isCredit ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-[13px] text-black truncate">{tx.description}</span>
-                        <span className="text-[9px] font-black text-gray-300 uppercase">{format(tx.timestamp, "MMM d, HH:mm")}</span>
-                      </div>
+          <div className="divide-y divide-gray-50">
+            {transactions.map((tx) => {
+              const isCredit = tx.amount > 0
+              return (
+                <div key={tx.id} className="flex items-center justify-between p-6 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", isCredit ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600")}>
+                      {isCredit ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn("text-lg font-black tracking-tighter", isCredit ? "text-blue-600" : "text-purple-600")}>
-                          {isCredit ? '+' : ''}{tx.amount.toFixed(0)}
-                        </span>
-                        <Gem className={cn("w-3.5 h-3.5 fill-current", isCredit ? "text-blue-600" : "text-purple-600")} />
-                      </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-[13px] text-black truncate">{tx.description}</span>
+                      <span className="text-[9px] font-black text-gray-300 uppercase">{format(tx.timestamp, "MMM d, HH:mm")}</span>
                     </div>
                   </div>
-                )
-              })}
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("text-lg font-black tracking-tighter", isCredit ? "text-blue-600" : "text-purple-600")}>
+                        {isCredit ? '+' : ''}{tx.amount.toFixed(0)}
+                      </span>
+                      <Gem className={cn("w-3.5 h-3.5 fill-current", isCredit ? "text-blue-600" : "text-purple-600")} />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            <div className="p-10 text-center">
+              <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Showing last {HARD_LIMIT} transactions</p>
             </div>
-            {hasMore && (
-              <div className="p-10 flex justify-center">
-                <Button onClick={loadMore} disabled={loadingMore} variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-[#00A2FF]">
-                  {loadingMore ? <Loader2 className="animate-spin" /> : "Load More"}
-                </Button>
-              </div>
-            )}
-          </>
+          </div>
         )}
       </main>
     </div>
