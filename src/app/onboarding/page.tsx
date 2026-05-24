@@ -1,16 +1,19 @@
+
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { base64ToBlob, uploadProfilePhoto } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Heart, Loader2, ChevronRight, ChevronLeft, RefreshCw } from "lucide-react"
+import { Heart, Loader2, ChevronRight, ChevronLeft, Camera } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { completeOnboardingAction } from "@/app/actions/matchflow-actions"
 
 const AFRICAN_COUNTRIES = [
   "Kenya", "Tanzania", "Uganda", "Rwanda", "Burundi", "South Sudan", "Ethiopia", "Somalia", "Eritrea", "Djibouti", "South Africa", "Nigeria", "Ghana", "Egypt"
@@ -28,12 +31,14 @@ export default function OnboardingPage() {
   const [country, setCountry] = useState("")
   const [lookingFor, setLookingFor] = useState("")
   const [loading, setLoading] = useState(false)
+  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null)
   
   const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const totalSteps = 3
+  const totalSteps = gender === 'female' ? 4 : 3
 
   useEffect(() => {
     if (user?.email && !name) {
@@ -42,65 +47,53 @@ export default function OnboardingPage() {
   }, [user, name])
 
   const maxDate = useMemo(() => {
-    // RESTRICT TO 18+ ONLY
     const d = new Date()
     d.setFullYear(d.getFullYear() - 18)
     return d.toISOString().split('T')[0]
   }, [])
 
-  const handleClearCache = () => {
-    localStorage.clear()
-    sessionStorage.clear()
-    toast({ title: "Cache Cleared" })
-    window.location.reload()
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => setUploadedPhoto(reader.result as string)
+      reader.readAsDataURL(file)
+    }
   }
 
   const handleComplete = async () => {
     if (!user) return
+    if (gender === 'female' && !uploadedPhoto) {
+      toast({ variant: "destructive", title: "Photo Required", description: "Please upload a profile photo." })
+      return
+    }
+
     setLoading(true)
 
     try {
-      const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
-      const initialCoins = gender === 'male' ? 150 : 0
-      const initialDiamonds = gender === 'female' ? 150 : 0
-      const timestamp = Date.now()
+      let finalPhotoUrl = uploadedPhoto;
+      if (uploadedPhoto && uploadedPhoto.startsWith('data:image')) {
+        const { blob } = base64ToBlob(uploadedPhoto);
+        finalPhotoUrl = await uploadProfilePhoto(blob, user.id);
+      }
 
-      // 1. Create or Update Profile
-      const { error: profileErr } = await supabase.from('users').upsert({
+      const res = await completeOnboardingAction({
         uid: user.id,
-        email: user.email,
+        email: user.email!,
         name: name,
         gender,
         dob,
         country,
         looking_for: lookingFor,
-        onboarding_complete: true,
-        match_flow_id: qId,
-        photo_url: user.user_metadata?.avatar_url || `https://picsum.photos/seed/${user.id}/400/400`,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'uid' })
+        photo_url: finalPhotoUrl
+      });
 
-      if (profileErr) throw profileErr;
-      
-      // 2. Setup Initial Balance
-      await supabase.from('balances').upsert({
-        user_id: user.id,
-        coins: initialCoins,
-        diamonds: initialDiamonds
-      }, { onConflict: 'user_id' })
-
-      if (initialCoins > 0) {
-        await supabase.from('coin_history').insert({
-          user_id: user.id,
-          amount: initialCoins,
-          type: 'bonus',
-          description: 'Welcome Bonus',
-          timestamp: timestamp
-        })
+      if (res.success) {
+        toast({ title: "Setup Complete!", description: res.bonus ? `You received ${res.bonus} welcome coins!` : "Welcome to QIVO!" })
+        router.replace("/home")
+      } else {
+        throw new Error(res.error)
       }
-
-      toast({ title: "Setup Complete!" })
-      router.replace("/home")
     } catch (err: any) {
       toast({ variant: "destructive", title: "Setup Failed", description: err.message })
       setLoading(false)
@@ -111,6 +104,7 @@ export default function OnboardingPage() {
     if (step === 1) return !!name && !!gender
     if (step === 2) return !!dob && !!country
     if (step === 3) return !!lookingFor
+    if (step === 4) return !!uploadedPhoto
     return false
   }
 
@@ -123,7 +117,7 @@ export default function OnboardingPage() {
           <Heart className="w-8 h-8 text-[#00A2FF] fill-current" />
         </div>
         <h1 className="text-2xl font-black text-black tracking-tight mt-4 text-center">
-          {step === 1 ? "Basic Info" : step === 2 ? "Where are you?" : "Preferences"}
+          {step === 1 ? "Basic Info" : step === 2 ? "Where are you?" : step === 3 ? "Preferences" : "Profile Photo"}
         </h1>
         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Step {step} of {totalSteps}</p>
       </header>
@@ -145,11 +139,6 @@ export default function OnboardingPage() {
                   </button>
                 ))}
               </div>
-            </div>
-            <div className="pt-10 flex justify-center">
-               <Button variant="ghost" size="sm" onClick={handleClearCache} className="text-[9px] font-bold text-gray-300 uppercase tracking-[0.2em] gap-2 hover:bg-transparent hover:text-gray-400">
-                 <RefreshCw className="w-3 h-3" /> Clear App Cache
-               </Button>
             </div>
           </div>
         )}
@@ -185,11 +174,30 @@ export default function OnboardingPage() {
             </div>
           </div>
         )}
+
+        {step === 4 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col items-center">
+            <div className="text-center space-y-2 mb-4">
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">A photo is required for female profiles</p>
+            </div>
+            <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+              <Avatar className="w-40 h-40 border-4 border-gray-50 shadow-2xl overflow-hidden bg-gray-100 rounded-[2.5rem]">
+                <AvatarImage src={uploadedPhoto || ""} className="object-cover" />
+                <AvatarFallback className="bg-gray-100"><Camera className="w-12 h-12 text-gray-200" /></AvatarFallback>
+              </Avatar>
+              <div className="absolute bottom-1 right-1 bg-[#00A2FF] p-3 rounded-2xl text-white shadow-xl border-2 border-white"><Camera className="w-5 h-5" /></div>
+            </div>
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+          </div>
+        )}
       </main>
 
       <footer className="fixed bottom-0 inset-x-0 p-8 bg-white/80 backdrop-blur-xl border-t border-gray-50 flex gap-4 max-w-md mx-auto w-full">
         {step > 1 && <Button variant="ghost" onClick={() => setStep(prev => prev - 1)} className="w-16 h-16 rounded-2xl bg-gray-50 text-gray-400"><ChevronLeft className="w-6 h-6" /></Button>}
-        <Button disabled={!canContinue() || loading} onClick={() => step < totalSteps ? setStep(prev => prev + 1) : handleComplete()} className="flex-1 h-16 rounded-2xl bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+        <Button disabled={!canContinue() || loading} onClick={() => {
+          if (step < totalSteps) setStep(prev => prev + 1);
+          else handleComplete();
+        }} className="flex-1 h-16 rounded-2xl bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
           {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (step === totalSteps ? "Finish Setup" : "Continue")}
         </Button>
       </footer>

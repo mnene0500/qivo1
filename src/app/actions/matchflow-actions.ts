@@ -2,25 +2,98 @@
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { headers } from 'next/headers';
 
 /**
  * @fileOverview Native Economy Actions on Vercel.
  * Hardened for strict bidirectional blocking and correct targeting.
  */
 
+export async function completeOnboardingAction(payload: {
+  uid: string;
+  email: string;
+  name: string;
+  gender: string;
+  dob: string;
+  country: string;
+  looking_for: string;
+  photo_url?: string;
+}) {
+  const supabase = getSupabaseAdmin();
+  const headersList = await headers();
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1';
+
+  try {
+    // 1. Check IP Account Limit (Max 3)
+    const { count, error: countErr } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('last_ip', ip);
+
+    if (countErr) throw countErr;
+    if (count !== null && count >= 3) {
+      return { success: false, error: "Account limit reached for this device (Max 3)." };
+    }
+
+    // 2. Determine Welcome Bonus
+    // Male: 1st & 2nd = 500, 3rd = 0
+    let initialCoins = 0;
+    if (payload.gender === 'male') {
+      initialCoins = (count !== null && count < 2) ? 500 : 0;
+    }
+    
+    // Female gets standard 150 (as per previous logic) or adjust as needed
+    const initialDiamonds = payload.gender === 'female' ? 150 : 0;
+    const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
+    const timestamp = Date.now();
+
+    // 3. Atomic Profile Creation
+    const { error: profileErr } = await supabase.from('users').upsert({
+      uid: payload.uid,
+      email: payload.email,
+      name: payload.name,
+      gender: payload.gender,
+      dob: payload.dob,
+      country: payload.country,
+      looking_for: payload.looking_for,
+      onboarding_complete: true,
+      match_flow_id: qId,
+      photo_url: payload.photo_url || `https://picsum.photos/seed/${payload.uid}/400/400`,
+      last_ip: ip,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'uid' });
+
+    if (profileErr) throw profileErr;
+
+    // 4. Setup Initial Balance
+    await supabase.from('balances').upsert({
+      user_id: payload.uid,
+      coins: initialCoins,
+      diamonds: initialDiamonds
+    }, { onConflict: 'user_id' });
+
+    if (initialCoins > 0) {
+      await supabase.from('coin_history').insert({
+        user_id: payload.uid,
+        amount: initialCoins,
+        type: 'bonus',
+        description: 'Welcome Bonus (New Device)',
+        timestamp: timestamp
+      });
+    }
+
+    return { success: true, bonus: initialCoins };
+  } catch (err: any) {
+    console.error("[Onboarding Server Error]:", err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function deleteUserCompletelyAction(uid: string) {
   const supabase = getSupabaseAdmin();
   try {
-    // 1. Get user to log IP before deletion if available
-    const { data: user } = await supabase.from('users').select('last_ip').eq('uid', uid).single();
-    
-    // 2. Perform nuclear auth deletion
     const { error } = await supabase.auth.admin.deleteUser(uid);
     if (error) throw error;
-    
-    // 3. Optional: Add IP to watchlist if account was flagged
-    // Logic here can be expanded for automated IP banning
-    
     return { success: true };
   } catch (err: any) {
     console.error("[Delete Account Error]:", err.message);
@@ -201,7 +274,6 @@ export async function sendMysteryNoteAction(user_id: string, message: string, re
       throw new Error("Insufficient coins.");
     }
 
-    // Filter recipients: Opposite gender, active, and NOT blocked/blocking
     const targetGender = user?.gender === 'male' ? 'female' : 'male';
     const blockedList = [...(user?.blocking || []), ...(user?.blocked_by || [])];
 

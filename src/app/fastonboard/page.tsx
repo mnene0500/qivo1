@@ -1,16 +1,19 @@
+
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { base64ToBlob, uploadProfilePhoto } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Heart, Loader2, RefreshCw } from "lucide-react"
+import { Heart, Loader2, RefreshCw, Camera, ChevronLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { completeOnboardingAction } from "@/app/actions/matchflow-actions"
 
 const AFRICAN_COUNTRIES = [
   "Kenya", "Tanzania", "Uganda", "Rwanda", "Burundi", "South Sudan", "Ethiopia", "Somalia", "Eritrea", "Djibouti", "South Africa", "Nigeria", "Ghana", "Egypt"
@@ -20,20 +23,19 @@ const LOOKING_FOR_OPTIONS = [
   "Serious partner", "Casual friendship", "Networking", "Dating", "Travel buddy"
 ]
 
-/**
- * @fileOverview Instant onboarding for both Email and Social Login users.
- * Robust profile creation using UPSERT with age verification.
- */
 export default function FastOnboardingPage() {
   const [gender, setGender] = useState("")
   const [country, setCountry] = useState("")
   const [lookingFor, setLookingFor] = useState("")
   const [dob, setDob] = useState("")
   const [loading, setLoading] = useState(false)
+  const [showPhotoStep, setShowPhotoStep] = useState(false)
+  const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null)
   
   const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const maxDate = useMemo(() => {
     const d = new Date()
@@ -41,76 +43,110 @@ export default function FastOnboardingPage() {
     return d.toISOString().split('T')[0]
   }, [])
 
-  const handleClearCache = () => {
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (!key.includes('auth-token')) {
-        localStorage.removeItem(key);
-      }
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => setUploadedPhoto(reader.result as string)
+      reader.readAsDataURL(file)
     }
-    sessionStorage.clear()
-    toast({ title: "Cache Optimized" })
-    window.location.reload()
   }
 
   const handleComplete = async () => {
     if (!user) return
+    
+    // Female users MUST upload a photo
+    if (gender === 'female' && !showPhotoStep) {
+      setShowPhotoStep(true)
+      return
+    }
+
+    if (gender === 'female' && !uploadedPhoto) {
+      toast({ variant: "destructive", title: "Photo Required", description: "Female users must upload a profile photo." })
+      return
+    }
+
     setLoading(true)
 
     try {
-      const initialCoins = gender === 'male' ? 150 : 0
-      const initialDiamonds = gender === 'female' ? 150 : 0
-      const timestamp = Date.now()
-      const qId = Math.floor(1000000 + Math.random() * 900000000).toString();
+      let finalPhotoUrl = uploadedPhoto;
+      
+      // Upload photo if provided
+      if (uploadedPhoto && uploadedPhoto.startsWith('data:image')) {
+        const { blob } = base64ToBlob(uploadedPhoto);
+        finalPhotoUrl = await uploadProfilePhoto(blob, user.id);
+      } else {
+        finalPhotoUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+      }
 
-      const socialName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "User";
-      const socialPhoto = user.user_metadata?.avatar_url || user.user_metadata?.picture || `https://picsum.photos/seed/${user.id}/400/400`;
-
-      // 1. Create Profile
-      const { error: profileErr } = await supabase.from('users').upsert({
+      const res = await completeOnboardingAction({
         uid: user.id,
-        email: user.email,
-        name: socialName,
+        email: user.email!,
+        name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || "User",
         gender,
         dob,
         country,
         looking_for: lookingFor,
-        onboarding_complete: true,
-        match_flow_id: qId,
-        photo_url: socialPhoto,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'uid' })
+        photo_url: finalPhotoUrl
+      });
 
-      if (profileErr) throw profileErr;
-      
-      // 2. Setup Initial Balance
-      await supabase.from('balances').upsert({
-        user_id: user.id,
-        coins: initialCoins,
-        diamonds: initialDiamonds
-      }, { onConflict: 'user_id' })
-
-      if (initialCoins > 0) {
-        await supabase.from('coin_history').insert({
-          user_id: user.id,
-          amount: initialCoins,
-          type: 'bonus',
-          description: 'Welcome Bonus',
-          timestamp: timestamp
-        })
+      if (res.success) {
+        toast({ title: "Setup Complete!", description: res.bonus ? `You received ${res.bonus} welcome coins!` : "Welcome to QIVO!" })
+        router.replace("/home");
+      } else {
+        throw new Error(res.error);
       }
-      
-      toast({ title: "Setup Complete!" })
-      router.replace("/home");
-      
     } catch (err: any) {
-      console.error("Onboarding failed:", err);
       toast({ variant: "destructive", title: "Setup Failed", description: err.message })
       setLoading(false)
     }
   }
 
   const canContinue = () => !!gender && !!country && !!lookingFor && !!dob
+
+  if (showPhotoStep) {
+    return (
+      <div className="flex-1 flex flex-col bg-white min-h-screen">
+        <header className="px-6 h-16 flex items-center border-b">
+          <Button variant="ghost" size="icon" onClick={() => setShowPhotoStep(false)} className="rounded-full">
+            <ChevronLeft className="w-6 h-6 text-black" />
+          </Button>
+          <h1 className="text-sm font-bold text-black uppercase tracking-widest ml-2">Profile Photo</h1>
+        </header>
+
+        <main className="flex-1 p-8 flex flex-col items-center justify-center space-y-8">
+           <div className="text-center space-y-2">
+             <h2 className="text-2xl font-black text-black tracking-tight">One last step!</h2>
+             <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+               Female users are required to upload a clear profile photo to proceed.
+             </p>
+           </div>
+
+           <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+            <Avatar className="w-48 h-48 border-4 border-gray-50 shadow-2xl overflow-hidden bg-gray-100 rounded-[3rem]">
+              <AvatarImage src={uploadedPhoto || ""} className="object-cover" />
+              <AvatarFallback className="bg-gray-100"><Camera className="w-16 h-16 text-gray-200" /></AvatarFallback>
+            </Avatar>
+            <div className="absolute bottom-2 right-2 bg-[#00A2FF] p-4 rounded-3xl text-white shadow-xl border-4 border-white"><Camera className="w-6 h-6" /></div>
+          </div>
+
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+          
+          <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Tap to upload</p>
+        </main>
+
+        <footer className="p-8 bg-white border-t">
+          <Button 
+            disabled={!uploadedPhoto || loading}
+            onClick={handleComplete}
+            className="w-full h-16 rounded-[2rem] bg-black text-white font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+          >
+            {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Finish & Proceed"}
+          </Button>
+        </footer>
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 flex flex-col bg-white min-h-screen relative">
@@ -185,12 +221,6 @@ export default function FastOnboardingPage() {
               </Select>
             </div>
           </div>
-
-          <div className="pt-10 flex justify-center">
-             <Button variant="ghost" size="sm" onClick={handleClearCache} className="text-[9px] font-bold text-gray-300 uppercase tracking-[0.2em] gap-2 hover:bg-transparent">
-               <RefreshCw className="w-3 h-3" /> Optimize Storage
-             </Button>
-          </div>
         </div>
       </main>
 
@@ -200,7 +230,7 @@ export default function FastOnboardingPage() {
           onClick={handleComplete}
           className="flex-1 h-16 rounded-2xl bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all"
         >
-          {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Get Started"}
+          {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (gender === 'female' ? "Continue to Photo" : "Get Started")}
         </Button>
       </footer>
     </div>
