@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
 import { sendGiftAction, clearChatAction } from "@/app/actions/matchflow-actions"
-import { checkCallBalanceAction } from "@/app/actions/call-actions"
+import { checkCallBalanceAction, startCallAction } from "@/app/actions/call-actions"
 import {
   Dialog,
   DialogContent,
@@ -182,7 +183,6 @@ function ChatsContent() {
       hasSentAutoMsg.current = true;
       const text = "I want to buy coins. Please guide me on the payment process.";
       const ts = Date.now();
-      // UPSERT CHAT FIRST to avoid FK issues
       supabase.from('chats').upsert({ id: chatId, last_message: text, last_message_at: ts, participant_ids: [currentUser.id, startWithId] }).then(() => {
         supabase.from('messages').insert({ chat_id: chatId, text, sender_id: currentUser.id, timestamp: ts })
       });
@@ -198,7 +198,6 @@ function ChatsContent() {
     setMessages(prev => [optimisticMsg, ...prev])
     setNewMessage("")
 
-    // 1. Create or Update the Chat record FIRST (Crucial for Foreign Key constraints)
     const { error: chatError } = await supabase.from('chats').upsert({ 
       id: chatId, 
       last_message: text, 
@@ -207,18 +206,15 @@ function ChatsContent() {
     })
 
     if (chatError) {
-      console.error("Chat upsert failed:", chatError.message);
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
       toast({ variant: "destructive", title: "Chat failed to initialize" })
       return
     }
 
-    // 2. Insert the message
     const { error: msgError } = await supabase.from('messages').insert({ chat_id: chatId, text, sender_id: currentUser.id, timestamp })
     if (!msgError) {
       await markAsSeen(chatId, timestamp)
     } else {
-      console.error("Message insert failed:", msgError.message);
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
       toast({ variant: "destructive", title: "Failed to send message" })
     }
@@ -234,14 +230,21 @@ function ChatsContent() {
   }
 
   const handleStartCall = async (type: 'video' | 'voice') => {
-    if (!currentUser || !startWithId) return
-    const res = await checkCallBalanceAction(currentUser.id, type)
-    if (!res.success) {
-      toast({ variant: "destructive", title: "Insufficient Coins", description: res.error })
+    if (!currentUser || !startWithId || !chatId) return
+    
+    const balanceCheck = await checkCallBalanceAction(currentUser.id, type)
+    if (!balanceCheck.success) {
+      toast({ variant: "destructive", title: "Insufficient Coins", description: balanceCheck.error })
       router.push("/recharge")
       return
     }
-    toast({ title: "Connecting Agora...", description: "Feature is in tokenization mode." })
+
+    const res = await startCallAction(chatId, currentUser.id, startWithId, type)
+    if (res.success) {
+      router.push(`/call/${chatId}?type=${type}&partnerId=${startWithId}&callId=${res.callId}`)
+    } else {
+      toast({ variant: "destructive", title: "Call Error", description: res.error })
+    }
   }
 
   const handleSendGift = async (gift: typeof GIFTS[0]) => {

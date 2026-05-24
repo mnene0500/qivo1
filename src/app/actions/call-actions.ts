@@ -1,6 +1,8 @@
+
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { RtcTokenBuilder, RtcRole } from 'agora-token';
 
 /**
  * @fileOverview Agora Token Generation and Calling Economy.
@@ -15,12 +17,61 @@ export async function generateAgoraTokenAction(channelName: string, uid: string)
     throw new Error("Agora Credentials missing in Vercel Settings.");
   }
 
+  // Use numeric UID for Agora if possible, or hash the string
+  const numericUid = Math.abs(uid.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a }, 0));
+  const role = RtcRole.PUBLISHER;
+  const expirationTimeInSeconds = 3600;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+  const token = RtcTokenBuilder.buildTokenWithUid(
+    appId,
+    appCertificate,
+    channelName,
+    numericUid,
+    role,
+    privilegeExpiredTs,
+    privilegeExpiredTs
+  );
+
   return {
     appId,
-    token: "PROTOTYPE_TOKEN_EXPECTED", 
+    token,
     channelName,
-    uid
+    uid: numericUid
   };
+}
+
+export async function startCallAction(chatId: string, callerId: string, receiverId: string, type: 'video' | 'voice') {
+  const supabase = getSupabaseAdmin();
+  try {
+    // End any existing calls for this chat just in case
+    await supabase.from('calls').update({ status: 'ended' }).eq('chat_id', chatId).neq('status', 'ended');
+
+    const { data, error } = await supabase.from('calls').insert({
+      chat_id: chatId,
+      caller_id: callerId,
+      receiver_id: receiverId,
+      type,
+      status: 'calling'
+    }).select().single();
+
+    if (error) throw error;
+    return { success: true, callId: data.id };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function endCallAction(callId: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error } = await supabase.from('calls').update({ status: 'ended' }).eq('id', callId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 }
 
 export async function checkCallBalanceAction(uid: string, type: 'video' | 'voice') {

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -6,6 +7,20 @@ import { getSupabaseAdmin } from '@/lib/supabase';
  * @fileOverview Native Economy Actions on Vercel.
  * Hardened to use standardized p_user_id and p_amount parameters.
  */
+
+export async function deleteUserCompletelyAction(uid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    // 1. Delete from Auth (This triggers a cascade delete if public.users.uid references auth.users.id with ON DELETE CASCADE)
+    const { error } = await supabase.auth.admin.deleteUser(uid);
+    if (error) throw error;
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[Delete Account Error]:", err.message);
+    return { success: false, error: err.message };
+  }
+}
 
 export async function dailyCheckInAction(uid: string) {
   const supabase = getSupabaseAdmin();
@@ -63,14 +78,9 @@ export async function dailyCheckInAction(uid: string) {
   }
 }
 
-/**
- * Award Coins Action
- * Hardened to use UID for the final transfer to ensure 100% accuracy.
- */
 export async function awardCoinsAction(merchantUid: string, targetUid: string, amount: number) {
   const supabase = getSupabaseAdmin();
   try {
-    // 1. Authorize the sender
     const { data: merchant, error: authErr } = await supabase
       .from('users')
       .select('uid, name, is_admin, is_coin_seller')
@@ -80,7 +90,6 @@ export async function awardCoinsAction(merchantUid: string, targetUid: string, a
     if (authErr || !merchant) throw new Error("Authorization failed.");
     if (!merchant.is_admin && !merchant.is_coin_seller) throw new Error("Unauthorized.");
 
-    // 2. Resolve target recipient
     const { data: target, error: targetErr } = await supabase
       .from('users')
       .select('uid, name')
@@ -91,13 +100,11 @@ export async function awardCoinsAction(merchantUid: string, targetUid: string, a
 
     const ts = Date.now();
 
-    // 3. Admin logic (Unlimited) vs Merchant logic (Deducted)
     if (!merchant.is_admin && merchant.is_coin_seller) {
       const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', merchantUid).single();
       const currentBal = Number(bal?.coins) || 0;
       if (currentBal < amount) throw new Error(`Insufficient coins (Balance: ${currentBal})`);
 
-      // Deduct Merchant
       const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: merchant.uid, p_amount: -amount });
       if (deductErr) throw deductErr;
 
@@ -110,7 +117,6 @@ export async function awardCoinsAction(merchantUid: string, targetUid: string, a
       });
     }
 
-    // 4. Award target atomically
     const { error: awardErr } = await supabase.rpc("increment_coins", { p_user_id: target.uid, p_amount: amount });
     if (awardErr) throw awardErr;
 

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -8,6 +9,7 @@ import { ChevronLeft, ChevronRight, ShieldAlert, Info, RefreshCw, CreditCard, Lo
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
+import { deleteUserCompletelyAction } from "@/app/actions/matchflow-actions"
 import Link from "next/link"
 import {
   AlertDialog,
@@ -50,9 +52,11 @@ export default function SettingsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useUser()
+  
   const [deleteConfirmText, setDeleteConfirmText] = useState("")
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
@@ -92,13 +96,19 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     if (!user || deleteConfirmText.toUpperCase() !== "DELETE") return
 
+    setIsDeleting(true)
     try {
-      await supabase.from('users').update({ is_deleted: true, onboarding_complete: false }).eq('uid', user.id)
-      await supabase.auth.signOut()
-      window.location.replace("/welcome")
-      toast({ title: "Account Deletion Requested" })
+      const res = await deleteUserCompletelyAction(user.id);
+      if (res.success) {
+        await supabase.auth.signOut();
+        window.location.replace("/welcome");
+        toast({ title: "Account Deleted", description: "All data has been removed." });
+      } else {
+        throw new Error(res.error);
+      }
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Deletion failed", description: error.message })
+      toast({ variant: "destructive", title: "Deletion failed", description: error.message });
+      setIsDeleting(false);
     }
   }
 
@@ -137,17 +147,19 @@ export default function SettingsPage() {
                   <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4 mx-auto">
                     <ShieldAlert className="w-8 h-8 text-red-500" />
                   </div>
-                  <AlertDialogTitle className="text-xl font-bold">Delete Account?</AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs font-bold pt-2 uppercase tracking-widest leading-relaxed text-center">
-                    Type <span className="text-red-600 font-black">DELETE</span> to confirm:
+                  <AlertDialogTitle className="text-xl font-bold">Delete Everything?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-[10px] font-bold pt-2 uppercase tracking-widest leading-relaxed text-center text-gray-400">
+                    This will remove your Auth account, profile, coins, and history from our systems. Type <span className="text-red-600 font-black">DELETE</span> to confirm:
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="py-4">
-                  <Input placeholder="Type DELETE" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} className="rounded-2xl h-14 text-center font-black" />
+                  <Input placeholder="Type DELETE" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} className="rounded-2xl h-14 text-center font-black bg-gray-50 border-gray-100" />
                 </div>
                 <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">
                   <AlertDialogCancel className="flex-1 h-14 rounded-full border-gray-100 bg-gray-50 text-gray-400 font-black uppercase text-[10px] tracking-widest">Cancel</AlertDialogCancel>
-                  <AlertDialogAction disabled={deleteConfirmText.toUpperCase() !== "DELETE"} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100" onClick={handleDeleteAccount}>Delete</AlertDialogAction>
+                  <AlertDialogAction disabled={deleteConfirmText.toUpperCase() !== "DELETE" || isDeleting} className="flex-1 h-14 rounded-full bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-100" onClick={handleDeleteAccount}>
+                    {isDeleting ? <Loader2 className="animate-spin w-4 h-4" /> : "Delete"}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
