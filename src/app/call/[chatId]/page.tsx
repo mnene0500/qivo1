@@ -10,8 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 
 /**
- * @fileOverview Hardened Agora Call Page.
- * Implements strict permission handling and signaling listeners.
+ * @fileOverview Hardened Agora Call Page with Phased Media Activation.
+ * Accesses camera first, then activates mic upon connection.
  */
 
 export default function CallPage({ params }: { params: Promise<{ chatId: string }> }) {
@@ -46,7 +46,6 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   const localVideoRef = useRef<HTMLDivElement>(null)
   const remoteVideoRef = useRef<HTMLDivElement>(null)
   const billingTimer = useRef<NodeJS.Timeout | null>(null)
-  const ringTimeout = useRef<NodeJS.Timeout | null>(null)
   const joining = useRef(false)
   const mounted = useRef(true)
 
@@ -69,17 +68,6 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [callId])
-
-  useEffect(() => {
-    if (joined && isRinging) {
-      ringTimeout.current = setTimeout(() => {
-        if (!remoteUser && mounted.current) {
-          handleEndCall(true)
-        }
-      }, 45000)
-    }
-    return () => { if (ringTimeout.current) clearTimeout(ringTimeout.current) }
-  }, [joined, isRinging, remoteUser])
 
   useEffect(() => {
     if (joined && remoteUser && user?.id && partnerId) {
@@ -108,28 +96,29 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
       try {
         const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
         
-        // 1. Check permissions early
-        let audioTrack, videoTrack = null;
-        try {
-          audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
-          if (type === 'video') {
-            videoTrack = await AgoraRTC.createCameraVideoTrack()
+        // 1. PHASE 1: Access Camera Immediately for Preview
+        if (type === 'video') {
+          try {
+            const videoTrack = await AgoraRTC.createCameraVideoTrack()
+            rtc.current.localVideoTrack = videoTrack
+            if (localVideoRef.current) {
+              videoTrack.play(localVideoRef.current)
+            }
+          } catch (vErr) {
+            console.error("Camera access denied:", vErr)
+            setPermissionError("Please allow camera access to start the video call.")
+            return
           }
-        } catch (permErr: any) {
-          console.error("Permissions denied:", permErr)
-          setPermissionError("Please allow camera and microphone access to start the call.")
-          return
         }
 
-        rtc.current.localAudioTrack = audioTrack
-        rtc.current.localVideoTrack = videoTrack
-
+        // 2. Setup Client
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
         rtc.current.client = client
 
         client.on("user-published", async (remote, mediaType) => {
           if (!mounted.current) return
           await client.subscribe(remote, mediaType)
+          
           if (mediaType === "video") {
             setRemoteUser(remote)
             setIsRinging(false)
@@ -139,10 +128,22 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
               }
             }, 500)
           }
+          
           if (mediaType === "audio") {
             remote.audioTrack?.play()
             setIsRinging(false)
             setRemoteUser((prev: any) => prev || remote)
+          }
+
+          // 3. PHASE 2: Activate Mic once connected to a remote peer
+          if (!rtc.current.localAudioTrack) {
+             try {
+                const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
+                rtc.current.localAudioTrack = audioTrack
+                await client.publish(audioTrack)
+             } catch (aErr) {
+                console.error("Mic access denied on connection:", aErr)
+             }
           }
         })
 
@@ -155,11 +156,16 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
         await client.join(tokenData.appId, tokenData.channelName, tokenData.token, tokenData.uid)
         
-        if (localVideoRef.current && videoTrack) {
-          videoTrack.play(localVideoRef.current)
+        // Publish video immediately if available
+        if (rtc.current.localVideoTrack) {
+          await client.publish(rtc.current.localVideoTrack)
+        } else if (type === 'voice') {
+           // For voice calls, activate mic on join
+           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
+           rtc.current.localAudioTrack = audioTrack
+           await client.publish(audioTrack)
         }
 
-        await client.publish(videoTrack ? [audioTrack, videoTrack] : [audioTrack])
         setJoined(true)
       } catch (err: any) {
         console.error("Call Init Error:", err)
@@ -232,13 +238,14 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
   return (
     <div className="fixed inset-0 bg-black z-[100] flex flex-col items-center justify-center select-none overflow-hidden">
+      {/* REMOTE VIDEO / BACKGROUND */}
       <div className="absolute inset-0 z-0">
         {type === 'video' && remoteUser ? (
-          <div ref={remoteVideoRef} className="w-full h-full" />
+          <div ref={remoteVideoRef} className="w-full h-full bg-black" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900">
              <div className="relative">
-               {isRinging && <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />}
+               {isRinging && <div className="absolute inset-0 bg-[#00A2FF] rounded-full animate-ping opacity-20" />}
                <Avatar className="w-32 h-32 border-4 border-white/10 shadow-2xl relative z-10">
                  <AvatarImage src={partnerProfile?.photo_url} className="object-cover" />
                  <AvatarFallback className="bg-zinc-800 text-zinc-500"><User className="w-16 h-16" /></AvatarFallback>
@@ -259,21 +266,50 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         )}
       </div>
 
-      {type === 'video' && joined && !cameraOff && (
-        <div className="absolute top-12 right-6 w-32 aspect-[3/4] bg-zinc-800 rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl z-20">
-          <div ref={localVideoRef} className="w-full h-full" />
+      {/* LOCAL PREVIEW (PiP) */}
+      {type === 'video' && (
+        <div className={cn(
+          "absolute transition-all duration-500 overflow-hidden border-2 border-white/20 shadow-2xl z-20",
+          remoteUser 
+            ? "top-12 right-6 w-32 aspect-[3/4] rounded-3xl" 
+            : "inset-0 border-none rounded-none z-[-1]"
+        )}>
+          <div ref={localVideoRef} className={cn("w-full h-full bg-zinc-800", cameraOff && "opacity-0")} />
+          {cameraOff && (
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-800">
+               <VideoOff className="w-8 h-8 text-zinc-600" />
+            </div>
+          )}
         </div>
       )}
 
+      {/* CONTROLS */}
       <div className="absolute bottom-16 inset-x-0 px-8 flex items-center justify-center gap-6 z-50">
-        <button onClick={toggleMute} className={cn("w-16 h-16 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl transition-all active:scale-90 flex items-center justify-center", muted ? "bg-red-500 text-white" : "bg-white/10 text-white")}>
+        <button 
+          onClick={toggleMute} 
+          className={cn(
+            "w-16 h-16 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl transition-all active:scale-90 flex items-center justify-center", 
+            muted ? "bg-red-500 text-white" : "bg-white/10 text-white"
+          )}
+        >
           {muted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
         </button>
-        <button onClick={() => handleEndCall(true)} className="w-20 h-20 rounded-full bg-red-600 text-white shadow-2xl shadow-red-500/40 border-4 border-white/10 active:scale-95 transition-all flex items-center justify-center">
+        
+        <button 
+          onClick={() => handleEndCall(true)} 
+          className="w-20 h-20 rounded-full bg-red-600 text-white shadow-2xl shadow-red-500/40 border-4 border-white/10 active:scale-95 transition-all flex items-center justify-center"
+        >
           <PhoneOff className="w-8 h-8" />
         </button>
+        
         {type === 'video' && (
-          <button onClick={toggleCamera} className={cn("w-16 h-16 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl transition-all active:scale-90 flex items-center justify-center", cameraOff ? "bg-red-500 text-white" : "bg-white/10 text-white")}>
+          <button 
+            onClick={toggleCamera} 
+            className={cn(
+              "w-16 h-16 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl transition-all active:scale-90 flex items-center justify-center", 
+              cameraOff ? "bg-red-500 text-white" : "bg-white/10 text-white"
+            )}
+          >
             {cameraOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
           </button>
         )}

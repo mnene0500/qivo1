@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation"
 
 /**
  * @fileOverview Signaling Shell for incoming calls and persistent navigation.
+ * Fixed Accept/Reject buttons for reliable signaling.
  */
 function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -59,11 +60,13 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     if (!incomingCall) return
     const call = incomingCall
     setIncomingCall(null)
+    // ROUTE TO CALL PAGE WITH FULL SIGNAL DATA
     router.push(`/call/${call.chat_id}?type=${call.type}&partnerId=${call.caller_id}&callId=${call.id}`)
   }
 
   const handleReject = async () => {
     if (!incomingCall) return
+    // UPDATE SIGNAL STATUS TO NOTIFY CALLER
     await supabase.from('calls').update({ status: 'ended' }).eq('id', incomingCall.id)
     setIncomingCall(null)
   }
@@ -80,26 +83,26 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       {isVisible && <BottomNav />}
 
       <Dialog open={!!incomingCall} onOpenChange={(open) => !open && handleReject()}>
-        <DialogContent className="rounded-[2.5rem] p-8 max-w-[85vw] border-none shadow-2xl bg-zinc-900 text-white overflow-hidden">
+        <DialogContent className="rounded-[2.5rem] p-8 max-w-[85vw] border-none shadow-2xl bg-zinc-900 text-white overflow-hidden outline-none">
           <div className="absolute inset-0 bg-gradient-to-b from-blue-500/10 to-transparent pointer-events-none" />
           <DialogHeader className="items-center text-center relative z-10">
             <div className="relative mb-6">
-               <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />
+               <div className="absolute inset-0 bg-[#00A2FF] rounded-full animate-ping opacity-20" />
                <Avatar className="w-24 h-24 border-4 border-white/10 shadow-2xl relative z-10">
                  <AvatarImage src={callerProfile?.photo_url} className="object-cover" />
                  <AvatarFallback className="bg-zinc-800 text-zinc-500"><User className="w-10 h-10" /></AvatarFallback>
                </Avatar>
             </div>
             <DialogTitle className="text-2xl font-black tracking-tight">{callerProfile?.name || 'Incoming Call'}</DialogTitle>
-            <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mt-1">
+            <p className="text-[10px] font-black text-[#00A2FF] uppercase tracking-[0.3em] mt-1">
               Incoming {incomingCall?.type === 'video' ? 'Video' : 'Voice'} Call
             </p>
           </DialogHeader>
           <div className="flex gap-4 mt-10 relative z-10">
-            <Button onClick={handleReject} variant="destructive" className="flex-1 h-16 rounded-full shadow-xl shadow-red-500/20 active:scale-95 transition-all">
+            <Button onClick={handleReject} variant="destructive" className="flex-1 h-16 rounded-full shadow-xl shadow-red-500/20 active:scale-95 transition-all py-0">
               <PhoneOff className="w-6 h-6" />
             </Button>
-            <Button onClick={handleAccept} className="flex-1 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-xl shadow-green-500/20 active:scale-95 transition-all">
+            <Button onClick={handleAccept} className="flex-1 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-xl shadow-green-500/20 active:scale-95 transition-all py-0">
               {incomingCall?.type === 'video' ? <Video className="w-6 h-6" /> : <Phone className="w-6 h-6" />}
             </Button>
           </div>
