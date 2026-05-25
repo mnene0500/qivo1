@@ -5,6 +5,7 @@ import { RtcTokenBuilder, RtcRole } from 'agora-token';
 
 /**
  * @fileOverview Agora Token Generation and Calling Economy for Owner system.
+ * Updated to handle non-strict chat references.
  */
 
 export async function generateAgoraTokenAction(channelName: string, uid: string) {
@@ -52,8 +53,10 @@ export async function startCallAction(chatId: string, callerId: string, receiver
       }
     }
 
+    // Clean up old active calls for this chat
     await supabase.from('calls').update({ status: 'ended' }).eq('chat_id', chatId).neq('status', 'ended');
 
+    // INSERT: Note - No strict Chat FK to allow calls before first message
     const { data, error } = await supabase.from('calls').insert({
       chat_id: chatId,
       caller_id: callerId,
@@ -65,6 +68,7 @@ export async function startCallAction(chatId: string, callerId: string, receiver
     if (error) throw error;
     return { success: true, callId: data.id };
   } catch (error: any) {
+    console.error("[Start Call Error]:", error.message);
     return { success: false, error: error.message };
   }
 }

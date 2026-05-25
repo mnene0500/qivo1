@@ -181,7 +181,16 @@ export async function sendMessageAction(payload: { chatId: string; senderId: str
       await supabase.rpc("increment_coins", { p_user_id: payload.senderId, p_amount: -cost });
       await supabase.from("coin_history").insert({ user_id: payload.senderId, amount: -cost, type: "chat_cost", description: `Message`, timestamp });
     }
-    await supabase.from('chats').upsert({ id: payload.chatId, last_message: payload.text.slice(0, 100), last_message_at: timestamp, participant_ids: [payload.senderId, payload.recipientId] }, { onConflict: 'id' });
+    
+    // UPDATED: Include last_sender_id for accurate unread badges
+    await supabase.from('chats').upsert({ 
+      id: payload.chatId, 
+      last_message: payload.text.slice(0, 100), 
+      last_message_at: timestamp, 
+      participant_ids: [payload.senderId, payload.recipientId],
+      last_sender_id: payload.senderId 
+    }, { onConflict: 'id' });
+
     const { error: msgError } = await supabase.from('messages').insert({ chat_id: payload.chatId, text: payload.text, sender_id: payload.senderId, timestamp });
     if (msgError) throw msgError;
     return { success: true };
@@ -210,7 +219,14 @@ export async function sendMysteryNoteAction(userId: string, message: string, rec
     for (const target of targets) {
       const ids = [userId, target.uid].sort();
       const chatId = `direct_${ids[0]}_${ids[1]}`;
-      await supabase.from('chats').upsert({ id: chatId, participant_ids: [userId, target.uid], last_message: message, last_message_at: ts }, { onConflict: 'id' });
+      // TRANSPARENT BROADCAST: Creates real chats with last_sender_id
+      await supabase.from('chats').upsert({ 
+        id: chatId, 
+        participant_ids: [userId, target.uid], 
+        last_message: message, 
+        last_message_at: ts,
+        last_sender_id: userId
+      }, { onConflict: 'id' });
       await supabase.from('messages').insert({ chat_id: chatId, sender_id: userId, text: message, timestamp: ts });
     }
     return { success: true };
@@ -327,7 +343,7 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
       supabase.from("coin_history").insert({ user_id: senderUid, amount: -coinAmount, type: "gift", description: `Sent ${giftName}`, timestamp: ts }),
       supabase.from("diamond_history").insert({ user_id: recipientUid, amount: reward, type: "gift", description: `Gift from ${sender.name}`, timestamp: ts }),
       supabase.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text: `[Gift: ${giftName}]`, is_gift: true, timestamp: ts }),
-      supabase.from('chats').upsert({ id: chatId, last_message: `[Gift: ${giftName}]`, last_message_at: ts, participant_ids: [senderUid, recipientUid] })
+      supabase.from('chats').upsert({ id: chatId, last_message: `[Gift: ${giftName}]`, last_message_at: ts, participant_ids: [senderUid, recipientUid], last_sender_id: senderUid })
     ]);
     return { success: true };
   } catch (err: any) {

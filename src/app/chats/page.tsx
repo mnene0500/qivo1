@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -85,7 +84,7 @@ function ChatsContent() {
     
     const { data: chatsData } = await supabase
       .from('chats')
-      .select('id, participant_ids, last_message, last_message_at, cleared_at, last_seen_at')
+      .select('id, participant_ids, last_message, last_message_at, cleared_at, last_seen_at, last_sender_id')
       .contains('participant_ids', [currentUser.id])
       .order('last_message_at', { ascending: false })
       .limit(30);
@@ -125,7 +124,8 @@ function ChatsContent() {
       const p = profileMap.get(pId);
       
       const mySeenAt = (c.last_seen_at as Record<string, number>)?.[currentUser.id] || 0;
-      const isUnread = c.last_message_at > mySeenAt && c.participant_ids[0] !== currentUser.id;
+      // UPDATED: Use last_sender_id for accurate notification
+      const isUnread = c.last_message_at > mySeenAt && c.last_sender_id !== currentUser.id;
 
       return {
         id: c.id,
@@ -187,7 +187,7 @@ function ChatsContent() {
     }
   }, [chatId, currentUser?.id, newMessage, startWithId, toast]);
 
-  // Handle Auto-Messages (e.g. from Coin Sellers)
+  // Handle Auto-Messages (e.g. from Coin Sellers) - SENT AS VISIBLE BUBBLE
   useEffect(() => {
     if (isInitialized && chatId && autoMsgType === 'buy_coins' && !autoMsgSent.current) {
       autoMsgSent.current = true;
