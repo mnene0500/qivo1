@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -262,7 +261,12 @@ export async function joinAgencyAction(userUid: string, code: string) {
 export async function reviewRecruitmentAction(applicantUid: string, status: 'approved' | 'rejected') {
   const supabase = getSupabaseAdmin();
   try {
-    await supabase.from('users').update({ agency_status: status }).eq('uid', applicantUid);
+    if (status === 'rejected') {
+      // CLEAR agency ID so they can apply again
+      await supabase.from('users').update({ agency_id: null, agency_status: null }).eq('uid', applicantUid);
+    } else {
+      await supabase.from('users').update({ agency_status: status }).eq('uid', applicantUid);
+    }
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

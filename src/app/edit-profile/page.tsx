@@ -86,8 +86,20 @@ export default function EditProfilePage() {
     if (file) {
       const reader = new FileReader()
       reader.onload = () => {
-        setTempImage(reader.result as string)
-        setCropOpen(true)
+        const result = reader.result as string;
+        if (targetPhotoIndex === 'profile') {
+          setTempImage(result)
+          setCropOpen(true)
+        } else {
+          // DIRECTLY UPDATE GALLERY (SKIP CROP)
+          const newPhotos = [...formData.additional_photos]
+          if (typeof targetPhotoIndex === 'number') {
+            newPhotos[targetPhotoIndex] = result
+          } else {
+            newPhotos.push(result)
+          }
+          setFormData({ ...formData, additional_photos: newPhotos.slice(0, 4) })
+        }
       }
       reader.readAsDataURL(file)
     }
@@ -115,14 +127,6 @@ export default function EditProfilePage() {
         const croppedBase64 = await getCroppedImg(tempImage, croppedAreaPixels)
         if (targetPhotoIndex === 'profile') {
           setFormData({ ...formData, photo_url: croppedBase64 })
-        } else {
-          const newPhotos = [...formData.additional_photos]
-          if (typeof targetPhotoIndex === 'number') {
-            newPhotos[targetPhotoIndex] = croppedBase64
-          } else {
-            newPhotos.push(croppedBase64)
-          }
-          setFormData({ ...formData, additional_photos: newPhotos.slice(0, 4) })
         }
         setCropOpen(false)
         setTempImage(null)
@@ -138,13 +142,11 @@ export default function EditProfilePage() {
     try {
       let finalPhotoUrl = formData.photo_url;
       
-      // 1. Upload Profile Photo if changed
       if (formData.photo_url.startsWith('data:image')) {
         const { blob } = base64ToBlob(formData.photo_url);
         finalPhotoUrl = await uploadProfilePhoto(blob, user.id);
       }
 
-      // 2. Upload Gallery Photos if changed
       const finalGalleryUrls: string[] = [];
       for (const p of formData.additional_photos) {
         if (p && p.startsWith('data:image')) {
@@ -169,7 +171,6 @@ export default function EditProfilePage() {
         updated_at: new Date().toISOString()
       };
 
-      // 3. Atomic DB Commit using UPSERT
       const { error: dbError } = await supabase
         .from('users')
         .upsert(updateData, { onConflict: 'uid' });
@@ -177,8 +178,6 @@ export default function EditProfilePage() {
       if (dbError) throw dbError;
 
       toast({ title: "Profile Updated Successfully" })
-      
-      // 4. Force Hard Refresh to bypass all caching and session state
       window.location.replace('/profile');
     } catch (error: any) {
       console.error("[Profile Save Crash]", error);

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, useRef, use } from "react"
@@ -48,6 +47,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   const remoteVideoRef = useRef<HTMLDivElement>(null)
   const billingTimer = useRef<NodeJS.Timeout | null>(null)
   const ringTimeout = useRef<NodeJS.Timeout | null>(null)
+  const joining = useRef(false)
 
   useEffect(() => {
     if (!partnerId) return
@@ -85,7 +85,6 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
       billingTimer.current = setInterval(async () => {
         setDuration(prev => {
           const next = prev + 1
-          // Billing Logic: Deduction at 11s (end of free preview) and then every 60s
           const isDeductionPoint = next === 11 || (next > 11 && (next - 11) % 60 === 0);
           if (isDeductionPoint) {
             deductCallCoinsAction(user.id, type, partnerId).then(res => {
@@ -103,7 +102,8 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     let mounted = true;
 
     const init = async () => {
-      if (typeof window === 'undefined' || !user?.id || !chatId) return
+      if (typeof window === 'undefined' || !user?.id || !chatId || joining.current) return
+      joining.current = true;
       
       try {
         const AgoraRTC = (await import('agora-rtc-sdk-ng')).default
@@ -112,21 +112,16 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
         rtc.current.client = client
 
-        // 2. Set up event listeners BEFORE joining (SDK Requirement)
+        // 2. Set up event listeners BEFORE joining
         client.on("user-published", async (user, mediaType) => {
           await client.subscribe(user, mediaType)
-          
           if (mediaType === "video") {
             setRemoteUser(user)
             setIsRinging(false)
-            // Small delay to ensure DOM is ready
             setTimeout(() => {
-              if (remoteVideoRef.current) {
-                user.videoTrack?.play(remoteVideoRef.current)
-              }
-            }, 150)
+              if (remoteVideoRef.current) user.videoTrack?.play(remoteVideoRef.current)
+            }, 200)
           }
-          
           if (mediaType === "audio") {
             user.audioTrack?.play()
             setIsRinging(false)
@@ -134,14 +129,8 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
           }
         })
 
-        client.on("user-unpublished", (user) => {
-          if (user.uid === remoteUser?.uid) {
-            setRemoteUser(null)
-          }
-        })
-
         client.on("user-left", () => {
-          handleEndCall(false)
+          if (mounted) handleEndCall(false)
         })
 
         // 3. Generate Token and Join
@@ -167,18 +156,17 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
           return;
         }
 
-        // 5. Display local video if applicable
         if (localVideoRef.current && videoTrack) {
           videoTrack.play(localVideoRef.current)
         }
 
-        // 6. Publish
         await client.publish(videoTrack ? [audioTrack, videoTrack] : [audioTrack])
         setJoined(true)
-
       } catch (err) {
         console.error("Agora Init Error:", err)
         if (mounted) router.replace('/home')
+      } finally {
+        joining.current = false;
       }
     }
 
@@ -196,17 +184,14 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   const handleEndCall = async (manual = true) => {
     const { client, localAudioTrack, localVideoTrack } = rtc.current;
     
-    // Cleanup tracks
     if (localAudioTrack) { localAudioTrack.stop(); localAudioTrack.close(); rtc.current.localAudioTrack = null; }
     if (localVideoTrack) { localVideoTrack.stop(); localVideoTrack.close(); rtc.current.localVideoTrack = null; }
     
-    // Leave channel
     if (client) { 
       try { await client.leave() } catch (e) {} 
       rtc.current.client = null;
     }
 
-    // Inform server
     if (manual && callId) { 
       await endCallAction(callId) 
     }
