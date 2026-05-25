@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -103,7 +102,7 @@ export async function completeOnboardingAction(payload: {
 
     if (profileErr) throw profileErr;
 
-    // Initialize Balance
+    // Initialize Balance with atomic reward
     await supabase.from('balances').upsert({ 
       user_id: payload.uid, 
       coins: initialCoins, 

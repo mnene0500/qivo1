@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo, use, useState, useEffect, useRef } from "react"
@@ -231,7 +230,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="bg-black text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-md flex items-center gap-2"><span>{profile.gender === 'female' ? '♀' : '♂'}</span><span>{age} Years</span></div>
-            <button onClick={handleCopyId} className="bg-gray-50 hover:bg-gray-100 text-gray-400 px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border border-gray-100 flex items-center gap-1.5 active:scale-95 transition-all">ID: {profile.match_flow_id || "---"}{copied ? <Check className="w-2 e-2 text-green-500" /> : <Copy className="w-2 h-2 opacity-30" />}</button>
+            <button onClick={handleCopyId} className="bg-gray-50 hover:bg-gray-100 text-gray-400 px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border border-gray-100 flex items-center gap-1.5 active:scale-95 transition-all">ID: {profile.match_flow_id || "---"}{copied ? <Check className="w-2 h-2 text-green-500" /> : <Copy className="w-2 h-2 opacity-30" />}</button>
           </div>
         </div>
 
