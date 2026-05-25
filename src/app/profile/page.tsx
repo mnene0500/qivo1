@@ -1,10 +1,11 @@
+
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Settings, ChevronRight, Copy, Check, BadgeCheck, Headphones, Pencil, Gem, Loader2, Award, Briefcase, UserPlus, Wallet, Shield, PlusCircle, LogOut, Flag } from "lucide-react"
+import { Settings, ChevronRight, Copy, Check, BadgeCheck, Headphones, Pencil, Gem, Loader2, Award, Briefcase, UserPlus, Wallet, Shield, PlusCircle, LogOut, Flag, UserCheck } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -15,6 +16,10 @@ import { createAgencyAction, joinAgencyAction, leaveAgencyAction } from "@/app/a
 import { useBalance } from "@/lib/providers/BalanceProvider"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
+/**
+ * @fileOverview Refined Profile (Me) Screen.
+ * Fixed Owner account crashes and added the Identity Verification button.
+ */
 export default function MePage() {
   const router = useRouter()
   const { user, loading: authLoading, isInitialized } = useUser()
@@ -31,16 +36,23 @@ export default function MePage() {
 
   const fetchProfile = useCallback(async () => {
     if (!user?.id) return
-    const { data } = await supabase
-      .from('users')
-      .select('uid, name, photo_url, match_flow_id, is_verified, is_owner, is_coin_seller, is_agent, gender, agency_id, agency_status, updated_at')
-      .eq('uid', user.id)
-      .maybeSingle();
-    
-    if (data) {
-      setProfile(data)
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('uid, name, photo_url, match_flow_id, is_verified, is_owner, is_coin_seller, is_agent, gender, agency_id, agency_status, updated_at')
+        .eq('uid', user.id)
+        .maybeSingle();
+      
+      if (data) {
+        setProfile(data)
+      } else if (error) {
+        console.error("Profile fetch error:", error.message)
+      }
+    } catch (e) {
+      console.error("Profile catch:", e)
+    } finally {
+      setIsReady(true)
     }
-    setIsReady(true)
   }, [user?.id])
 
   useEffect(() => {
@@ -49,6 +61,14 @@ export default function MePage() {
     }
     if (user?.id) fetchProfile()
   }, [user, isInitialized, authLoading, fetchProfile, router])
+
+  const copyToClipboard = (text: string, setCopied: (val: boolean) => void) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast({ title: "Copied to clipboard" });
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   const handleJoinAgency = async () => {
     if (!user || !agencyCode) return
@@ -89,14 +109,6 @@ export default function MePage() {
     setIsProcessing(false)
   }
 
-  const copyToClipboard = (text: string, setCopied: (val: boolean) => void) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast({ title: "Copied to clipboard" });
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   if (!isReady || authLoading) return (
     <div className="fixed inset-0 bg-white flex items-center justify-center select-none z-[9999]">
        <h1 className="text-7xl font-logo font-black text-[#00A2FF] tracking-tight animate-pulse">
@@ -110,6 +122,7 @@ export default function MePage() {
   const isAgent = profile?.is_agent === true
   const isFemale = profile?.gender === 'female'
   const isAgencyMember = profile?.agency_status === 'approved'
+  const isVerified = profile?.is_verified === true
   
   // Safe Image URL with fallback for manually created accounts
   const displayPhoto = profile?.photo_url || "https://picsum.photos/seed/qivo/400/400"
@@ -137,7 +150,7 @@ export default function MePage() {
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-1.5">
             {profile?.name || "User"} 
-            {profile?.is_verified && <BadgeCheck className="w-4 h-4 text-white fill-blue-500" />}
+            {isVerified && <BadgeCheck className="w-4 h-4 text-white fill-blue-500" />}
           </h2>
           <p onClick={() => copyToClipboard(profile?.match_flow_id, setIdCopied)} className="text-white/70 font-semibold text-[9px] uppercase tracking-widest mt-1 cursor-pointer active:opacity-50 transition-opacity">
             ID: {profile?.match_flow_id || "---"} {idCopied ? <Check className="w-2.5 h-2.5 inline text-green-300" /> : <div className="inline-block"><Copy className="w-2.5 h-2.5 opacity-50" /></div>}
@@ -155,6 +168,25 @@ export default function MePage() {
               <span className="text-[8px] font-black uppercase opacity-60">Diamonds</span>
             </Button>
           </div>
+
+          {/* VERIFICATION SECTION */}
+          {!isVerified && (
+            <section className="space-y-3">
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Trust & Verification</h3>
+              <div className="bg-white rounded-3xl p-2 shadow-sm border border-black/5 overflow-hidden">
+                <Button variant="ghost" className="h-16 w-full justify-between px-5 rounded-none" onClick={() => router.push('/verify-identity')}>
+                  <div className="flex items-center gap-4">
+                    <div className="bg-blue-50 p-2.5 rounded-xl"><UserCheck className="w-5 h-5 text-[#00A2FF]" /></div>
+                    <div className="flex flex-col items-start">
+                       <span className="font-semibold text-xs text-black">Verify Identity</span>
+                       <span className="text-[8px] font-bold text-[#00A2FF] uppercase tracking-tighter">Get Verified Badge</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                </Button>
+              </div>
+            </section>
+          )}
 
           {isMerchant && (
             <section className="space-y-3">

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -78,9 +79,6 @@ export async function deleteUserCompletelyAction(uid: string) {
       supabase.from('balances').delete().eq('user_id', uid)
     ]);
 
-    // 2. Unlink from chats participant lists (Complex logic avoided for prototype)
-    // In a full production app, we would use an RPC to filter participant_ids array.
-
     // 3. Delete Profile
     const { error: profileErr } = await supabase.from('users').delete().eq('uid', uid);
     if (profileErr) throw profileErr;
@@ -88,8 +86,7 @@ export async function deleteUserCompletelyAction(uid: string) {
     // 4. Delete Auth record LAST
     const { error: authErr } = await supabase.auth.admin.deleteUser(uid);
     if (authErr) {
-      console.warn("[Delete Auth] User record in public.users is gone, but Auth deletion failed:", authErr.message);
-      // We still return success if the database is clean, as the user can no longer log into their profile
+      console.warn("[Delete Auth] Auth deletion failed (user record gone):", authErr.message);
     }
     
     return { success: true };
@@ -135,8 +132,6 @@ export async function toggleUserRoleAction(ownerUid: string, targetMatchFlowId: 
     const { data: owner } = await supabase.from('users').select('is_owner').eq('uid', ownerUid).single();
     if (!owner?.is_owner) throw new Error("Unauthorized");
 
-    const { error } = await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchMatchFlowId);
-    // Note: The variable name above should match your implementation, usually targetMatchFlowId
     const { error: updateErr } = await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchFlowId);
     if (updateErr) throw updateErr;
 
