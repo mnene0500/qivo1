@@ -74,6 +74,11 @@ function ChatsContent() {
   const [isGifting, setIsGifting] = useState(false)
   const [giftDialogOpen, setGiftDialogOpen] = useState(false)
 
+  // Long Press Logic for Deletion from List
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const isLongPress = useRef(false)
+
   const fetchSummaries = useCallback(async () => {
     if (!currentUser?.id) return
     const { data: chatsData } = await supabase
@@ -195,7 +200,7 @@ function ChatsContent() {
     const res = await clearChatAction(currentUser.id, targetId)
     if (res.success) {
       toast({ title: "Chat Deleted" })
-      if (!id) { 
+      if (!id || id === chatId) { 
         setMessages([]); 
         router.push("/chats") 
       }
@@ -219,6 +224,32 @@ function ChatsContent() {
     }
   }
 
+  // Long press handler functions
+  const handleTouchStart = (id: string) => {
+    isLongPress.current = false
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true
+      setDeletingChatId(id)
+    }, 700)
+  }
+
+  const handleTouchEnd = (partnerId: string) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+    if (!isLongPress.current) {
+      router.push(`/chats?startWith=${partnerId}`)
+    }
+  }
+
+  const handleTouchMove = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
   // Bidirectional Block Logic
   const isBidirectionalBlocked = partnerProfile && (
     (partnerProfile.blocking || []).includes(currentUser?.id) || 
@@ -239,7 +270,13 @@ function ChatsContent() {
             <p className="font-bold text-xs uppercase tracking-widest">No conversations</p>
           </div>
         ) : chatSummaries.map(s => (
-          <div key={s.id} onClick={() => router.push(`/chats?startWith=${s.partner_id}`)} className="p-5 flex items-center gap-4 active:bg-gray-50 border-b border-gray-50 transition-colors">
+          <div 
+            key={s.id} 
+            onPointerDown={() => handleTouchStart(s.id)}
+            onPointerUp={() => handleTouchEnd(s.partner_id)}
+            onPointerMove={handleTouchMove}
+            className="p-5 flex items-center gap-4 active:bg-gray-50 border-b border-gray-50 transition-colors cursor-pointer touch-none"
+          >
             <div className="relative">
               <Avatar className="w-14 h-14 border"><AvatarImage src={s.partner_photo} className="object-cover" /><AvatarFallback>{s.partner_name[0]}</AvatarFallback></Avatar>
               {s.unread_count > 0 && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm">{s.unread_count}</div>}
@@ -257,6 +294,30 @@ function ChatsContent() {
           </div>
         ))}
       </main>
+
+      {/* GLOBAL LONG PRESS DELETE DIALOG */}
+      <AlertDialog open={!!deletingChatId} onOpenChange={(open) => !open && setDeletingChatId(null)}>
+        <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none shadow-2xl">
+          <AlertDialogHeader className="items-center text-center">
+            <AlertDialogTitle className="text-xl font-bold">Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs uppercase font-bold tracking-widest text-gray-400">
+              This will clear your message history with this user.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">
+            <AlertDialogCancel className="flex-1 h-14 rounded-full bg-gray-50 border-none">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (deletingChatId) handleClearChat(deletingChatId);
+                setDeletingChatId(null);
+              }} 
+              className="flex-1 h-14 rounded-full bg-red-500 text-white shadow-lg shadow-red-100"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 
