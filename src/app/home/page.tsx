@@ -44,7 +44,6 @@ export default function HomePage() {
   const [profile, setProfile] = useState<any>(null)
   
   const hasFetched = useRef(false)
-  const currentUserId = useRef<string | null>(null)
 
   const fetchUsers = useCallback(async (isManual = false) => {
     if (!profile) return;
@@ -78,7 +77,6 @@ export default function HomePage() {
     }
   }, [currentUser?.id, profile, activeTab]);
 
-  // Handle Onboarding Redirect & Profile State
   useEffect(() => {
     if (isInitialized && currentUser && !profile) {
       supabase.from('users').select('uid, gender, country, onboarding_complete').eq('uid', currentUser.id).single()
@@ -92,7 +90,6 @@ export default function HomePage() {
     }
   }, [isInitialized, currentUser, router, profile, authLoading]);
 
-  // Stabilized Fetch Trigger
   useEffect(() => {
     if (profile && !hasFetched.current) {
       fetchUsers();
@@ -103,7 +100,7 @@ export default function HomePage() {
   const handleTabChange = (tab: 'Recommend' | 'Nearby') => {
     if (activeTab === tab) return
     setActiveTab(tab)
-    hasFetched.current = false // Allow one fetch for new tab
+    hasFetched.current = false 
   }
 
   if (authLoading || !isInitialized) return (
@@ -119,7 +116,7 @@ export default function HomePage() {
       <div className="bg-[#00A2FF] pt-6 pb-2 relative shadow-lg">
         <div className="px-4 grid grid-cols-2 gap-3 mb-4">
           <button onClick={() => router.push('/mystery-note')} className="h-28 bg-purple-600 border border-white/20 rounded-[1.5rem] p-4 flex flex-col items-start justify-center gap-1 active:scale-95 transition-all text-white shadow-lg">
-            <FileText className="w-5 h-5 mb-1" /><p className="text-sm font-black">Mystery Note</p>
+            <FileText className="w-5 h-5 mb-1" /><p className="text-sm font-black">Message Blast</p>
           </button>
           <button onClick={() => router.push('/tasks')} className="h-28 bg-blue-900 border border-white/20 rounded-[1.5rem] p-4 flex flex-col items-start justify-center gap-1 active:scale-95 transition-all text-white shadow-lg">
             <Target className="w-5 h-5 mb-1" /><p className="text-sm font-black">Task Center</p>
@@ -129,11 +126,7 @@ export default function HomePage() {
         <div className="sticky top-0 z-50 bg-[#00A2FF] px-6 py-4 flex items-center justify-between border-t border-white/10">
           <div className="flex items-center gap-8">
             {(['Recommend', 'Nearby'] as const).map((tab) => (
-              <button 
-                key={tab} 
-                onClick={() => handleTabChange(tab)} 
-                className={cn("text-sm font-black transition-all relative pb-2", activeTab === tab ? "text-white" : "text-white/40")}
-              >
+              <button key={tab} onClick={() => handleTabChange(tab)} className={cn("text-sm font-black transition-all relative pb-2", activeTab === tab ? "text-white" : "text-white/40")}>
                 {tab}
                 {activeTab === tab && <div className="absolute -bottom-1 left-0 right-0 h-1 bg-white rounded-full animate-in zoom-in" />}
               </button>

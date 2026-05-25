@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -15,10 +15,6 @@ import { createAgencyAction, joinAgencyAction, leaveAgencyAction } from "@/app/a
 import { useBalance } from "@/lib/providers/BalanceProvider"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 
-/**
- * @fileOverview Refined Me Page.
- * Removed avatar border for a cleaner, unified profile look.
- */
 export default function MePage() {
   const router = useRouter()
   const { user, loading: authLoading, isInitialized } = useUser()
@@ -26,12 +22,12 @@ export default function MePage() {
   const { coins, diamonds } = useBalance();
   
   const [idCopied, setIdCopied] = useState(false)
-  const [agencyCopied, setAgencyCopied] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [isReady, setIsReady] = useState(false)
   const [agencyCode, setAgencyCode] = useState("")
   const [agencyName, setAgencyName] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
+  const fetchGuard = useRef(false)
 
   const fetchProfile = useCallback(async () => {
     if (!user?.id) return
@@ -46,8 +42,14 @@ export default function MePage() {
   }, [user?.id])
 
   useEffect(() => {
-    if (isInitialized && !authLoading && !user) router.replace("/welcome")
-    if (user?.id) fetchProfile()
+    if (isInitialized && !authLoading && !user) {
+        router.replace("/welcome")
+        return
+    }
+    if (user?.id && !fetchGuard.current) {
+        fetchProfile()
+        fetchGuard.current = true
+    }
   }, [user, isInitialized, authLoading, fetchProfile, router])
 
   const copyToClipboard = (text: string, setCopied: (val: boolean) => void) => {
@@ -119,7 +121,7 @@ export default function MePage() {
             <div className="relative w-28 h-28 rounded-full overflow-hidden bg-white shadow-xl">
               <Image src={`${displayPhoto}?t=${cacheBust}`} alt={profile?.name || "Me"} fill className="object-cover" sizes="112px" />
             </div>
-            <button className="absolute bottom-1 right-1 bg-white p-2.5 rounded-full shadow-lg border border-blue-50 active:scale-90 transition-transform" onClick={() => router.push('/edit-profile')}>
+            <button className="absolute bottom-1 right-1 bg-white p-2.5 rounded-full shadow-lg active:scale-90 transition-transform" onClick={() => router.push('/edit-profile')}>
               <Pencil className="w-4 h-4 text-[#00A2FF]" />
             </button>
           </div>
@@ -145,14 +147,14 @@ export default function MePage() {
 
           {!isVerified && (
             <section className="space-y-3">
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Trust & Verification</h3>
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identity Trust</h3>
               <div className="bg-white rounded-3xl p-2 shadow-sm border border-black/5 overflow-hidden">
                 <Button variant="ghost" className="h-16 w-full justify-between px-5 rounded-none" onClick={() => router.push('/verify-identity')}>
                   <div className="flex items-center gap-4">
                     <div className="bg-blue-50 p-2.5 rounded-xl"><UserCheck className="w-5 h-5 text-[#00A2FF]" /></div>
                     <div className="flex flex-col items-start">
-                       <span className="font-semibold text-xs text-black">Verify Identity</span>
-                       <span className="text-[8px] font-bold text-[#00A2FF] uppercase tracking-tighter">Get Verified Badge</span>
+                       <span className="font-semibold text-xs text-black">Verify My Face</span>
+                       <span className="text-[8px] font-bold text-[#00A2FF] uppercase tracking-tighter">Get Trusted Badge</span>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300" />

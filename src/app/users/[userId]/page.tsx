@@ -32,7 +32,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
     if (!profile?.match_flow_id) return
     navigator.clipboard.writeText(profile.match_flow_id)
     setIdCopied(true)
-    toast({ title: "ID Copied to clipboard" })
+    toast({ title: "ID Copied" })
     setTimeout(() => setIdCopied(false), 2000)
   }
 
