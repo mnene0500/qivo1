@@ -114,9 +114,10 @@ export async function completeOnboardingAction(payload: {
 export async function deleteUserCompletelyAction(uid: string) {
   const supabase = getSupabaseAdmin();
   try {
-    // 1. Manually clear blocking relations and reports to prevent foreign key errors
+    // 1. Manually clear blocking relations, reports, and calls to prevent foreign key errors
     await Promise.all([
       supabase.from('reports').delete().or(`reporter_id.eq.${uid},reported_id.eq.${uid}`),
+      supabase.from('calls').delete().or(`caller_id.eq.${uid},receiver_id.eq.${uid}`),
       supabase.from('chats').delete().contains('participant_ids', [uid]),
       supabase.from('withdrawals').delete().eq('user_id', uid)
     ]);
@@ -314,12 +315,15 @@ export async function reviewRecruitmentAction(applicantUid: string, status: 'app
   try {
     if (status === 'rejected') {
       // Clear agency ID and status completely so they can apply elsewhere
-      await supabase.from('users').update({ agency_id: null, agency_status: null }).eq('uid', applicantUid);
+      const { error } = await supabase.from('users').update({ agency_id: null, agency_status: null }).eq('uid', applicantUid);
+      if (error) throw error;
     } else {
-      await supabase.from('users').update({ agency_status: status }).eq('uid', applicantUid);
+      const { error } = await supabase.from('users').update({ agency_status: status }).eq('uid', applicantUid);
+      if (error) throw error;
     }
     return { success: true };
   } catch (err: any) {
+    console.error("[Agency Review Error]:", err.message);
     return { success: false, error: err.message };
   }
 }
@@ -327,7 +331,8 @@ export async function reviewRecruitmentAction(applicantUid: string, status: 'app
 export async function updateWithdrawalStatusAction(requestId: string, status: 'paid' | 'rejected') {
   const supabase = getSupabaseAdmin();
   try {
-    await supabase.from('withdrawals').update({ status }).eq('id', requestId);
+    const { error } = await supabase.from('withdrawals').update({ status }).eq('id', requestId);
+    if (error) throw error;
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -421,7 +426,7 @@ export async function sendMysteryNoteAction(user_id: string, message: string, re
       await supabase.from('messages').insert({ chat_id: chatId, sender_id: user_id, text: message, timestamp: ts });
     }
     
-    await supabase.from('coin_history').insert({ user_id: amount: -cost, type: 'mystery_note', description: `Blast to ${targets.length} users`, timestamp: ts });
+    await supabase.from('coin_history').insert({ user_id, amount: -cost, type: 'mystery_note', description: `Blast to ${targets.length} users`, timestamp: ts });
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

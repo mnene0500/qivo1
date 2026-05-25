@@ -52,7 +52,6 @@ export default function AgencyManagePage() {
       setProfile(p)
       const aid = p.agency_id
       if (aid) {
-        // Fetch all relevant data for the agency
         const [apps, mems, withs] = await Promise.all([
           supabase.from('users').select('*').eq('agency_id', aid).eq('agency_status', 'pending'),
           supabase.from('users').select('*').eq('agency_id', aid).eq('agency_status', 'approved'),
@@ -72,7 +71,6 @@ export default function AgencyManagePage() {
 
     if (!user?.id) return
 
-    // REALTIME: Listen for new agency activity
     const channel = supabase.channel(`agency-center-live`)
       .on('postgres_changes', { event: '*', table: 'users' }, () => fetchData())
       .on('postgres_changes', { event: '*', table: 'withdrawals' }, () => fetchData())
@@ -83,22 +81,38 @@ export default function AgencyManagePage() {
 
   const handleReview = async (applicantUid: string, status: 'approved' | 'rejected') => {
     if (!user) return
-    const res = await reviewRecruitmentAction(applicantUid, status)
-    if (res.success) {
-      toast({ title: status === 'approved' ? "Member Approved" : "Applicant Rejected" })
-      fetchData() // Immediate local refresh
+    setIsProcessing(true)
+    try {
+      const res = await reviewRecruitmentAction(applicantUid, status)
+      if (res.success) {
+        toast({ title: status === 'approved' ? "Member Approved" : "Applicant Rejected" })
+        await fetchData() 
+      } else {
+        toast({ variant: "destructive", title: "Error", description: res.error })
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "System Error" })
+    } finally {
+      setIsProcessing(false)
     }
   }
 
   const handleWithdrawalReview = async (requestId: string, status: 'paid' | 'rejected') => {
     if (!user || !profile?.agency_id) return
     setIsProcessing(true)
-    const res = await updateWithdrawalStatusAction(requestId, status)
-    if (res.success) {
-      toast({ title: `Payout marked as ${status}` })
-      fetchData() // Immediate local refresh
+    try {
+      const res = await updateWithdrawalStatusAction(requestId, status)
+      if (res.success) {
+        toast({ title: `Payout marked as ${status}` })
+        await fetchData()
+      } else {
+        toast({ variant: "destructive", title: "Error", description: res.error })
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "System Error" })
+    } finally {
+      setIsProcessing(false)
     }
-    setIsProcessing(false)
   }
 
   if (loading) return <div className="flex-1 flex items-center justify-center bg-white min-h-screen"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
@@ -126,8 +140,8 @@ export default function AgencyManagePage() {
               <div key={app.uid} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl animate-in fade-in slide-in-from-right-4">
                 <div className="flex items-center gap-3"><Avatar className="w-10 h-10"><AvatarImage src={app.photo_url} /><AvatarFallback><User /></AvatarFallback></Avatar><span className="font-bold text-sm">{app.name}</span></div>
                 <div className="flex gap-2">
-                  <Button size="icon" onClick={() => handleReview(app.uid, 'approved')} className="bg-green-500 rounded-full h-9 w-9 shadow-lg shadow-green-100"><Check className="w-4 h-4 text-white" /></Button>
-                  <Button size="icon" onClick={() => handleReview(app.uid, 'rejected')} variant="outline" className="border-red-200 text-red-500 rounded-full h-9 w-9"><X className="w-4 h-4" /></Button>
+                  <Button size="icon" disabled={isProcessing} onClick={() => handleReview(app.uid, 'approved')} className="bg-green-500 rounded-full h-9 w-9 shadow-lg shadow-green-100"><Check className="w-4 h-4 text-white" /></Button>
+                  <Button size="icon" disabled={isProcessing} onClick={() => handleReview(app.uid, 'rejected')} variant="outline" className="border-red-200 text-red-500 rounded-full h-9 w-9"><X className="w-4 h-4" /></Button>
                 </div>
               </div>
             ))}
