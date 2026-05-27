@@ -32,43 +32,37 @@
     @apply border-border;
   }
 
-  html {
-    scroll-behavior: smooth;
-    -webkit-user-select: none;
-    user-select: none;
+  html, body {
     height: 100%;
-    overscroll-behavior-y: none;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  html::-webkit-scrollbar,
-  body::-webkit-scrollbar {
-    display: none;
+    overflow: hidden; /* Prevents global page scroll */
+    background-color: white;
   }
 
   body {
     @apply bg-background text-foreground font-body antialiased;
-    overscroll-behavior-y: none;
     -webkit-user-select: none;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
-    min-height: 100vh;
-    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    position: fixed; /* Extra lock for mobile viewports */
+    width: 100%;
+    overscroll-behavior: none;
   }
 
   input, textarea {
     -webkit-user-select: auto;
     user-select: auto;
   }
-
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-headline;
-  }
 }
 
+/* 
+  Native-tier transitions: 
+  Applied to the scrolling content container only.
+*/
 .native-page-transition {
   animation: pageEnter 0.15s cubic-bezier(0.2, 0, 0, 1) forwards;
+  will-change: transform, opacity;
 }
 
 @keyframes pageEnter {
@@ -89,27 +83,4 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
-
-.premium-shadow {
-  box-shadow: 0 20px 40px -15px rgba(0, 162, 255, 0.12);
-}
-
-.liquid-elastic-transition {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.bubble-enter {
-  animation: bubbleEnter 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) backwards;
-}
-
-@keyframes bubbleEnter {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
 }

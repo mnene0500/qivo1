@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -53,7 +52,6 @@ export default function HomePage() {
   
   const hasFetched = useRef(false)
 
-  // fetchUsers overhauled to accept tab directly to prevent race conditions
   const fetchUsers = useCallback(async (pageNum = 0, isManual = false, targetTab?: 'Recommend' | 'Nearby') => {
     if (!profile) return;
     
@@ -78,8 +76,6 @@ export default function HomePage() {
         query = query.eq('gender', oppositeGender);
       }
       
-      // RECOMMEND: No country filter
-      // NEARBY: Strict country filter
       if (currentTab === 'Nearby' && profile.country) {
         query = query.eq('country', profile.country);
       }
@@ -115,7 +111,6 @@ export default function HomePage() {
     }
   }, [currentUser?.id, profile, activeTab]);
 
-  // Handle Profile Load
   useEffect(() => {
     if (isInitialized && currentUser && !profile) {
       supabase.from('users').select('uid, gender, country, onboarding_complete').eq('uid', currentUser.id).single()
@@ -129,7 +124,6 @@ export default function HomePage() {
     }
   }, [isInitialized, currentUser, router, profile, authLoading]);
 
-  // Initial Data Fetch
   useEffect(() => {
     if (profile && !hasFetched.current) {
       if (cachedUsers.length === 0) {
@@ -145,7 +139,6 @@ export default function HomePage() {
     cachedTab = tab;
     setPage(0);
     cachedPage = 0;
-    // Pass tab directly to bypass async state update lag
     fetchUsers(0, true, tab);
   }
 
@@ -157,9 +150,12 @@ export default function HomePage() {
   if (authLoading || !isInitialized) return null;
 
   return (
-    <div className="flex-1 bg-white min-h-screen relative select-none">
-      {/* TOP ACTIONS - SCROLLS AWAY */}
-      <div className="px-4 grid grid-cols-2 gap-3 py-5 bg-[#00A2FF]">
+    <div className="flex flex-col w-full bg-white">
+      {/* 
+         TOP HEADER AREA: 
+         These buttons scroll away as they are part of the normal flow.
+      */}
+      <div className="px-4 grid grid-cols-2 gap-3 py-5 bg-[#00A2FF] shrink-0">
         <button onClick={() => router.push('/mystery-note')} className="h-24 bg-purple-600 border border-white/20 rounded-2xl p-5 flex flex-col items-start justify-center gap-1 active:scale-95 transition-all text-white shadow-xl">
           <FileText className="w-5 h-5 mb-1" />
           <p className="text-[10px] font-black uppercase tracking-widest leading-none">Message Blast</p>
@@ -170,8 +166,11 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* STICKY TAB BAR - FIXED AT TOP OF SCROLL */}
-      <div className="sticky top-0 z-50 bg-[#00A2FF] px-6 py-4 flex items-center justify-between border-b border-white/10 shadow-md">
+      {/* 
+         STICKY TAB BAR: 
+         Locks to top-0 of the AppShell's scrolling area.
+      */}
+      <div className="sticky top-0 z-40 bg-[#00A2FF] px-6 py-4 flex items-center justify-between border-b border-white/10 shadow-md">
         <div className="flex items-center gap-8">
           {(['Recommend', 'Nearby'] as const).map((tab) => (
             <button key={tab} onClick={() => handleTabChange(tab)} className={cn("text-sm font-black transition-all relative pb-1 uppercase tracking-widest", activeTab === tab ? "text-white" : "text-white/40")}>
@@ -185,12 +184,16 @@ export default function HomePage() {
         </button>
       </div>
 
-      <main className="px-3 pt-4 pb-32">
+      {/* 
+         USER GRID: 
+         Content flows behind the fixed BottomNav (handled by AppShell padding).
+      */}
+      <main className="px-3 pt-4">
         {users.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-3">
               {users.map((u) => (
-                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-3xl shadow-lg bg-gray-50 active:scale-95 transition-all cursor-pointer group" onClick={() => router.push(`/users/${u.uid}`)}>
+                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-3xl shadow-lg bg-gray-50 active:scale-95 transition-all cursor-pointer" onClick={() => router.push(`/users/${u.uid}`)}>
                   <Image src={`${u.photo_url}?t=${u.updated_at}`} alt={u.name} fill className="object-cover" sizes="50vw" priority />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-4 text-white flex flex-col gap-3">
@@ -218,7 +221,7 @@ export default function HomePage() {
                   onClick={handleLoadMore} 
                   disabled={isLoadingMore} 
                   variant="outline" 
-                  className="rounded-full border-gray-100 font-black text-[10px] uppercase tracking-widest h-14 px-12 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+                  className="rounded-full border-gray-100 font-black text-[10px] uppercase tracking-widest h-14 px-12 shadow-sm hover:bg-gray-50"
                 >
                   {isLoadingMore ? <Loader2 className="w-4 h-4 animate-spin text-[#00A2FF]" /> : "Show More Users"}
                 </Button>

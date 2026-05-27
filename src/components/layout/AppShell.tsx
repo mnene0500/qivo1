@@ -6,37 +6,45 @@ import { Suspense } from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * @fileOverview Signaling Shell.
- * Optimized for native feel and fixed navigation.
- * Fixed: BottomNav is now outside the transition container to prevent scrolling away.
+ * @fileOverview Viewport-Centric App Shell.
+ * Ensures persistent UI (BottomNav) stays fixed while content scrolls independently.
  */
 function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
+  // Logic to determine if global nav should be shown
   const isChatDetail = pathname === '/chats' && searchParams.has('startWith')
-  const isVisible = ['/home', '/chats', '/profile'].includes(pathname || "") && !isChatDetail
+  const isCall = pathname?.startsWith('/call/')
+  const isWelcome = pathname === '/welcome'
+  const isAuth = pathname === '/auth'
+  
+  const showNav = ['/home', '/chats', '/profile', '/explore'].includes(pathname || "") && !isChatDetail && !isCall && !isWelcome && !isAuth
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
-      {/* WRAP CHILDREN IN TRANSITION CONTAINER */}
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-white">
+      {/* 
+        MAIN CONTENT AREA: 
+        This is the ONLY area that scrolls. Everything else (BottomNav) 
+        stays perfectly still.
+      */}
       <main className={cn(
-        "flex-1 flex flex-col relative z-0",
-        isVisible && "pb-20", // Prevent content from being hidden behind BottomNav
+        "flex-1 w-full overflow-y-auto overflow-x-hidden relative z-0 no-scrollbar pb-[env(safe-area-inset-bottom)]",
+        showNav && "pb-24", // Spacing for BottomNav
         "native-page-transition"
       )}>
         {children}
       </main>
       
-      {/* NAVIGATION BAR - FIXED OUTSIDE MAIN SCROLL */}
-      {isVisible && <BottomNav />}
+      {/* FIXED NAVIGATION: Outside of scroll area */}
+      {showNav && <BottomNav />}
     </div>
   )
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<div className="flex-1 bg-white" />}>
+    <Suspense fallback={<div className="flex-1 bg-white h-screen" />}>
       <ShellContent>
         {children}
       </ShellContent>

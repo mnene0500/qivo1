@@ -61,8 +61,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
   const allPhotos = Array.from(new Set([profile.photo_url, ...(profile.additional_photos || [])].filter(Boolean)));
 
   return (
-    <div className="flex-1 bg-white flex flex-col min-h-screen pb-32 select-none overflow-x-hidden">
-      <div className="relative h-[55vh] w-full overflow-hidden">
+    <div className="flex flex-col w-full bg-white pb-32 relative">
+      {/* 
+         SCROLLABLE CONTENT: 
+         Profile photos and details scroll normally.
+      */}
+      <div className="relative h-[55vh] w-full overflow-hidden shrink-0">
         <Image src={profile.photo_url} alt={profile.name} fill className="object-cover" priority sizes="100vw" />
         <div className="absolute top-12 inset-x-0 px-6 flex justify-between items-center z-20">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full bg-white/10 backdrop-blur-xl text-white w-10 h-10 border border-white/20 shadow-2xl active:scale-90 transition-all"><ChevronLeft className="w-6 h-6" /></Button>
@@ -78,7 +82,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
         </div>
       </div>
 
-      <div className="relative z-10 bg-white px-6 pt-8 space-y-6 rounded-none">
+      <div className="px-6 pt-8 space-y-6">
         <div className="space-y-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -123,15 +127,20 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
           </section>
         )}
 
-        <div className="grid grid-cols-1 gap-2 pb-20">
+        <div className="grid grid-cols-1 gap-2 pb-10">
           <DetailItem icon={Globe} label="Region" value={profile.country || "Not specified"} color="bg-emerald-50 text-emerald-600" />
           <DetailItem icon={GraduationCap} label="Academic" value={profile.education_level || "Not specified"} color="bg-purple-50 text-purple-600" />
           <DetailItem icon={Heart} label="Intentions" value={profile.looking_for || "Exploring"} color="bg-rose-50 text-rose-600" />
         </div>
       </div>
 
-      {/* STRICTLY FIXED BOTTOM BUTTON */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/90 backdrop-blur-xl border-t border-black/5 z-[100] pb-[env(safe-area-inset-bottom,24px)]">
+      {/* 
+         STRICTLY FIXED BOTTOM FOOTER: 
+         Anchored to the bottom of the viewport using 'fixed'.
+         The z-index ensures it's above the scrollable content but 
+         the AppShell's BottomNav logic will handle the secondary layer.
+      */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/90 backdrop-blur-xl border-t border-black/5 z-[60] pb-[env(safe-area-inset-bottom,24px)]">
         <Button 
           className="w-full h-14 rounded-2xl bg-[#00A2FF] hover:bg-[#0081CC] text-white text-xs font-black flex items-center justify-center gap-2.5 shadow-xl uppercase tracking-[0.2em] active:scale-95 transition-all border-none" 
           onClick={() => router.push(`/chats?startWith=${profile.uid}`)}
