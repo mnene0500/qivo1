@@ -11,7 +11,7 @@ import { useUser } from "@/firebase/auth/use-user"
 
 /**
  * @fileOverview High-fidelity Fixed Bottom Navigation.
- * Locked at bottom=0 with high z-index to allow content to scroll behind.
+ * Truly fixed at the bottom with high z-index.
  */
 export function BottomNav() {
   const pathname = usePathname()
@@ -53,9 +53,9 @@ export function BottomNav() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-white border-t h-16 flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-white border-t h-16 flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.08)]">
       {navItems.map((item) => {
-        const isActive = pathname === item.href || (item.href === '/chats' && pathname?.startsWith('/chats'))
+        const isActive = pathname === item.href || (item.href === '/chats' && pathname === '/chats')
         
         return (
           <Link

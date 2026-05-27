@@ -55,9 +55,9 @@ const GIFTS = [
   { name: "Galaxy", icon: "🌌", price: 50000 },
 ]
 
-// GLOBAL CACHE to survive tab switches
 let cachedSummaries: ChatSummary[] = [];
-const PAGE_SIZE = 15;
+const SUMMARY_PAGE_SIZE = 15;
+const MESSAGE_PAGE_SIZE = 30;
 
 function ChatsContent() {
   const searchParams = useSearchParams()
@@ -67,28 +67,39 @@ function ChatsContent() {
   const { coins } = useBalance()
   const startWithId = searchParams.get("startWith")
   
+  // Chat List States
+  const [chatSummaries, setChatSummaries] = useState<ChatSummary[]>(cachedSummaries)
+  const [loadingSummaries, setLoadingSummaries] = useState(false)
+  const [summaryPage, setSummaryPage] = useState(0)
+  const [hasMoreSummaries, setHasMoreSummaries] = useState(true)
+
+  // Conversation States
   const [chatId, setChatId] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([])
-  const [chatSummaries, setChatSummaries] = useState<ChatSummary[]>(cachedSummaries)
   const [partnerProfile, setPartnerProfile] = useState<any>(null)
   const [activeChatClearedAt, setActiveChatClearedAt] = useState<number>(-1)
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [hasMoreMessages, setHasMoreMessages] = useState(true)
+  
+  // Gifting States
   const [isGifting, setIsGifting] = useState(false)
   const [giftDialogOpen, setGiftDialogOpen] = useState(false)
-  const [loadingSummaries, setLoadingSummaries] = useState(false)
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
 
+  // Delete State
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const isLongPress = useRef(false)
 
+  // --------------------------------------------------------------------------
+  // CHAT SUMMARIES LOGIC
+  // --------------------------------------------------------------------------
   const fetchSummaries = useCallback(async (pageNum = 0) => {
     if (!currentUser?.id) return
     if (pageNum === 0) setLoadingSummaries(true)
     
-    const from = pageNum * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    const from = pageNum * SUMMARY_PAGE_SIZE;
+    const to = from + SUMMARY_PAGE_SIZE - 1;
 
     const { data: chatsData } = await supabase
       .from('chats')
@@ -138,20 +149,22 @@ function ChatsContent() {
       setChatSummaries(enhanced);
       cachedSummaries = enhanced;
     } else {
-      setChatSummaries(prev => [...prev, ...enhanced]);
-      cachedSummaries = [...cachedSummaries, ...enhanced];
+      setChatSummaries(prev => {
+        const ids = new Set(prev.map(s => s.id));
+        const filtered = enhanced.filter(s => !ids.has(s.id));
+        return [...prev, ...filtered];
+      });
+      cachedSummaries = [...cachedSummaries, ...enhanced.filter(s => !new Set(cachedSummaries.map(x => x.id)).has(s.id))];
     }
     
-    setHasMore(chatsData.length === PAGE_SIZE);
-    setPage(pageNum);
+    setHasMoreSummaries(chatsData.length === SUMMARY_PAGE_SIZE);
+    setSummaryPage(pageNum);
     setLoadingSummaries(false);
   }, [currentUser?.id])
 
   useEffect(() => {
     if (currentUser?.id && !startWithId) {
-      if (cachedSummaries.length === 0) {
-        fetchSummaries(0)
-      }
+      if (cachedSummaries.length === 0) fetchSummaries(0)
       const channel = supabase.channel('chats_realtime_summaries')
         .on('postgres_changes', { event: '*', table: 'chats' }, () => fetchSummaries(0))
         .subscribe()
@@ -159,13 +172,50 @@ function ChatsContent() {
     }
   }, [currentUser?.id, startWithId, fetchSummaries])
 
+  // --------------------------------------------------------------------------
+  // CONVERSATION LOGIC (PAGINATED)
+  // --------------------------------------------------------------------------
+  const fetchMessagesBatch = useCallback(async (isLoadMore = false) => {
+    if (!chatId || activeChatClearedAt === -1 || loadingMessages) return;
+    if (isLoadMore && !hasMoreMessages) return;
+
+    setLoadingMessages(true);
+    
+    let query = supabase
+      .from('messages')
+      .select('id, text, sender_id, timestamp, is_gift')
+      .eq('chat_id', chatId)
+      .gt('timestamp', activeChatClearedAt)
+      .order('timestamp', { ascending: false })
+      .limit(MESSAGE_PAGE_SIZE);
+
+    if (isLoadMore && messages.length > 0) {
+      const oldestVisibleTimestamp = messages[messages.length - 1].timestamp;
+      query = query.lt('timestamp', oldestVisibleTimestamp);
+    }
+
+    const { data, error } = await query;
+
+    if (!error && data) {
+      if (isLoadMore) {
+        setMessages(prev => [...prev, ...data]);
+      } else {
+        setMessages(data);
+      }
+      setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE);
+    }
+    setLoadingMessages(false);
+  }, [chatId, activeChatClearedAt, messages, hasMoreMessages, loadingMessages]);
+
   useEffect(() => {
     if (currentUser?.id && startWithId) {
       const ids = [currentUser.id, startWithId].sort()
       const cId = `direct_${ids[0]}_${ids[1]}`
       setMessages([])
       setChatId(cId)
+      setHasMoreMessages(true);
       markChatAsReadAction(currentUser.id, cId);
+      
       Promise.all([
         supabase.from('users').select('uid, name, photo_url, is_verified').eq('uid', startWithId).maybeSingle(),
         supabase.from('chats').select('cleared_at').eq('id', cId).maybeSingle()
@@ -178,31 +228,23 @@ function ChatsContent() {
   }, [currentUser?.id, startWithId])
 
   useEffect(() => {
-    if (!chatId || activeChatClearedAt === -1) return
-    const fetchMessages = async () => {
-      const { data } = await supabase
-        .from('messages')
-        .select('id, text, sender_id, timestamp, is_gift')
-        .eq('chat_id', chatId)
-        .gt('timestamp', activeChatClearedAt)
-        .order('timestamp', { ascending: false })
-        .limit(40)
-      if (data) setMessages(data)
+    if (chatId && activeChatClearedAt !== -1) {
+      fetchMessagesBatch(false);
+      
+      const channel = supabase.channel(`messages:${chatId}`)
+        .on('postgres_changes', { event: 'INSERT', table: 'messages', filter: `chat_id=eq.${chatId}` }, (payload) => {
+          const newMsg = payload.new as Message
+          if (newMsg.timestamp <= activeChatClearedAt) return
+          setMessages(prev => {
+            const matched = prev.find(m => m.is_optimistic && Math.abs(m.timestamp - newMsg.timestamp) < 3000);
+            if (matched) return [newMsg, ...prev.filter(m => m.id !== matched.id)];
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [newMsg, ...prev];
+          });
+        }).subscribe()
+      return () => { supabase.removeChannel(channel) }
     }
-    fetchMessages()
-    const channel = supabase.channel(`messages:${chatId}`)
-      .on('postgres_changes', { event: 'INSERT', table: 'messages', filter: `chat_id=eq.${chatId}` }, (payload) => {
-        const newMsg = payload.new as Message
-        if (newMsg.timestamp <= activeChatClearedAt) return
-        setMessages(prev => {
-          const matched = prev.find(m => m.is_optimistic && Math.abs(m.timestamp - newMsg.timestamp) < 3000);
-          if (matched) return [newMsg, ...prev.filter(m => m.id !== matched.id)];
-          if (prev.some(m => m.id === newMsg.id)) return prev;
-          return [newMsg, ...prev];
-        });
-      }).subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [chatId, activeChatClearedAt])
+  }, [chatId, activeChatClearedAt]);
 
   const handleSendMessage = useCallback(async () => {
     const text = newMessage.trim()
@@ -214,7 +256,7 @@ function ChatsContent() {
     const res = await sendMessageAction({ chatId, senderId: currentUser.id, recipientId: startWithId, text });
     if (!res.success) {
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
-      toast({ variant: "destructive", title: "Error" })
+      toast({ variant: "destructive", title: res.error === 'insufficient_funds' ? "Insufficient Coins" : "Error" })
     }
   }, [chatId, currentUser?.id, newMessage, startWithId, toast]);
 
@@ -264,9 +306,12 @@ function ChatsContent() {
 
   if (authLoading || !isInitialized) return null;
 
+  // --------------------------------------------------------------------------
+  // RENDER CHAT LIST
+  // --------------------------------------------------------------------------
   if (!startWithId) return (
     <div className="flex-1 bg-white min-h-screen relative select-none animate-in fade-in duration-200">
-      <header className="px-6 h-16 flex items-center border-b sticky top-0 bg-white/90 backdrop-blur-md z-50">
+      <header className="px-6 h-16 flex items-center border-b sticky top-0 bg-white/90 backdrop-blur-md z-[100]">
         <h1 className="text-3xl font-logo text-[#00A2FF]">Chats</h1>
       </header>
       <main className="flex flex-col pb-32">
@@ -291,9 +336,9 @@ function ChatsContent() {
                 </div>
               </div>
             ))}
-            {hasMore && (
+            {hasMoreSummaries && (
               <div className="p-8 flex justify-center">
-                <Button variant="ghost" onClick={() => fetchSummaries(page + 1)} disabled={loadingSummaries} className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                <Button variant="ghost" onClick={() => fetchSummaries(summaryPage + 1)} disabled={loadingSummaries} className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                   {loadingSummaries ? <Loader2 className="animate-spin w-4 h-4" /> : "Load More Chats"}
                 </Button>
               </div>
@@ -314,9 +359,12 @@ function ChatsContent() {
     </div>
   )
 
+  // --------------------------------------------------------------------------
+  // RENDER CONVERSATION
+  // --------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-screen bg-white select-none overflow-hidden">
-      <header className="h-16 border-b flex items-center px-4 gap-4 bg-white z-50">
+      <header className="h-16 border-b flex items-center px-4 gap-4 bg-white z-[100] sticky top-0">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full"><ChevronLeft className="w-6 h-6 text-black" /></Button>
         <div className="flex items-center gap-3 flex-1 cursor-pointer active:opacity-70 transition-opacity min-w-0" onClick={() => router.push(`/users/${startWithId}`)}>
           <Avatar className="w-10 h-10 border shrink-0"><AvatarImage src={partnerProfile?.photo_url} className="object-cover" /><AvatarFallback>{partnerProfile?.name?.[0]}</AvatarFallback></Avatar>
@@ -332,12 +380,13 @@ function ChatsContent() {
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
+      
       <main className="flex-1 overflow-y-auto p-6 flex flex-col-reverse gap-4 bg-gray-50 no-scrollbar">
         {messages.map(m => {
           const isMe = m.sender_id === currentUser?.id;
           const gift = m.is_gift ? GIFTS.find(g => m.text.includes(g.name)) : null;
           return (
-            <div key={m.id} className={cn("max-w-[80%] p-4 rounded-[2rem] text-sm font-medium shadow-sm relative", 
+            <div key={m.id} className={cn("max-w-[80%] p-4 rounded-[2rem] text-sm font-medium shadow-sm relative animate-in fade-in slide-in-from-bottom-2", 
               isMe ? "bg-[#00A2FF] text-white self-end rounded-br-none" : "bg-white text-black self-start rounded-bl-none border",
               m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-600 text-white border-none p-6 flex flex-col items-center text-center gap-3"
             )}>
@@ -345,8 +394,17 @@ function ChatsContent() {
             </div>
           )
         })}
+
+        {hasMoreMessages && (
+          <div className="py-8 flex justify-center">
+             <Button variant="ghost" onClick={() => fetchMessagesBatch(true)} disabled={loadingMessages} className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+               {loadingMessages ? <Loader2 className="animate-spin w-4 h-4" /> : "Load older messages"}
+             </Button>
+          </div>
+        )}
       </main>
-      <footer className="p-4 border-t bg-white pb-[env(safe-area-inset-bottom)]">
+
+      <footer className="p-4 border-t bg-white pb-[env(safe-area-inset-bottom)] z-[100] sticky bottom-0">
         <div className="flex items-center gap-2">
           <Dialog open={giftDialogOpen} onOpenChange={setGiftDialogOpen}>
             <DialogTrigger asChild><Button size="icon" variant="ghost" className="rounded-full h-12 w-12 text-pink-500"><Gift className="w-6 h-6" /></Button></DialogTrigger>

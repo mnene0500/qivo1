@@ -24,7 +24,6 @@ interface UserProfile {
 
 const PAGE_SIZE = 12;
 
-// GLOBAL CACHE to survive tab switches
 let cachedUsers: UserProfile[] = [];
 let cachedTab: 'Recommend' | 'Nearby' = 'Recommend';
 let cachedPage = 0;
@@ -76,14 +75,18 @@ export default function HomePage() {
 
       const { data } = await query;
       if (data) {
-        const filtered = data.filter(u => u.uid !== currentUser?.id);
+        const filtered = (data as any[]).filter(u => u.uid !== currentUser?.id);
         
         if (pageNum === 0) {
           setUsers(filtered);
           cachedUsers = filtered;
         } else {
-          setUsers(prev => [...prev, ...filtered]);
-          cachedUsers = [...cachedUsers, ...filtered];
+          setUsers(prev => {
+             const existingIds = new Set(prev.map(u => u.uid));
+             const uniqueNew = filtered.filter(u => !existingIds.has(u.uid));
+             return [...prev, ...uniqueNew];
+          });
+          cachedUsers = [...cachedUsers, ...filtered.filter(u => !new Set(cachedUsers.map(x => x.uid)).has(u.uid))];
         }
         
         setHasMore(data.length === PAGE_SIZE);
@@ -138,8 +141,7 @@ export default function HomePage() {
 
   return (
     <div className="flex-1 bg-white min-h-screen relative select-none">
-      {/* FIXED TOP HEADER */}
-      <div className="sticky top-0 z-50 bg-[#00A2FF] shadow-lg">
+      <div className="sticky top-0 z-[100] bg-[#00A2FF] shadow-lg">
         <div className="px-4 grid grid-cols-2 gap-3 py-4">
           <button onClick={() => router.push('/mystery-note')} className="h-20 bg-purple-600 border border-white/20 rounded-2xl p-4 flex flex-col items-start justify-center gap-1 active:scale-95 transition-all text-white shadow-lg">
             <FileText className="w-4 h-4 mb-1" /><p className="text-[9px] font-black uppercase tracking-tight">Message Blast</p>
