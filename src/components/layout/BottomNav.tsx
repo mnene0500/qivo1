@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -11,7 +10,7 @@ import { useUser } from "@/firebase/auth/use-user"
 
 /**
  * @fileOverview High-fidelity Fixed Bottom Navigation.
- * Truly fixed at the bottom with high z-index and optimized layering.
+ * Fixed: Explicit viewport positioning and high z-index.
  */
 export function BottomNav() {
   const pathname = usePathname()
