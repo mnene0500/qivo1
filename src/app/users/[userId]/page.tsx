@@ -13,7 +13,7 @@ import { useUser } from "@/firebase/auth/use-user"
 import { useToast } from "@/hooks/use-toast"
 
 /**
- * @fileOverview User Detail Profile with Straight Edge Design and Copyable ID.
+ * @fileOverview User Detail Profile with Strictly Fixed Bottom Action.
  */
 export default function UserDetailPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params)
@@ -56,7 +56,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
        </h1>
     </div>
   );
-  if (!profile) return <div className="min-h-screen flex items-center justify-center p-8">Profile not found.</div>
+  if (!profile) return <div className="min-h-screen flex items-center justify-center p-8 text-black font-bold">Profile not found.</div>
 
   const age = calculateAge(profile.dob)
   const allPhotos = Array.from(new Set([profile.photo_url, ...(profile.additional_photos || [])].filter(Boolean)));
@@ -124,15 +124,22 @@ export default function UserDetailPage({ params }: { params: Promise<{ userId: s
           </section>
         )}
 
-        <div className="grid grid-cols-1 gap-2 pb-10">
+        <div className="grid grid-cols-1 gap-2 pb-20">
           <DetailItem icon={Globe} label="Region" value={profile.country || "Not specified"} color="bg-emerald-50 text-emerald-600" />
           <DetailItem icon={GraduationCap} label="Academic" value={profile.education_level || "Not specified"} color="bg-purple-50 text-purple-600" />
           <DetailItem icon={Heart} label="Intentions" value={profile.looking_for || "Exploring"} color="bg-rose-50 text-rose-600" />
         </div>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 p-6 bg-gradient-to-t from-white via-white/95 to-transparent z-50">
-        <Button className="w-full h-14 rounded-xl bg-[#00A2FF] hover:bg-[#0081CC] text-white text-xs font-black flex items-center justify-center gap-2.5 shadow-xl uppercase tracking-[0.2em] active:scale-95 transition-all border-none" onClick={() => router.push(`/chats?startWith=${profile.uid}`)}><MessageSquare className="w-4 h-4 fill-white" />Send Message</Button>
+      {/* STRICTLY FIXED BOTTOM BUTTON */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/90 backdrop-blur-xl border-t border-black/5 z-[100] pb-[env(safe-area-inset-bottom,24px)]">
+        <Button 
+          className="w-full h-14 rounded-2xl bg-[#00A2FF] hover:bg-[#0081CC] text-white text-xs font-black flex items-center justify-center gap-2.5 shadow-xl uppercase tracking-[0.2em] active:scale-95 transition-all border-none" 
+          onClick={() => router.push(`/chats?startWith=${profile.uid}`)}
+        >
+          <MessageSquare className="w-4 h-4 fill-white" />
+          Send Message
+        </Button>
       </div>
     </div>
   )

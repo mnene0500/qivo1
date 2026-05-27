@@ -1,3 +1,4 @@
+
 "use client"
 
 import { usePathname, useSearchParams } from "next/navigation"
@@ -17,20 +18,17 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isVisible = ['/home', '/chats', '/profile'].includes(pathname || "") && !isChatDetail
 
   return (
-    <div className="flex-1 flex flex-col relative min-h-screen overflow-x-hidden bg-white">
-      {/* WRAP CHILDREN IN TRANSITION CONTAINER INDEPENDENT OF FIXED NAV */}
+    <div className="flex-1 flex flex-col relative min-h-screen bg-white">
+      {/* WRAP CHILDREN IN TRANSITION CONTAINER */}
       <main className={cn(
         "flex-1 flex flex-col relative z-0",
+        isVisible && "pb-20", // Add padding so content doesn't hide behind BottomNav
         "native-page-transition"
       )}>
         {children}
       </main>
       
-      {isVisible && (
-        <div className="relative z-[100]">
-          <BottomNav />
-        </div>
-      )}
+      {isVisible && <BottomNav />}
     </div>
   )
 }
