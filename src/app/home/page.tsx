@@ -34,7 +34,7 @@ function calculateAge(dob: string) {
 }
 
 /**
- * @fileOverview Home feed with Fetch Guards to prevent unnecessary refreshes.
+ * @fileOverview Home feed with Fetch Guards and Independent Buttons.
  */
 export default function HomePage() {
   const router = useRouter()
@@ -164,7 +164,7 @@ export default function HomePage() {
                       <span className="text-[7px] font-bold uppercase truncate opacity-70">{u.country}</span>
                     </div>
                   </div>
-                  <Button size="sm" className="w-full h-8 rounded-lg bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black text-[10px] uppercase tracking-widest gap-2 shadow-lg" onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}>
+                  <Button size="sm" className="w-full h-8 rounded-lg bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black text-[10px] uppercase tracking-widest gap-2 shadow-lg z-10" onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}>
                     <MessageSquare className="w-3 h-3" />CHAT
                   </Button>
                 </div>

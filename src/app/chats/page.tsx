@@ -155,8 +155,10 @@ function ChatsContent() {
     if (currentUser?.id && startWithId) {
       const ids = [currentUser.id, startWithId].sort()
       const cId = `direct_${ids[0]}_${ids[1]}`
-      setChatId(cId)
+      
+      // IMMEDIATE RESET to prevent "blink"
       setMessages([])
+      setChatId(cId)
       
       markChatAsReadAction(currentUser.id, cId);
       
@@ -193,6 +195,7 @@ function ChatsContent() {
     setIsGifting(true);
     const ts = Date.now();
     const giftMsg = `[Gift: ${gift.name}]`;
+    // OPTIMISTIC UPDATE: No animation here to prevent "jumping"
     const optimistic: Message = { id: `gift-${ts}`, text: giftMsg, sender_id: currentUser.id, timestamp: ts, is_gift: true, is_optimistic: true };
     
     setMessages(prev => [optimistic, ...prev]);
@@ -233,10 +236,24 @@ function ChatsContent() {
       .on('postgres_changes', { event: 'INSERT', table: 'messages', filter: `chat_id=eq.${chatId}` }, (payload) => {
         const newMsg = payload.new as Message
         if (newMsg.timestamp <= activeChatClearedAt) return
-        setMessages(prev => [newMsg, ...prev.filter(m => m.id !== `temp-${newMsg.timestamp}` && m.id !== `gift-${newMsg.timestamp}`)]);
+        
+        // BETTER DEDUPLICATION: Check for optimistic message and replace
+        setMessages(prev => {
+          const isFromMe = newMsg.sender_id === currentUser?.id;
+          if (isFromMe) {
+            // Find temp message that matches approximately (within 5s)
+            const matched = prev.find(m => m.is_optimistic && Math.abs(m.timestamp - newMsg.timestamp) < 5000);
+            if (matched) {
+               return [newMsg, ...prev.filter(m => m.id !== matched.id)];
+            }
+          }
+          // If not from me or no match, just append if not already there
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [newMsg, ...prev];
+        });
       }).subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [chatId, activeChatClearedAt])
+  }, [chatId, activeChatClearedAt, currentUser?.id])
 
   const handleClearChat = async (id?: string) => {
     const targetId = id || chatId
@@ -259,10 +276,11 @@ function ChatsContent() {
 
   const handleTouchStart = (id: string) => {
     isLongPress.current = false
+    // FASTER POPUP: 400ms instead of 700ms
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true
       setDeletingChatId(id)
-    }, 700)
+    }, 400)
   }
 
   const handleTouchEnd = (partnerId: string) => {
@@ -381,12 +399,13 @@ function ChatsContent() {
           const isMe = m.sender_id === currentUser?.id;
           const gift = m.is_gift ? GIFTS.find(g => m.text.includes(g.name)) : null;
           return (
-            <div key={m.id} className={cn("max-w-[80%] p-4 rounded-[2rem] text-sm font-medium shadow-sm animate-in zoom-in-95 relative", 
+            <div key={m.id} className={cn("max-w-[80%] p-4 rounded-[2rem] text-sm font-medium shadow-sm relative", 
               isMe ? "bg-[#00A2FF] text-white self-end rounded-br-none" : "bg-white text-black self-start rounded-bl-none border",
-              m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-600 text-white border-none shadow-pink-100 p-6 flex flex-col items-center text-center gap-3"
+              m.is_gift && "bg-gradient-to-br from-pink-500 to-rose-600 text-white border-none shadow-pink-100 p-6 flex flex-col items-center text-center gap-3",
+              !m.is_optimistic && "animate-in zoom-in-95"
             )}>
               {m.is_gift ? (
-                <><div className="text-5xl animate-bounce">{gift?.icon || "🎁"}</div><p className="font-black uppercase tracking-widest text-[10px]">{gift?.name || "Premium Gift"}</p>
+                <><div className="text-5xl">{gift?.icon || "🎁"}</div><p className="font-black uppercase tracking-widest text-[10px]">{gift?.name || "Premium Gift"}</p>
                 {isMe && <Button size="sm" onClick={() => handleSendGift(gift!)} className="mt-2 h-8 rounded-full bg-white/20 text-white text-[9px] uppercase font-black">Send One More</Button>}</>
               ) : m.text}
             </div>
