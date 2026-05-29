@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -89,12 +90,14 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       let coins = 0;
       const amt = Number(pending.amount);
       
-      if (amt === 1) coins = 10;
-      else if (amt === 60) coins = 500;
+      // Tiered Coin Logic
+      if (amt === 60) coins = 500;
       else if (amt === 120) coins = 1000;
-      else if (amt === 180) coins = 1500;
-      else if (amt === 240) coins = 2000;
       else if (amt === 600) coins = 5000;
+      else if (amt === 800) coins = 7000;
+      else if (amt === 1000) coins = 10000;
+      else if (amt === 1500) coins = 15000;
+      else if (amt === 2000) coins = 20000;
       else coins = Math.floor(amt * 8.33);
 
       const { error: rpcErr } = await supabase.rpc("increment_coins", { p_user_id: pending.user_id, p_amount: coins });

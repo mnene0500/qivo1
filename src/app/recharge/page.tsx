@@ -33,12 +33,13 @@ import {
 } from "@/components/ui/dialog"
 
 const PACKAGES = [
-  { id: "p1", label: "10", coins: 10, priceKes: 1 },
-  { id: "p2", label: "500", coins: 500, priceKes: 60 },
-  { id: "p3", label: "1K", coins: 1000, priceKes: 120, popular: true },
-  { id: "p4", label: "1.5K", coins: 1500, priceKes: 180 },
-  { id: "p5", label: "2K", coins: 2000, priceKes: 240 },
-  { id: "p6", label: "5K", coins: 5000, priceKes: 600 },
+  { id: "p1", label: "500", coins: 500, priceKes: 60 },
+  { id: "p2", label: "1K", coins: 1000, priceKes: 120, popular: true },
+  { id: "p3", label: "5K", coins: 5000, priceKes: 600 },
+  { id: "p4", label: "7K", coins: 7000, priceKes: 800 },
+  { id: "p5", label: "10K", coins: 10000, priceKes: 1000 },
+  { id: "p6", label: "15K", coins: 15000, priceKes: 1500 },
+  { id: "p7", label: "20K", coins: 20000, priceKes: 2000 },
 ]
 
 const RATES = {
@@ -84,7 +85,6 @@ export default function RechargePage() {
   const currencyInfo = RATES[currentCountry as keyof typeof RATES] || RATES['Default']
   const selectedPackage = PACKAGES.find(p => p.id === selectedId)
   
-  // PesaPal restricted for Merchant-only regions
   const isPesaPalCountry = !['Nigeria', 'Ghana', 'South Africa'].includes(currentCountry)
 
   const handleRecharge = async () => {
@@ -179,14 +179,9 @@ export default function RechargePage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
              <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Select Package</h3>
-             {!isPesaPalCountry && (
-               <span className="text-[8px] font-bold text-[#00A2FF] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 flex items-center gap-1">
-                 <Info className="w-2.5 h-2.5" /> Merchant Portal Only
-               </span>
-             )}
           </div>
           
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {PACKAGES.map((pkg) => (
               <button 
                 key={pkg.id} 
@@ -244,17 +239,11 @@ export default function RechargePage() {
             <ExternalLink className="w-4 h-4 text-yellow-400" />
           </Button>
 
-          {isPesaPalCountry ? (
+          {isPesaPalCountry && (
             <div className="flex items-center justify-center gap-2 text-gray-300 py-4">
               <ShieldCheck className="w-4 h-4" />
               <span className="text-[9px] font-black tracking-[0.2em]">Secured by PesaPal</span>
             </div>
-          ) : (
-             <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 text-center">
-               <p className="text-[9px] font-bold text-blue-700 leading-relaxed uppercase tracking-widest">
-                 Automated card payments are unavailable in {currentCountry}. Please select a package to contact a verified merchant.
-               </p>
-             </div>
           )}
         </div>
       </main>
