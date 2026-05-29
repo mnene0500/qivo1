@@ -142,8 +142,8 @@ export default function EditProfilePage() {
   if (loading) return <div className="h-screen flex items-center justify-center bg-white"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
 
   return (
-    <div className="flex-1 bg-white min-h-screen flex flex-col relative select-none native-page-transition">
-      <header className="px-4 h-16 flex items-center justify-between border-b sticky top-0 bg-white z-50">
+    <div className="flex-1 bg-white min-h-screen flex flex-col relative select-none">
+      <header className="px-4 h-16 flex items-center justify-between border-b bg-white sticky top-0 z-50">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full"><ChevronLeft className="w-6 h-6 text-black" /></Button>
         <h1 className="text-sm font-black text-black uppercase tracking-widest">Edit Profile</h1>
         <div className="w-10" />
@@ -241,7 +241,7 @@ export default function EditProfilePage() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 inset-x-0 p-6 bg-white/90 backdrop-blur-xl border-t border-black/5 z-[60] pb-[env(safe-area-inset-bottom,24px)]">
+      <footer className="fixed bottom-0 inset-x-0 p-6 bg-white/95 backdrop-blur-xl border-t border-black/5 z-[60] pb-[env(safe-area-inset-bottom,24px)]">
         <Button 
           onClick={handleSave} 
           disabled={saving} 
