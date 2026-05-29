@@ -79,14 +79,14 @@ function ShellContent({ children }: { children: React.ReactNode }) {
         ref={mainRef}
         className={cn(
           "flex-1 w-full overflow-y-auto overflow-x-hidden relative z-0 no-scrollbar pb-[env(safe-area-inset-bottom)]",
-          showNav ? "pb-20" : "pb-0",
-          mounted ? "native-page-transition" : "opacity-0"
+          showNav ? "pb-16" : "pb-0",
+          mounted ? "opacity-100" : "opacity-0"
         )}
       >
         {children}
       </main>
       
-      {showNav && <BottomNav />}
+      {mounted && showNav && <BottomNav />}
     </div>
   )
 }
