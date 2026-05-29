@@ -2,8 +2,9 @@
 
 import { usePathname, useSearchParams } from "next/navigation"
 import { BottomNav } from "./BottomNav"
-import { Suspense, useRef, useEffect } from "react"
+import { Suspense, useRef, useEffect, useMemo } from "react"
 import { cn } from "@/lib/utils"
+import { useUser } from "@/firebase/auth/use-user"
 
 /**
  * @fileOverview Viewport-Centric App Shell.
@@ -11,11 +12,12 @@ import { cn } from "@/lib/utils"
  * Implements Scroll Persistence and single-click scroll-to-top logic.
  */
 
-const scrollCache: Record<string, number> = {};
+let scrollCache: Record<string, number> = {};
 
 function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { user, isInitialized } = useUser()
   const mainRef = useRef<HTMLElement>(null)
   
   const isChatDetail = pathname === '/chats' && searchParams.has('startWith')
@@ -24,7 +26,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isAuth = pathname === '/auth'
   const isSplash = pathname === '/'
   
-  const showNav = ['/home', '/chats', '/profile'].includes(pathname || "") && !isChatDetail && !isCall && !isWelcome && !isAuth && !isSplash
+  const showNav = useMemo(() => {
+    const navRoutes = ['/home', '/chats', '/profile'];
+    return !!user && navRoutes.includes(pathname || "") && !isChatDetail && !isCall && !isWelcome && !isAuth && !isSplash;
+  }, [user, pathname, isChatDetail, isCall, isWelcome, isAuth, isSplash]);
 
   // RESTORE SCROLL
   useEffect(() => {
@@ -64,6 +69,13 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     window.addEventListener('qivo-nav-refresh', handleRefresh);
     return () => window.removeEventListener('qivo-nav-refresh', handleRefresh);
   }, [pathname])
+
+  // Clear cache on session change
+  useEffect(() => {
+    if (!user) {
+      scrollCache = {};
+    }
+  }, [user])
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-white">
