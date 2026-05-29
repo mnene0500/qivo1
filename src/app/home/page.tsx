@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -153,7 +152,7 @@ export default function HomePage() {
     return () => observer.disconnect();
   }, [hasMore, isLoadingMore, isRefreshing, page, fetchUsers, profile]);
 
-  // REFRESH EVENT LISTENERS
+  // REFRESH EVENT LISTENERS (Single Click Refresh)
   useEffect(() => {
     const handleRefresh = (e: any) => {
       if (e.detail.path === '/home') {
@@ -249,7 +248,7 @@ export default function HomePage() {
               {hasMore && (
                 <div className="flex items-center gap-2 text-gray-400">
                   <Loader2 className="w-4 h-4 animate-spin text-[#00A2FF]" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Searching more users...</span>
+                  <span className="text-[10px] font-bold tracking-widest">Searching more users...</span>
                 </div>
               )}
             </div>

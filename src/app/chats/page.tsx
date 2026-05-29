@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -367,7 +366,7 @@ function ChatsContent() {
 
       <AlertDialog open={!!deletingChatId} onOpenChange={(open) => !open && setDeletingChatId(null)}>
         <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none shadow-2xl">
-          <AlertDialogHeader className="items-center text-center"><AlertDialogTitle className="text-xl font-bold">Delete Conversation?</AlertDialogTitle><AlertDialogDescription className="text-xs uppercase font-bold tracking-widest text-gray-400">History will be cleared.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader className="items-center text-center"><AlertDialogTitle className="text-xl font-bold">Delete Conversation?</AlertDialogTitle><AlertDialogDescription className="text-[10px] uppercase font-bold tracking-widest text-gray-400">History will be cleared.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">
             <AlertDialogCancel className="flex-1 h-14 rounded-full bg-gray-50">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { if (deletingChatId) clearChatAction(currentUser!.id, deletingChatId); setDeletingChatId(null); fetchSummaries(0); }} className="flex-1 h-14 rounded-full bg-red-500">Delete</AlertDialogAction>

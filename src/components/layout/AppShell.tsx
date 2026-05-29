@@ -1,4 +1,3 @@
-
 "use client"
 
 import { usePathname, useSearchParams } from "next/navigation"
@@ -9,10 +8,9 @@ import { cn } from "@/lib/utils"
 /**
  * @fileOverview Viewport-Centric App Shell.
  * Ensures persistent UI (BottomNav) stays fixed while content scrolls independently.
- * Implements Scroll Persistence for main navigation tabs.
+ * Implements Scroll Persistence and single-click scroll-to-top logic.
  */
 
-// Global scroll cache to persist positions between unmounts
 const scrollCache: Record<string, number> = {};
 
 function ShellContent({ children }: { children: React.ReactNode }) {

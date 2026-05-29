@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -11,11 +10,10 @@ import { useUser } from "@/firebase/auth/use-user"
 
 /**
  * @fileOverview Strictly Fixed Global Navigation.
- * Includes "Double Tap to Refresh" logic for Home and Chat.
+ * Refined: Single click on active icon triggers refresh and scroll-to-top.
  */
 export function BottomNav() {
   const pathname = usePathname()
-  const router = useRouter()
   const { user } = useUser()
   const [totalUnread, setTotalUnread] = useState(0)
 
@@ -50,7 +48,7 @@ export function BottomNav() {
   const handleNavClick = (e: React.MouseEvent, href: string) => {
     if (pathname === href) {
       e.preventDefault();
-      // Dispatch custom event to signal refresh/scroll-to-top
+      // Signal refresh/scroll-to-top to AppShell and Page components
       window.dispatchEvent(new CustomEvent('qivo-nav-refresh', { detail: { path: href } }));
     }
   }
