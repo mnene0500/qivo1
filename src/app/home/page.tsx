@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
-import { RotateCw, BadgeCheck, FileText, Target, MessageSquare, Loader2 } from "lucide-react"
+import { RotateCw, BadgeCheck, FileText, Target, MessageSquare, Loader2, Sparkles } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
@@ -96,7 +96,7 @@ export default function HomePage() {
              const uniqueNew = filtered.filter(u => !existingIds.has(u.uid));
              return [...prev, ...uniqueNew];
           });
-          cachedUsers = [...cachedUsers, ...filtered.filter(u => !new Set(cachedUsers.map(x => x.uid)).has(u.uid))];
+          cachedUsers = [...cachedUsers, ...filtered.filter(u => !new Set(cachedUsers.map(x => u.uid)).has(u.uid))];
         }
         
         setHasMore(data.length === PAGE_SIZE);
@@ -150,19 +150,34 @@ export default function HomePage() {
   if (authLoading || !isInitialized) return null;
 
   return (
-    <div className="flex flex-col w-full bg-white">
+    <div className="flex flex-col w-full bg-white select-none">
       {/* 
          TOP HEADER AREA: 
-         These buttons scroll away as they are part of the normal flow.
+         Glossy buttons with improved size and appearance.
       */}
-      <div className="px-4 grid grid-cols-2 gap-3 py-5 bg-[#00A2FF] shrink-0">
-        <button onClick={() => router.push('/mystery-note')} className="h-24 bg-purple-600 border border-white/20 rounded-2xl p-5 flex flex-col items-start justify-center gap-1 active:scale-95 transition-all text-white shadow-xl">
-          <FileText className="w-5 h-5 mb-1" />
-          <p className="text-[10px] font-black uppercase tracking-widest leading-none">Message Blast</p>
+      <div className="px-4 grid grid-cols-2 gap-3 py-6 bg-[#00A2FF] shrink-0">
+        <button 
+          onClick={() => router.push('/mystery-note')} 
+          className="h-28 bg-gradient-to-br from-purple-500 to-purple-700 border border-white/20 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-2 active:scale-95 transition-all text-white shadow-2xl relative overflow-hidden group"
+        >
+          <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-2xl group-active:scale-150 transition-transform" />
+          <FileText className="w-6 h-6 mb-1 text-purple-100" />
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-widest leading-none mb-1">Message Blast</p>
+            <p className="text-[8px] font-bold text-purple-100/70 uppercase tracking-widest">Connect with many</p>
+          </div>
         </button>
-        <button onClick={() => router.push('/tasks')} className="h-24 bg-blue-900 border border-white/20 rounded-2xl p-5 flex flex-col items-start justify-center gap-1 active:scale-95 transition-all text-white shadow-xl">
-          <Target className="w-5 h-5 mb-1" />
-          <p className="text-[10px] font-black uppercase tracking-widest leading-none">Task Center</p>
+        
+        <button 
+          onClick={() => router.push('/tasks')} 
+          className="h-28 bg-gradient-to-br from-indigo-800 to-blue-900 border border-white/20 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-2 active:scale-95 transition-all text-white shadow-2xl relative overflow-hidden group"
+        >
+          <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full blur-2xl group-active:scale-150 transition-transform" />
+          <Target className="w-6 h-6 mb-1 text-blue-100" />
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-widest leading-none mb-1">Task Center</p>
+            <p className="text-[8px] font-bold text-blue-100/70 uppercase tracking-widest">Daily rewards</p>
+          </div>
         </button>
       </div>
 
@@ -186,17 +201,17 @@ export default function HomePage() {
 
       {/* 
          USER GRID: 
-         Content flows behind the fixed BottomNav (handled by AppShell padding).
+         Content flows behind the fixed BottomNav.
       */}
       <main className="px-3 pt-4">
         {users.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-3">
               {users.map((u) => (
-                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-3xl shadow-lg bg-gray-50 active:scale-95 transition-all cursor-pointer" onClick={() => router.push(`/users/${u.uid}`)}>
+                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-[2.5rem] shadow-xl bg-gray-50 active:scale-95 transition-all cursor-pointer" onClick={() => router.push(`/users/${u.uid}`)}>
                   <Image src={`${u.photo_url}?t=${u.updated_at}`} alt={u.name} fill className="object-cover" sizes="50vw" priority />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-4 text-white flex flex-col gap-3">
+                  <div className="absolute inset-x-0 bottom-0 p-5 text-white flex flex-col gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
                         <h4 className="font-black text-sm truncate tracking-tight">{u.name}</h4>
@@ -207,7 +222,7 @@ export default function HomePage() {
                         <span className="text-[8px] font-bold uppercase truncate opacity-70 tracking-widest">{u.country}</span>
                       </div>
                     </div>
-                    <Button size="sm" className="w-full h-9 rounded-xl bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black text-[10px] uppercase tracking-[0.2em] gap-2 shadow-lg z-10" onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}>
+                    <Button size="sm" className="w-full h-10 rounded-2xl bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black text-[10px] uppercase tracking-[0.2em] gap-2 shadow-lg z-10" onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}>
                       <MessageSquare className="w-3.5 h-3.5" />CHAT
                     </Button>
                   </div>

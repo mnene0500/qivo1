@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 /**
  * @fileOverview Viewport-Centric App Shell.
  * Ensures persistent UI (BottomNav) stays fixed while content scrolls independently.
+ * Explore route removed.
  */
 function ShellContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -18,8 +19,9 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const isCall = pathname?.startsWith('/call/')
   const isWelcome = pathname === '/welcome'
   const isAuth = pathname === '/auth'
+  const isSplash = pathname === '/'
   
-  const showNav = ['/home', '/chats', '/profile', '/explore'].includes(pathname || "") && !isChatDetail && !isCall && !isWelcome && !isAuth
+  const showNav = ['/home', '/chats', '/profile'].includes(pathname || "") && !isChatDetail && !isCall && !isWelcome && !isAuth && !isSplash
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-white">
@@ -30,7 +32,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       */}
       <main className={cn(
         "flex-1 w-full overflow-y-auto overflow-x-hidden relative z-0 no-scrollbar pb-[env(safe-area-inset-bottom)]",
-        showNav && "pb-24", // Spacing for BottomNav
+        showNav && "pb-20", // Spacing for BottomNav
         "native-page-transition"
       )}>
         {children}

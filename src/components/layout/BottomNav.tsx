@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, MessageSquare, User, Sparkles } from "lucide-react"
+import { Home, MessageSquare, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
@@ -10,7 +10,7 @@ import { useUser } from "@/firebase/auth/use-user"
 
 /**
  * @fileOverview Strictly Fixed Global Navigation.
- * Positioned outside of the scrolling content container in AppShell.
+ * Height reduced for a more compact, modern feel. Explore removed.
  */
 export function BottomNav() {
   const pathname = usePathname()
@@ -47,13 +47,12 @@ export function BottomNav() {
 
   const navItems = [
     { label: "Home", icon: Home, href: "/home" },
-    { label: "Explore", icon: Sparkles, href: "/explore" },
     { label: "Chat", icon: MessageSquare, href: "/chats", badge: totalUnread },
     { label: "Me", icon: User, href: "/profile" },
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-white/95 backdrop-blur-xl border-t h-20 flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom,12px)] shadow-[0_-10px_30px_rgba(0,0,0,0.06)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-white/95 backdrop-blur-xl border-t h-16 flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom,4px)] shadow-[0_-10px_30px_rgba(0,0,0,0.06)]">
       {navItems.map((item) => {
         const isActive = pathname === item.href || (item.href === '/chats' && pathname === '/chats')
         
@@ -67,17 +66,17 @@ export function BottomNav() {
             )}
           >
             <div className={cn(
-              "relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300",
+              "relative w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300",
               isActive && "bg-blue-50/50"
             )}>
               <item.icon className={cn("w-5 h-5", isActive ? "text-[#00A2FF] fill-current" : "text-gray-400")} />
               {item.badge !== undefined && item.badge > 0 && (
-                <div className="absolute top-1 right-1 bg-red-500 text-white text-[8px] font-black min-w-[16px] h-4 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <div className="absolute top-0 right-0 bg-red-500 text-white text-[7px] font-black min-w-[14px] h-3.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {item.badge > 9 ? '9+' : item.badge}
                 </div>
               )}
             </div>
-            <span className={cn("text-[9px] font-black uppercase tracking-tight", isActive ? "opacity-100" : "opacity-60")}>
+            <span className={cn("text-[8px] font-black uppercase tracking-tight", isActive ? "opacity-100" : "opacity-60")}>
               {item.label}
             </span>
           </Link>
