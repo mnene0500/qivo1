@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -416,15 +417,16 @@ function ChatsContent() {
         </div>
       </main>
 
+      {/* REFINED TYPING AREA */}
       <footer className="p-4 border-t bg-white pb-[env(safe-area-inset-bottom, 16px)] shrink-0 z-[50]">
-        <div className="flex items-center gap-3 max-w-full">
+        <div className="flex items-center gap-3 max-w-5xl mx-auto w-full">
           <Dialog open={giftDialogOpen} onOpenChange={setGiftDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="icon" variant="ghost" className="rounded-full h-11 w-11 bg-pink-50 text-pink-500 shrink-0 shadow-sm border border-pink-100">
+              <Button size="icon" variant="ghost" className="rounded-full h-12 w-12 bg-pink-50 text-pink-500 shrink-0 shadow-sm border border-pink-100 active:scale-90 transition-transform">
                 <Gift className="w-6 h-6 fill-current" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-t-[3rem] p-0 max-w-full sm:max-w-md fixed bottom-0 top-auto translate-y-0 border-none shadow-2xl">
+            <DialogContent className="rounded-t-[3rem] p-0 max-w-full sm:max-w-md fixed bottom-0 top-auto translate-y-0 border-none shadow-2xl animate-in slide-in-from-bottom duration-300">
               <DialogHeader className="p-8 pb-2"><DialogTitle className="text-xl font-black uppercase tracking-tight">Gifts ({coins} Coins)</DialogTitle></DialogHeader>
               <div className="grid grid-cols-4 gap-3 p-6 pt-4 max-h-[60vh] overflow-y-auto no-scrollbar pb-12">
                 {GIFTS.map((gift) => (
@@ -436,12 +438,12 @@ function ChatsContent() {
             </DialogContent>
           </Dialog>
           
-          <div className="flex-1 flex items-center bg-gray-50 rounded-[1.5rem] px-4 h-12 border border-black/5 focus-within:ring-2 focus-within:ring-[#00A2FF]/20 transition-all">
+          <div className="flex-1 flex items-center bg-gray-50 rounded-[1.8rem] px-4 min-h-[48px] border border-black/5 focus-within:ring-2 focus-within:ring-[#00A2FF]/20 focus-within:bg-white transition-all min-w-0">
             <input 
               value={newMessage} 
               onChange={e => setNewMessage(e.target.value)} 
               onKeyDown={e => e.key === 'Enter' && handleSendMessage()} 
-              className="flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-gray-400 min-w-0" 
+              className="flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-gray-400 py-3" 
               placeholder="Type something..." 
             />
           </div>
@@ -452,7 +454,7 @@ function ChatsContent() {
             disabled={!newMessage.trim()}
             className={cn(
               "rounded-full h-12 w-12 shrink-0 shadow-xl transition-all active:scale-90",
-              newMessage.trim() ? "bg-[#00A2FF] text-white" : "bg-gray-100 text-gray-400 shadow-none"
+              newMessage.trim() ? "bg-[#00A2FF] text-white shadow-blue-200" : "bg-gray-100 text-gray-400 shadow-none"
             )}
           >
             <Send className="w-5 h-5 fill-current" />

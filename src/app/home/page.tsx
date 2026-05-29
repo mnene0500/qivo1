@@ -227,23 +227,30 @@ export default function HomePage() {
           <>
             <div className="grid grid-cols-2 gap-2.5">
               {users.map((u) => (
-                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.1] rounded-xl shadow-lg bg-gray-50 active:scale-95 transition-all cursor-pointer" onClick={() => router.push(`/users/${u.uid}`)}>
+                <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.4] rounded-lg shadow-lg bg-gray-50 active:scale-95 transition-all cursor-pointer" onClick={() => router.push(`/users/${u.uid}`)}>
                   <Image src={`${u.photo_url}?t=${u.updated_at}`} alt={u.name} fill className="object-cover" sizes="50vw" priority />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-3 text-white flex flex-col gap-2">
+                  
+                  {/* FLOATING CHAT BUTTON TOP RIGHT */}
+                  <Button 
+                    size="icon" 
+                    className="absolute top-2 right-2 rounded-full h-8 w-8 bg-[#00A2FF]/90 backdrop-blur-md text-white shadow-xl z-20 active:scale-90 border border-white/20" 
+                    onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}
+                  >
+                    <MessageSquare className="w-4 h-4 fill-current" />
+                  </Button>
+
+                  <div className="absolute inset-x-0 bottom-0 p-3 text-white">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <h4 className="font-black text-xs truncate tracking-tight">{u.name}</h4>
-                        {u.is_verified && <BadgeCheck className="w-3 h-3 text-[#00A2FF] fill-white shrink-0" />}
+                        <h4 className="font-black text-[13px] truncate tracking-tight">{u.name}</h4>
+                        {u.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-[#00A2FF] fill-white shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="bg-[#00B200] text-white font-black text-[8px] px-1.5 py-0.5 rounded-md">{calculateAge(u.dob)}</span>
-                        <span className="text-[8px] font-bold opacity-70 truncate">{u.country}</span>
+                        <span className="bg-[#00B200] text-white font-black text-[9px] px-1.5 py-0.5 rounded-md">{calculateAge(u.dob)}</span>
+                        <span className="text-[9px] font-bold opacity-70 truncate uppercase tracking-tighter">{u.country}</span>
                       </div>
                     </div>
-                    <Button size="sm" className="w-full h-7 rounded-lg bg-[#00A2FF] hover:bg-[#0081CC] text-white font-black text-[9px] gap-1.5 shadow-lg z-10" onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }}>
-                      <MessageSquare className="w-3 h-3" />Chat
-                    </Button>
                   </div>
                 </Card>
               ))}

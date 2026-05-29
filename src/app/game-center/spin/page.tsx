@@ -59,6 +59,7 @@ export default function SpinToWinPage() {
         const newRotation = rotation + targetAngle
         setRotation(newRotation)
 
+        // DELAY REVEAL: 5.5s delay for 5s animation to ensure it stops fully
         setTimeout(() => {
           setIsSpinning(false)
           setLastWin(res.winAmount)
@@ -67,7 +68,7 @@ export default function SpinToWinPage() {
           } else {
             toast({ title: "No Win This Time", description: "Better luck next spin!" })
           }
-        }, 5000)
+        }, 5500)
       } else {
         throw new Error(res.error)
       }
