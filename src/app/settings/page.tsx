@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -70,7 +69,6 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     try {
-      // Clear all local caches before signing out
       localStorage.clear();
       sessionStorage.clear();
       await supabase.auth.signOut()
@@ -89,7 +87,7 @@ export default function SettingsPage() {
         }
       }
       sessionStorage.clear()
-      toast({ title: "App Reset", description: "Storage optimized. Reloading..." })
+      toast({ title: "App reset", description: "Reloading..." })
       setTimeout(() => window.location.reload(), 1000)
     } catch (err) {
       toast({ variant: "destructive", title: "Error" })
@@ -107,12 +105,12 @@ export default function SettingsPage() {
         sessionStorage.clear();
         await supabase.auth.signOut();
         window.location.replace("/welcome");
-        toast({ title: "Account Deleted", description: "All data has been permanently removed." });
+        toast({ title: "Account deleted" });
       } else {
         throw new Error(res.error);
       }
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Deletion Failed", description: error.message });
+      toast({ variant: "destructive", title: "Deletion failed", description: error.message });
       setIsDeleting(false);
     }
   }
@@ -131,7 +129,7 @@ export default function SettingsPage() {
         <div className="flex flex-col mt-4">
           <SettingItem label="Charge Settings" href="/pricing" icon={<CreditCard className="w-5 h-5 text-blue-500" />} />
           <SettingItem label="Blocked List" href="/blocked-list" icon={<Ban className="w-5 h-5 text-red-400" />} />
-          <SettingItem label="About QIVO" href="/about" icon={<Info className="w-5 h-5 text-gray-500" />} />
+          <SettingItem label="About Qivo" href="/about" icon={<Info className="w-5 h-5 text-gray-500" />} />
           <SettingItem label="Clear Cache" onClick={handleClearCache} icon={<RefreshCw className="w-5 h-5 text-orange-500" />} />
 
           {!loading && !profile?.is_owner && (
@@ -152,9 +150,9 @@ export default function SettingsPage() {
                   <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4 mx-auto">
                     <ShieldAlert className="w-8 h-8 text-red-500" />
                   </div>
-                  <AlertDialogTitle className="text-xl font-bold">Delete Everything?</AlertDialogTitle>
+                  <AlertDialogTitle className="text-xl font-bold">Delete everything?</AlertDialogTitle>
                   <AlertDialogDescription className="text-[10px] font-bold pt-2 uppercase tracking-widest leading-relaxed text-center text-gray-400">
-                    This will permanently remove your account, profile, chats, and history. Type <span className="text-red-600 font-black">DELETE</span> to confirm:
+                    Type <span className="text-red-600 font-black">DELETE</span> to confirm:
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="py-4">
@@ -184,7 +182,7 @@ export default function SettingsPage() {
             </AlertDialogTrigger>
             <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none select-none">
               <AlertDialogHeader className="items-center text-center">
-                <AlertDialogTitle className="text-xl font-bold">Sign Out?</AlertDialogTitle>
+                <AlertDialogTitle className="text-xl font-bold">Sign out?</AlertDialogTitle>
                 <AlertDialogDescription className="text-[10px] font-bold uppercase tracking-widest text-gray-400">You will need to login again.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">

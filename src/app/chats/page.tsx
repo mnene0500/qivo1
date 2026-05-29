@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -7,7 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, User, Gift, Trash2, MoreVertical, BadgeCheck, Loader2 } from "lucide-react"
+import { Send, ChevronLeft, User, Gift, Trash2, MoreVertical, BadgeCheck, Loader2, Ban, Flag } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
@@ -282,7 +281,7 @@ function ChatsContent() {
     const res = await sendMessageAction({ chatId, senderId: currentUser.id, recipientId: startWithId, text });
     if (!res.success) {
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
-      toast({ variant: "destructive", title: res.error === 'insufficient_funds' ? "Insufficient Coins" : "Error" })
+      toast({ variant: "destructive", title: res.error === 'insufficient_funds' ? "Insufficient coins" : "Error" })
     }
   }, [chatId, currentUser?.id, newMessage, startWithId, toast]);
 
@@ -292,7 +291,7 @@ function ChatsContent() {
     const { data: userPrf } = await supabase.from('users').select('is_owner, is_special_user').eq('uid', currentUser.id).single();
     const isFree = userPrf?.is_owner || userPrf?.is_special_user;
     if (!isFree && (Number(bal?.coins) || 0) < gift.price) {
-      toast({ variant: "destructive", title: "Insufficient Coins" });
+      toast({ variant: "destructive", title: "Insufficient coins" });
       setGiftDialogOpen(false);
       return;
     }
@@ -331,14 +330,20 @@ function ChatsContent() {
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#00A2FF]" /></div>
         ) : chatSummaries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-40 opacity-40 px-12 text-center text-gray-300">
-            <User className="w-12 h-12 mb-4" /><p className="font-bold text-xs uppercase tracking-widest">No Conversations</p>
+            <User className="w-12 h-12 mb-4" /><p className="font-bold text-xs uppercase tracking-widest">No conversations</p>
           </div>
         ) : (
           <>
             {chatSummaries.map(s => (
               <div key={s.id} onPointerDown={() => handleTouchStart(s.id)} onPointerUp={() => handleTouchEnd(s.partner_id)} className="p-4 flex items-center gap-4 active:bg-gray-50 border-b border-gray-50 transition-colors cursor-pointer touch-none">
                 <div className="relative">
-                  <Avatar className="w-14 h-14 border"><AvatarImage src={s.partner_photo} className="object-cover" /><AvatarFallback>{s.partner_name[0]}</AvatarFallback></Avatar>
+                  <Avatar 
+                    className="w-14 h-14 border cursor-pointer active:scale-95 transition-transform" 
+                    onClick={(e) => { e.stopPropagation(); router.push(`/users/${s.partner_id}`); }}
+                  >
+                    <AvatarImage src={s.partner_photo} className="object-cover" />
+                    <AvatarFallback>{s.partner_name[0]}</AvatarFallback>
+                  </Avatar>
                   {s.unread_count > 0 && <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm">{s.unread_count}</div>}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -359,10 +364,10 @@ function ChatsContent() {
 
       <AlertDialog open={!!deletingChatId} onOpenChange={(open) => !open && setDeletingChatId(null)}>
         <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none shadow-2xl">
-          <AlertDialogHeader className="items-center text-center"><AlertDialogTitle className="text-xl font-bold">Delete Conversation?</AlertDialogTitle><AlertDialogDescription className="text-[10px] uppercase font-bold tracking-widest text-gray-400">History will be cleared.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader className="items-center text-center"><AlertDialogTitle className="text-xl font-bold">Delete conversation?</AlertDialogTitle><AlertDialogDescription className="text-[10px] uppercase font-bold tracking-widest text-gray-400">History will be cleared.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6">
             <AlertDialogCancel className="flex-1 h-14 rounded-full bg-gray-50 text-[10px] font-black uppercase">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (deletingChatId) clearChatAction(currentUser!.id, deletingChatId); setDeletingChatId(null); fetchSummaries(0); }} className="flex-1 h-14 rounded-full bg-red-500 text-[10px] font-black uppercase">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={() => { if (deletingChatId) clearChatAction(currentUser!.id, deletingChatId); setDeletingChatId(null); fetchSummaries(0); }} className="flex-1 h-14 rounded-full bg-red-500 text-white text-[10px] font-black uppercase">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -379,11 +384,16 @@ function ChatsContent() {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" className="rounded-full text-gray-400"><MoreVertical className="w-5 h-5" /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-2xl min-w-[160px]">
-            <AlertDialog>
-              <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-500 font-bold gap-2"><Trash2 className="w-4 h-4" /> Delete Chat</DropdownMenuItem></AlertDialogTrigger>
-              <AlertDialogContent className="rounded-[2.5rem] max-w-[85vw] p-8 border-none"><AlertDialogHeader className="items-center text-center"><AlertDialogTitle className="text-xl font-bold">Delete Chat?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter className="flex flex-row items-center justify-center gap-4 mt-6"><AlertDialogCancel className="flex-1 h-14 rounded-full bg-gray-50 text-[10px] font-black uppercase">Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { clearChatAction(currentUser!.id, chatId!); router.push("/chats"); }} className="flex-1 h-14 rounded-full bg-red-500 text-[10px] font-black uppercase">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-            </AlertDialog>
+          <DropdownMenuContent align="end" className="rounded-2xl min-w-[160px] p-2 border-none shadow-xl">
+            <DropdownMenuItem onClick={() => { clearChatAction(currentUser!.id, chatId!); router.push("/chats"); }} className="rounded-xl h-11 text-red-500 font-bold gap-3 px-4">
+              <Trash2 className="w-4 h-4" /> Delete Chat
+            </DropdownMenuItem>
+            <DropdownMenuItem className="rounded-xl h-11 font-bold gap-3 px-4 text-gray-700">
+              <Ban className="w-4 h-4 text-red-400" /> Block User
+            </DropdownMenuItem>
+            <DropdownMenuItem className="rounded-xl h-11 font-bold gap-3 px-4 text-gray-700">
+              <Flag className="w-4 h-4 text-gray-400" /> Report
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
@@ -410,28 +420,28 @@ function ChatsContent() {
         <div className="flex items-center gap-3 max-w-full">
           <Dialog open={giftDialogOpen} onOpenChange={setGiftDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="icon" variant="ghost" className="rounded-full h-11 w-11 text-pink-500 shrink-0">
-                <Gift className="w-6 h-6" />
+              <Button size="icon" variant="ghost" className="rounded-full h-11 w-11 bg-pink-50 text-pink-500 shrink-0 shadow-sm border border-pink-100">
+                <Gift className="w-6 h-6 fill-current" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-[2.5rem] p-0 max-w-[95vw]">
-              <DialogHeader className="p-6 pb-2"><DialogTitle className="text-lg font-black uppercase">Gifts ({coins} Coins)</DialogTitle></DialogHeader>
-              <div className="grid grid-cols-3 gap-2 p-6 pt-0 max-h-[50vh] overflow-y-auto no-scrollbar">
+            <DialogContent className="rounded-t-[3rem] p-0 max-w-full sm:max-w-md fixed bottom-0 top-auto translate-y-0 border-none shadow-2xl">
+              <DialogHeader className="p-8 pb-2"><DialogTitle className="text-xl font-black uppercase tracking-tight">Gifts ({coins} Coins)</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-4 gap-3 p-6 pt-4 max-h-[60vh] overflow-y-auto no-scrollbar pb-12">
                 {GIFTS.map((gift) => (
-                  <button key={gift.name} onClick={() => handleSendGift(gift)} disabled={isGifting} className="flex flex-col items-center p-3 bg-gray-50 rounded-2xl active:scale-95 transition-all">
-                    <span className="text-3xl">{gift.icon}</span><span className="text-[9px] font-black uppercase mt-1">{gift.name}</span><span className="text-[8px] font-bold text-[#00A2FF]">{gift.price}</span>
+                  <button key={gift.name} onClick={() => handleSendGift(gift)} disabled={isGifting} className="flex flex-col items-center p-3 bg-gray-50 rounded-2xl active:scale-95 transition-all border border-transparent hover:border-pink-200">
+                    <span className="text-3xl">{gift.icon}</span><span className="text-[10px] font-black uppercase mt-1 truncate w-full text-center">{gift.name}</span><span className="text-[9px] font-bold text-[#00A2FF]">{gift.price}</span>
                   </button>
                 ))}
               </div>
             </DialogContent>
           </Dialog>
           
-          <div className="flex-1 flex items-center bg-gray-50 rounded-2xl px-4 h-11 border border-black/5 focus-within:ring-2 focus-within:ring-[#00A2FF]/20 transition-all">
+          <div className="flex-1 flex items-center bg-gray-50 rounded-[1.5rem] px-4 h-12 border border-black/5 focus-within:ring-2 focus-within:ring-[#00A2FF]/20 transition-all">
             <input 
               value={newMessage} 
               onChange={e => setNewMessage(e.target.value)} 
               onKeyDown={e => e.key === 'Enter' && handleSendMessage()} 
-              className="flex-1 bg-transparent text-sm font-bold outline-none placeholder:text-gray-400 min-w-0" 
+              className="flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-gray-400 min-w-0" 
               placeholder="Type something..." 
             />
           </div>
@@ -441,11 +451,11 @@ function ChatsContent() {
             size="icon" 
             disabled={!newMessage.trim()}
             className={cn(
-              "rounded-full h-11 w-11 shrink-0 shadow-lg transition-all active:scale-90",
+              "rounded-full h-12 w-12 shrink-0 shadow-xl transition-all active:scale-90",
               newMessage.trim() ? "bg-[#00A2FF] text-white" : "bg-gray-100 text-gray-400 shadow-none"
             )}
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-5 h-5 fill-current" />
           </Button>
         </div>
       </footer>

@@ -6,7 +6,6 @@ import { ChevronLeft, MessageSquare, Coins, Star } from "lucide-react"
 
 /**
  * @fileOverview Displays the cost of interactions in QIVO.
- * Simplified for messaging and gifting.
  */
 export default function PricingPage() {
   const router = useRouter()
@@ -36,7 +35,7 @@ export default function PricingPage() {
           <Star className="absolute -right-4 -top-4 w-24 h-24 text-white/5 rotate-12" />
           <div className="relative z-10">
             <h2 className="text-2xl font-black uppercase tracking-tighter mb-1">Interaction Rates</h2>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Global QIVO Economy</p>
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Global Qivo Economy</p>
           </div>
         </div>
 
@@ -59,12 +58,6 @@ export default function PricingPage() {
               </div>
             </div>
           ))}
-        </div>
-
-        <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100">
-          <p className="text-[10px] font-bold text-blue-600 text-center leading-relaxed uppercase tracking-widest">
-            Female users earn diamonds for receiving messages and gifts.
-          </p>
         </div>
       </main>
 

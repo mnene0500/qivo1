@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useRouter } from "next/navigation"
@@ -8,7 +7,9 @@ import {
   Headphones, 
   MessageSquare, 
   ShieldCheck,
-  Zap
+  Zap,
+  Globe,
+  Clock
 } from "lucide-react"
 
 /**
