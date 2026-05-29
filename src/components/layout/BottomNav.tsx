@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -10,7 +11,7 @@ import { useUser } from "@/firebase/auth/use-user"
 
 /**
  * @fileOverview Strictly Fixed Global Navigation.
- * Refined: Single click on active icon triggers refresh and scroll-to-top.
+ * Refined: Hydration safe and unread count badge.
  */
 export function BottomNav() {
   const pathname = usePathname()
@@ -53,7 +54,6 @@ export function BottomNav() {
   const handleNavClick = (e: React.MouseEvent, href: string) => {
     if (pathname === href) {
       e.preventDefault();
-      // Signal refresh/scroll-to-top to AppShell and Page components
       window.dispatchEvent(new CustomEvent('qivo-nav-refresh', { detail: { path: href } }));
     }
   }
@@ -86,7 +86,7 @@ export function BottomNav() {
               isActive && "bg-blue-50/50"
             )}>
               <item.icon className={cn("w-5 h-5", isActive ? "text-[#00A2FF] fill-current" : "text-gray-400")} />
-              {item.badge !== undefined && item.badge > 0 && (
+              {item.badge > 0 && (
                 <div className="absolute top-0 right-0 bg-red-500 text-white text-[7px] font-bold min-w-[14px] h-3.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {item.badge > 9 ? '9+' : item.badge}
                 </div>

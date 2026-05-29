@@ -63,7 +63,7 @@ export default function RechargePage() {
   const router = useRouter()
   const { user } = useUser()
   const { toast } = useToast()
-  const { coins } = useBalance()
+  const { coins: currentBalance } = useBalance()
   
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -80,12 +80,11 @@ export default function RechargePage() {
     })
   }, [user?.id])
 
-  if (!mounted) return null
+  if (!mounted) return <div className="min-h-screen bg-white" />
 
   const currentCountry = manualCountry || profile?.country || 'Kenya'
   const currencyInfo = RATES[currentCountry as keyof typeof RATES] || RATES['Default']
   const selectedPackage = PACKAGES.find(p => p.id === selectedId)
-  
   const isPesaPalCountry = !['Nigeria', 'Ghana', 'South Africa'].includes(currentCountry)
 
   const handleRecharge = async () => {
@@ -93,20 +92,18 @@ export default function RechargePage() {
       router.push("/auth")
       return
     }
-
-    if (!selectedId) {
+    if (!selectedPackage) {
       toast({ title: "Select a package first" })
       return
     }
-
     if (!isPesaPalCountry) {
-      router.push(`/coin-sellers?selectedPackage=${selectedPackage?.label}&amount=${selectedPackage?.coins}`)
+      router.push(`/coin-sellers?selectedPackage=${selectedPackage.label}&amount=${selectedPackage.coins}`)
       return
     }
     
     setIsProcessing(true)
     try {
-      const res = await initiatePesaPalPayment(user.id, selectedPackage!.priceKes, selectedPackage!.coins)
+      const res = await initiatePesaPalPayment(user.id, selectedPackage.priceKes, selectedPackage.coins)
       if (res.success && res.redirect_url) {
         window.location.href = res.redirect_url
       } else {
@@ -125,8 +122,8 @@ export default function RechargePage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white select-none relative overflow-hidden">
-      <header className="px-4 h-16 flex items-center justify-between border-b bg-white sticky top-0 z-[60]">
+    <div className="flex flex-col min-h-screen bg-white select-none">
+      <header className="px-4 h-16 flex items-center justify-between border-b bg-white sticky top-0 z-[70] shrink-0">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full text-black">
             <ChevronLeft className="w-6 h-6" />
@@ -173,13 +170,13 @@ export default function RechargePage() {
           <div className="flex flex-col items-center gap-2 pt-4">
               <div className="bg-yellow-50 px-6 py-3 rounded-full flex items-center gap-3 border border-yellow-100 shadow-sm">
                   <Coins className='w-6 h-6 text-yellow-500 fill-yellow-500'/>
-                  <span className="text-2xl font-black text-black">{coins}</span>
+                  <span className="text-2xl font-black text-black">{currentBalance}</span>
               </div>
-              <p className="text-[10px] font-bold text-gray-400 tracking-widest">Balance Available</p>
+              <p className="text-[10px] font-bold text-gray-400 tracking-widest">Available Coins</p>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Select Package</h3>
+            <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Select Tier</h3>
             <div className="grid grid-cols-2 gap-3">
               {PACKAGES.map((pkg) => (
                 <button 
@@ -228,8 +225,8 @@ export default function RechargePage() {
                 <MessageSquare className="w-4 h-4 text-yellow-400 fill-current" />
               </div>
               <div className="text-left">
-                <span className="block text-[11px] font-black uppercase tracking-widest leading-none">Find Coinsellers</span>
-                <span className="text-[8px] opacity-60 font-bold">Manual Transfer & Escrow</span>
+                <span className="block text-[11px] font-black uppercase tracking-widest leading-none">Coinsellers</span>
+                <span className="text-[8px] opacity-60 font-bold">Local Transfer & Payout</span>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-yellow-400" />
@@ -238,13 +235,13 @@ export default function RechargePage() {
           {isPesaPalCountry && (
             <div className="flex items-center justify-center gap-2 text-gray-300 pt-4">
               <ShieldCheck className="w-4 h-4" />
-              <span className="text-[9px] font-black tracking-[0.2em]">Secured by PesaPal</span>
+              <span className="text-[9px] font-black tracking-[0.2em]">Verified Gateway</span>
             </div>
           )}
         </div>
       </main>
 
-      <footer className="sticky bottom-0 inset-x-0 p-6 bg-white/95 backdrop-blur-xl border-t border-black/5 z-[60] flex flex-col gap-4 pb-[env(safe-area-inset-bottom,24px)] shadow-[0_-10px_30px_rgba(0,0,0,0.04)]">
+      <footer className="sticky bottom-0 inset-x-0 p-6 bg-white/95 backdrop-blur-xl border-t border-black/5 z-[80] flex flex-col gap-4 pb-[env(safe-area-inset-bottom,24px)] shadow-[0_-10px_30px_rgba(0,0,0,0.04)] mt-auto shrink-0">
         <Button 
           onClick={handleRecharge}
           disabled={isProcessing || !selectedId}

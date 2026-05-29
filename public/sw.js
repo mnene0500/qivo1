@@ -6,11 +6,11 @@ self.addEventListener('push', function(event) {
       body: data.body,
       icon: '/icon-192.png',
       badge: '/notification.png',
+      vibrate: [100, 50, 100],
       data: {
         url: data.url || '/'
       }
     };
-
     event.waitUntil(
       self.registration.showNotification(data.title, options)
     );

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { usePathname, useSearchParams } from "next/navigation"
@@ -8,9 +9,7 @@ import { useUser } from "@/firebase/auth/use-user"
 
 /**
  * @fileOverview Viewport-Centric App Shell.
- * Ensures persistent UI (BottomNav) stays fixed while content scrolls independently.
- * Implements Scroll Persistence and single-click scroll-to-top logic.
- * Optimized for hydration safety.
+ * Optimized for hydration safety and scroll persistence.
  */
 
 let scrollCache: Record<string, number> = {};
@@ -22,22 +21,22 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   const mainRef = useRef<HTMLElement>(null)
   const [mounted, setMounted] = useState(false)
   
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const isChatDetail = pathname === '/chats' && searchParams.has('startWith')
   const isCall = pathname?.startsWith('/call/')
   const isWelcome = pathname === '/welcome'
   const isAuth = pathname === '/auth'
   const isSplash = pathname === '/'
-  
-  // Hydration safety: ensure mounted state
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const isFastOnboard = pathname === '/fastonboard'
 
   const showNav = useMemo(() => {
-    if (!mounted) return false;
+    if (!mounted || !user) return false;
     const navRoutes = ['/home', '/chats', '/profile'];
-    return !!user && navRoutes.includes(pathname || "") && !isChatDetail && !isCall && !isWelcome && !isAuth && !isSplash;
-  }, [mounted, user, pathname, isChatDetail, isCall, isWelcome, isAuth, isSplash]);
+    return navRoutes.includes(pathname || "") && !isChatDetail && !isCall && !isWelcome && !isAuth && !isSplash && !isFastOnboard;
+  }, [mounted, user, pathname, isChatDetail, isCall, isWelcome, isAuth, isSplash, isFastOnboard]);
 
   // RESTORE SCROLL
   useEffect(() => {
@@ -49,20 +48,16 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
   // SAVE SCROLL ON LEAVE
   useEffect(() => {
+    const currentMain = mainRef.current;
+    if (!currentMain || !pathname) return;
+
     const handleScroll = () => {
-      if (mainRef.current && pathname) {
-        scrollCache[pathname] = mainRef.current.scrollTop;
-      }
+      scrollCache[pathname] = currentMain.scrollTop;
     }
 
-    const currentMain = mainRef.current;
-    if (currentMain) {
-      currentMain.addEventListener('scroll', handleScroll);
-    }
+    currentMain.addEventListener('scroll', handleScroll);
     return () => {
-      if (currentMain) {
-        currentMain.removeEventListener('scroll', handleScroll);
-      }
+      currentMain.removeEventListener('scroll', handleScroll);
     }
   }, [pathname])
 
@@ -78,21 +73,14 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('qivo-nav-refresh', handleRefresh);
   }, [pathname])
 
-  // Clear cache on session change
-  useEffect(() => {
-    if (!user) {
-      scrollCache = {};
-    }
-  }, [user])
-
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-white">
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-white relative">
       <main 
         ref={mainRef}
         className={cn(
           "flex-1 w-full overflow-y-auto overflow-x-hidden relative z-0 no-scrollbar pb-[env(safe-area-inset-bottom)]",
-          showNav && "pb-20",
-          "native-page-transition"
+          showNav ? "pb-20" : "pb-0",
+          mounted ? "native-page-transition" : "opacity-0"
         )}
       >
         {children}

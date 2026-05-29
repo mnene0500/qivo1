@@ -54,6 +54,51 @@ export async function completeOnboardingAction(payload: {
   }
 }
 
+export async function checkIdentityDuplicateAction(userId: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: user } = await supabase.from('users').select('photo_url').eq('uid', userId).single();
+    if (!user?.photo_url) return { success: true };
+
+    const { data: others } = await supabase
+      .from('users')
+      .select('match_flow_id')
+      .eq('photo_url', user.photo_url)
+      .eq('is_verified', true)
+      .neq('uid', userId)
+      .maybeSingle();
+
+    if (others) {
+      return { success: false, matchFlowId: others.match_flow_id };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: true };
+  }
+}
+
+export async function deleteUserCompletelyAction(uid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    // 1. Storage Cleanup
+    try {
+      const { data: files } = await supabase.storage.from('photos').list(uid);
+      if (files?.length) {
+        await supabase.storage.from('photos').remove(files.map(f => `${uid}/${f.name}`));
+      }
+    } catch (e) {}
+
+    // 2. Auth Deletion (Admin)
+    const { error: authErr } = await supabase.auth.admin.deleteUser(uid);
+    if (authErr) throw authErr;
+
+    // 3. Database records handled by CASCADE
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function savePushSubscriptionAction(userId: string, endpoint: string, subscriptionJson: any) {
   const supabase = getSupabaseAdmin();
   try {
@@ -211,6 +256,36 @@ export async function sendMessageAction(payload: { chatId: string; senderId: str
   }
 }
 
+export async function sendMysteryNoteAction(senderUid: string, text: string, count: number) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const cost = count * 10;
+    const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', senderUid).single();
+    if ((Number(bal?.coins) || 0) < cost) throw new Error("Insufficient coins");
+
+    const { data: recipients } = await supabase
+      .from('users')
+      .select('uid')
+      .neq('uid', senderUid)
+      .eq('onboarding_complete', true)
+      .limit(count);
+
+    if (!recipients || recipients.length === 0) throw new Error("No recipients found");
+
+    await supabase.rpc("increment_coins", { p_user_id: senderUid, p_amount: -cost });
+
+    for (const r of recipients) {
+      const ids = [senderUid, r.uid].sort();
+      const chatId = `direct_${ids[0]}_${ids[1]}`;
+      await sendMessageAction({ chatId, senderId: senderUid, recipientId: r.uid, text });
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 export async function requestWithdrawalAction(userUid: string, diamonds: number, amount_kes: number, agencyId: string, mpesaNumber: string) {
   const supabase = getSupabaseAdmin();
   try {
@@ -243,6 +318,16 @@ export async function joinAgencyAction(userUid: string, code: string) {
     const { data: agency } = await supabase.from('agencies').select('code').eq('code', code).maybeSingle();
     if (!agency) throw new Error("Invalid Code.");
     await supabase.from('users').update({ agency_id: code, agency_status: 'pending' }).eq('uid', userUid);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function leaveAgencyAction(userUid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    await supabase.from('users').update({ agency_id: null, agency_status: null }).eq('uid', userUid);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
