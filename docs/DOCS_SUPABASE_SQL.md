@@ -1,25 +1,26 @@
 
-# QIVO Production SQL (Run in SQL Editor)
+# QIVO Production SQL (Run in Supabase SQL Editor)
 
 ```sql
 -- 1. SETUP ATOMIC HELPERS (Hardened for Realtime Economy)
-CREATE OR REPLACE FUNCTION public.increment_diamonds(user_id UUID, amount NUMERIC)
+-- These functions use SECURITY DEFINER to bypass RLS for internal balance shifts
+CREATE OR REPLACE FUNCTION public.increment_diamonds(p_user_id UUID, p_amount NUMERIC)
 RETURNS VOID AS $$
 BEGIN
   INSERT INTO public.balances (user_id, diamonds)
-  VALUES (user_id, amount)
+  VALUES (p_user_id, p_amount)
   ON CONFLICT (user_id)
-  DO UPDATE SET diamonds = COALESCE(balances.diamonds, 0) + amount, updated_at = NOW();
+  DO UPDATE SET diamonds = COALESCE(balances.diamonds, 0) + p_amount, updated_at = NOW();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION public.increment_coins(user_id UUID, amount BIGINT)
+CREATE OR REPLACE FUNCTION public.increment_coins(p_user_id UUID, p_amount BIGINT)
 RETURNS VOID AS $$
 BEGIN
   INSERT INTO public.balances (user_id, coins)
-  VALUES (user_id, amount)
+  VALUES (p_user_id, p_amount)
   ON CONFLICT (user_id)
-  DO UPDATE SET coins = COALESCE(balances.coins, 0) + amount, updated_at = NOW();
+  DO UPDATE SET coins = COALESCE(balances.coins, 0) + p_amount, updated_at = NOW();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -36,10 +37,12 @@ CREATE TABLE IF NOT EXISTS public.users (
   photo_url TEXT,
   additional_photos TEXT[] DEFAULT '{}',
   match_flow_id TEXT UNIQUE,
+  education_level TEXT,
   onboarding_complete BOOLEAN DEFAULT FALSE,
-  is_admin BOOLEAN DEFAULT FALSE,
+  is_owner BOOLEAN DEFAULT FALSE,
   is_coin_seller BOOLEAN DEFAULT FALSE,
   is_agent BOOLEAN DEFAULT FALSE,
+  is_special_user BOOLEAN DEFAULT FALSE,
   is_verified BOOLEAN DEFAULT FALSE,
   is_deleted BOOLEAN DEFAULT FALSE,
   agency_id TEXT,
@@ -57,6 +60,16 @@ CREATE TABLE IF NOT EXISTS public.balances (
   coins BIGINT DEFAULT 0,
   diamonds NUMERIC DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.calls (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chat_id TEXT NOT NULL,
+  caller_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+  receiver_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
+  type TEXT CHECK (type IN ('video', 'voice')),
+  status TEXT DEFAULT 'calling', -- calling, active, ended
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.pending_payments (
@@ -89,7 +102,7 @@ CREATE TABLE IF NOT EXISTS public.diamond_history (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
   amount NUMERIC,
-  type TEXT,
+  type TEXT, 
   description TEXT,
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
@@ -100,7 +113,8 @@ CREATE TABLE IF NOT EXISTS public.chats (
   last_message TEXT,
   last_message_at BIGINT,
   cleared_at JSONB DEFAULT '{}'::jsonb,
-  last_seen_at JSONB DEFAULT '{}'::jsonb
+  last_seen_at JSONB DEFAULT '{}'::jsonb,
+  last_sender_id UUID
 );
 
 CREATE TABLE IF NOT EXISTS public.messages (
@@ -125,7 +139,8 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
   agency_id TEXT REFERENCES public.agencies(code) ON DELETE CASCADE,
   diamonds NUMERIC,
   amount_kes NUMERIC,
-  status TEXT DEFAULT 'pending',
+  mpesa_number TEXT,
+  status TEXT DEFAULT 'pending', -- pending, paid, rejected
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
@@ -136,15 +151,18 @@ CREATE TABLE IF NOT EXISTS public.reports (
   reason TEXT,
   description TEXT,
   proof_photo_url TEXT,
-  status TEXT DEFAULT 'pending',
+  status TEXT DEFAULT 'pending', -- pending, resolved
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
 -- 3. ENABLE REALTIME SAFELY (FULL PAYLOAD)
 ALTER TABLE public.balances REPLICA IDENTITY FULL;
 ALTER TABLE public.users REPLICA IDENTITY FULL;
-ALTER TABLE public.coin_history REPLICA IDENTITY FULL;
-ALTER TABLE public.diamond_history REPLICA IDENTITY FULL;
+ALTER TABLE public.calls REPLICA IDENTITY FULL;
+ALTER TABLE public.chats REPLICA IDENTITY FULL;
+ALTER TABLE public.messages REPLICA IDENTITY FULL;
+ALTER TABLE public.withdrawals REPLICA IDENTITY FULL;
+ALTER TABLE public.reports REPLICA IDENTITY FULL;
 
 DO $$ 
 BEGIN 
@@ -155,24 +173,19 @@ END $$;
 
 ALTER PUBLICATION supabase_realtime SET TABLE 
   public.balances, 
-  public.coin_history, 
-  public.diamond_history, 
-  public.chats, 
-  public.messages, 
   public.users, 
+  public.calls, 
+  public.chats, 
+  public.messages,
   public.withdrawals, 
-  public.reports,
-  public.pending_payments;
+  public.reports;
 
 -- 4. ENABLE RLS & POLICIES
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.balances ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.coin_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.diamond_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.processed_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.calls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.agencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
@@ -189,6 +202,13 @@ CREATE POLICY "Users view own balance" ON public.balances FOR SELECT USING (auth
 
 DROP POLICY IF EXISTS "Participants can view chats" ON public.chats;
 CREATE POLICY "Participants can view chats" ON public.chats FOR SELECT USING (auth.uid() = ANY(participant_ids));
+
+DROP POLICY IF EXISTS "Withdrawals are visible to user and agency agent" ON public.withdrawals;
+CREATE POLICY "Withdrawals are visible to user and agency agent" ON public.withdrawals
+FOR SELECT USING (
+  auth.uid() = user_id OR 
+  auth.uid() IN (SELECT agent_uid FROM public.agencies WHERE code = agency_id)
+);
 
 -- 6. GRANT PERMISSIONS
 GRANT USAGE ON SCHEMA public TO anon, authenticated;

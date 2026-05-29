@@ -1,25 +1,26 @@
 
-# QIVO Production SQL (Run in SQL Editor)
+# QIVO Production SQL (Run in Supabase SQL Editor)
 
 ```sql
 -- 1. SETUP ATOMIC HELPERS (Hardened for Realtime Economy)
-CREATE OR REPLACE FUNCTION public.increment_diamonds(user_id UUID, amount NUMERIC)
+-- These functions use SECURITY DEFINER to bypass RLS for internal balance shifts
+CREATE OR REPLACE FUNCTION public.increment_diamonds(p_user_id UUID, p_amount NUMERIC)
 RETURNS VOID AS $$
 BEGIN
   INSERT INTO public.balances (user_id, diamonds)
-  VALUES (user_id, amount)
+  VALUES (p_user_id, p_amount)
   ON CONFLICT (user_id)
-  DO UPDATE SET diamonds = COALESCE(balances.diamonds, 0) + amount, updated_at = NOW();
+  DO UPDATE SET diamonds = COALESCE(balances.diamonds, 0) + p_amount, updated_at = NOW();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION public.increment_coins(user_id UUID, amount BIGINT)
+CREATE OR REPLACE FUNCTION public.increment_coins(p_user_id UUID, p_amount BIGINT)
 RETURNS VOID AS $$
 BEGIN
   INSERT INTO public.balances (user_id, coins)
-  VALUES (user_id, amount)
+  VALUES (p_user_id, p_amount)
   ON CONFLICT (user_id)
-  DO UPDATE SET coins = COALESCE(balances.coins, 0) + amount, updated_at = NOW();
+  DO UPDATE SET coins = COALESCE(balances.coins, 0) + p_amount, updated_at = NOW();
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   photo_url TEXT,
   additional_photos TEXT[] DEFAULT '{}',
   match_flow_id TEXT UNIQUE,
+  education_level TEXT,
   onboarding_complete BOOLEAN DEFAULT FALSE,
   is_owner BOOLEAN DEFAULT FALSE,
   is_coin_seller BOOLEAN DEFAULT FALSE,
@@ -70,6 +72,14 @@ CREATE TABLE IF NOT EXISTS public.calls (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.pending_payments (
+  order_id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  amount NUMERIC,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.processed_payments (
   order_tracking_id TEXT PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -92,7 +102,7 @@ CREATE TABLE IF NOT EXISTS public.diamond_history (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES public.users(uid) ON DELETE CASCADE,
   amount NUMERIC,
-  type TEXT,
+  type TEXT, 
   description TEXT,
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
@@ -130,7 +140,7 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
   diamonds NUMERIC,
   amount_kes NUMERIC,
   mpesa_number TEXT,
-  status TEXT DEFAULT 'pending',
+  status TEXT DEFAULT 'pending', -- pending, paid, rejected
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
@@ -141,7 +151,7 @@ CREATE TABLE IF NOT EXISTS public.reports (
   reason TEXT,
   description TEXT,
   proof_photo_url TEXT,
-  status TEXT DEFAULT 'pending',
+  status TEXT DEFAULT 'pending', -- pending, resolved
   timestamp BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)
 );
 
@@ -152,6 +162,7 @@ ALTER TABLE public.calls REPLICA IDENTITY FULL;
 ALTER TABLE public.chats REPLICA IDENTITY FULL;
 ALTER TABLE public.messages REPLICA IDENTITY FULL;
 ALTER TABLE public.withdrawals REPLICA IDENTITY FULL;
+ALTER TABLE public.reports REPLICA IDENTITY FULL;
 
 DO $$ 
 BEGIN 
@@ -176,6 +187,7 @@ ALTER TABLE public.calls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
 -- 5. CREATE POLICIES
 DROP POLICY IF EXISTS "Users can manage own profile" ON public.users;
