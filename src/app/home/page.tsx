@@ -1,162 +1,104 @@
+
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
-import { RotateCw, BadgeCheck, FileText, Target, Loader2, Sparkles, MessageSquare, MapPin } from "lucide-react"
+import { RotateCw, BadgeCheck, FileText, Target, Loader2, Sparkles, MessageSquare } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { Button } from "@/components/ui/button"
 
 interface UserProfile {
-  uid: string
-  name: string
-  photo_url: string
-  country: string
-  gender: string
-  dob: string
-  is_verified?: boolean
-  updated_at: string
+  uid: string; name: string; photo_url: string; country: string; dob: string; is_verified?: boolean; updated_at: string;
 }
 
-const PAGE_SIZE = 12;
-let globalUserCache: UserProfile[] = []; // Simple cross-mount cache
-
-function calculateAge(dob: string) {
-  if (!dob) return 18
-  const birthDate = new Date(dob); const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-  return age;
-}
+let cachedUsers: UserProfile[] = [];
 
 export default function HomePage() {
   const router = useRouter()
-  const { user: currentUser, loading: authLoading, isInitialized } = useUser()
-  
+  const { user: currentUser, isInitialized } = useUser()
   const [activeTab, setActiveTab] = useState<'recommend' | 'nearby'>('recommend')
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [users, setUsers] = useState<UserProfile[]>(globalUserCache)
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
+  const [loading, setLoading] = useState(cachedUsers.length === 0)
+  const [users, setUsers] = useState<UserProfile[]>(cachedUsers)
   const [profile, setProfile] = useState<any>(null)
 
-  const fetchUsers = useCallback(async (pageNum = 0, reshuffle = false) => {
-    if (!profile) return;
-    if (pageNum === 0) setIsRefreshing(true);
+  const fetchUsers = useCallback(async (reshuffle = false) => {
+    if (!currentUser?.id) return;
+    if (users.length === 0) setLoading(true);
 
-    try {
-      const from = pageNum * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      const oppositeGender = profile.gender === 'male' ? 'female' : 'male';
-      const blockedList = [...(profile.blocking || []), ...(profile.blocked_by || [])];
+    const { data: myProfile } = await supabase.from('users').select('*').eq('uid', currentUser.id).single();
+    if (!myProfile) return;
+    setProfile(myProfile);
 
-      let query = supabase
-        .from('users')
-        .select('*')
-        .eq('onboarding_complete', true)
-        .eq('gender', oppositeGender)
-        .is('is_deleted', false)
-        .not('uid', 'in', `(${[currentUser!.id, ...blockedList].join(',')})`);
+    const oppositeGender = myProfile.gender === 'male' ? 'female' : 'male';
+    let query = supabase.from('users').select('*').eq('onboarding_complete', true).eq('gender', oppositeGender).is('is_deleted', false).neq('uid', currentUser.id);
 
-      if (activeTab === 'nearby') {
-        query = query.eq('country', profile.country);
+    if (activeTab === 'nearby') query = query.eq('country', myProfile.country);
+    
+    const { data } = await query.order('updated_at', { ascending: false }).limit(40);
+
+    if (data) {
+      let final = data as any[];
+      if (reshuffle && final.length > 5) {
+        const top = final.slice(0, 4);
+        const rest = final.slice(4);
+        final = [top[1], top[2], top[0], top[3], ...rest];
       }
-      
-      // ORDER BY updated_at to bring online/recent users to the top
-      query = query.order('updated_at', { ascending: false }).range(from, to);
-
-      const { data } = await query;
-
-      if (data) {
-        let finalData = pageNum === 0 ? data : [...users, ...data];
-        
-        if (reshuffle && finalData.length > 3) {
-          // RESHUFFLE LOGIC: Cyclic shift for top users
-          const active = finalData.slice(0, 4);
-          const others = finalData.slice(4);
-          const shiftedActive = [active[1], active[2], active[0], active[3]];
-          finalData = [...shiftedActive, ...others];
-        }
-
-        setUsers(finalData as any);
-        globalUserCache = finalData as any;
-        setHasMore(data.length === PAGE_SIZE);
-        setPage(pageNum);
-      }
-    } finally {
-      setIsRefreshing(false);
+      setUsers(final);
+      cachedUsers = final;
     }
-  }, [currentUser?.id, profile, activeTab, users]);
+    setLoading(false);
+  }, [currentUser?.id, activeTab]);
 
   useEffect(() => {
-    if (isInitialized && currentUser && !profile) {
-      supabase.from('users').select('*').eq('uid', currentUser.id).single().then(({ data }) => {
-        if (data?.onboarding_complete) setProfile(data);
-        else if (data) router.replace("/fastonboard");
-      });
-    }
-  }, [isInitialized, currentUser, router, profile]);
+    if (isInitialized) fetchUsers();
+  }, [isInitialized, activeTab]);
 
-  useEffect(() => {
-    if (profile && (users.length === 0 || activeTab)) {
-      fetchUsers(0);
-    }
-  }, [profile, activeTab]);
-
-  const handleRefresh = () => {
-    fetchUsers(0, true);
-  }
+  const calculateAge = (dob: string) => {
+    if (!dob) return 21;
+    const diff = Date.now() - new Date(dob).getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+  };
 
   return (
     <div className="flex flex-col w-full bg-white select-none">
       <div className="px-4 grid grid-cols-2 gap-3 py-6 bg-white shrink-0">
-        <button onClick={() => router.push('/mystery-note')} className="h-28 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-600 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-1 text-white shadow-xl relative overflow-hidden">
-          <FileText className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest">Message</p><p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Blast</p>
+        <button onClick={() => router.push('/mystery-note')} className="h-28 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-600 rounded-[2rem] p-6 flex flex-col items-start justify-center text-white shadow-xl">
+          <FileText className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest">Message Blast</p>
         </button>
-        <button onClick={() => router.push('/tasks')} className="h-28 bg-gradient-to-br from-purple-900 via-purple-800 to-purple-600 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-1 text-white shadow-xl relative overflow-hidden">
-          <Target className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest">Task</p><p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Center</p>
+        <button onClick={() => router.push('/tasks')} className="h-28 bg-gradient-to-br from-purple-900 via-purple-800 to-purple-600 rounded-[2rem] p-6 flex flex-col items-start justify-center text-white shadow-xl">
+          <Target className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest">Task Center</p>
         </button>
       </div>
 
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl px-5 py-3 flex items-center justify-between border-b border-gray-50 h-14">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl px-5 py-3 flex items-center justify-between border-b h-14">
         <div className="flex items-center gap-6">
-          {[
-            { id: 'recommend', label: 'Recommend' },
-            { id: 'nearby', label: 'Nearby' }
-          ].map((tab) => (
-            <button 
-              key={tab.id} 
-              onClick={() => setActiveTab(tab.id as any)} 
-              className={cn(
-                "text-xs font-black uppercase tracking-widest transition-all", 
-                activeTab === tab.id ? "text-[#00A2FF]" : "text-gray-300"
-              )}
-            >
-              {tab.label}
+          {['recommend', 'nearby'].map((t) => (
+            <button key={t} onClick={() => setActiveTab(t as any)} className={cn("text-xs font-black uppercase tracking-widest", activeTab === t ? "text-[#00A2FF]" : "text-gray-300")}>
+              {t}
             </button>
           ))}
         </div>
-        <button onClick={handleRefresh} className={cn("p-2 text-gray-400 transition-transform", isRefreshing && "animate-spin")}><RotateCw className="w-4 h-4" /></button>
+        <button onClick={() => fetchUsers(true)} className="p-2 text-gray-400"><RotateCw className="w-4 h-4" /></button>
       </div>
 
       <main className="px-4 pt-4 pb-24">
-        {users.length === 0 && !isRefreshing ? (
-          <div className="py-40 text-center opacity-40 px-12">
-            <p className="font-black text-xs uppercase tracking-widest">No profiles found</p>
-          </div>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3">{[1,2,3,4].map(i => <div key={i} className="aspect-[1/1.3] bg-gray-50 rounded-[2rem] animate-pulse" />)}</div>
+        ) : users.length === 0 ? (
+          <div className="py-40 text-center opacity-40 uppercase font-black text-xs">No profiles found</div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {users.map((u) => (
-              <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-[2rem] shadow-xl bg-gray-50" onClick={() => router.push(`/users/${u.uid}`)}>
+              <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-[2rem] shadow-xl" onClick={() => router.push(`/users/${u.uid}`)}>
                 <Image src={u.photo_url} alt={u.name} fill className="object-cover" sizes="50vw" priority />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                 <div className="absolute bottom-4 left-4 right-4 text-white">
                   <div className="flex items-center gap-1 mb-1">
-                    <h4 className="font-black text-sm truncate max-w-[80px]">{u.name}</h4>
+                    <h4 className="font-black text-sm truncate">{u.name}</h4>
                     {u.is_verified && <BadgeCheck className="w-3.5 h-3.5 text-[#00A2FF] fill-white" />}
                   </div>
                   <div className="flex items-center gap-2">
@@ -164,19 +106,11 @@ export default function HomePage() {
                     <span className="text-[9px] font-bold opacity-60 uppercase truncate">{u.country}</span>
                   </div>
                 </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }} 
-                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white"
-                >
+                <button onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
                   <MessageSquare className="w-4 h-4 fill-current" />
                 </button>
               </Card>
             ))}
-          </div>
-        )}
-        {hasMore && users.length > 0 && !isRefreshing && (
-          <div className="py-10 flex justify-center">
-             <Button onClick={() => fetchUsers(page + 1)} variant="ghost" className="text-[10px] font-black uppercase tracking-widest">Load More</Button>
           </div>
         )}
       </main>
