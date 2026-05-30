@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog"
 
 const PACKAGES = [
+  { id: "p0", label: "Trial", coins: 5, priceKes: 1 },
   { id: "p1", label: "500", coins: 500, priceKes: 80 },
   { id: "p2", label: "1000", coins: 1000, priceKes: 120, popular: true },
   { id: "p3", label: "5000", coins: 5000, priceKes: 600 },
@@ -193,7 +194,7 @@ export default function RechargePage() {
                 >
                   {selectedId === pkg.id && (
                     <div className="absolute -top-2 -right-1 bg-[#00A2FF] text-white p-1 rounded-full shadow-lg">
-                      <Check className="w-3 h-3" />
+                      <Check className="w-3.5 h-3.5" />
                     </div>
                   )}
                   <div className="flex flex-col items-center gap-1 mb-2">

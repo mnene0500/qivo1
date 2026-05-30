@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
@@ -17,7 +17,8 @@ import {
   ArrowRightLeft, 
   Loader2, 
   Info,
-  Smartphone
+  Smartphone,
+  Calendar
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { requestWithdrawalAction } from "@/app/actions/matchflow-actions"
@@ -46,12 +47,20 @@ export default function AgencyMemberPage() {
     fetchData()
   }, [user?.id])
 
+  const isSaturday = useMemo(() => {
+    return new Date().getDay() === 6;
+  }, []);
+
   const diamondBalance = balances.diamonds
   const cashRate = 0.08 
   const minDiamondsForCash = 12500
   const expectedKes = (Number(diamondsToUse) * cashRate).toFixed(2)
 
   const handleWithdraw = async () => {
+    if (!isSaturday) {
+      toast({ variant: "destructive", title: "Access Denied", description: "Withdrawals are only allowed on Saturdays." });
+      return;
+    }
     const amount = Number(diamondsToUse)
     if (isNaN(amount) || amount < minDiamondsForCash || amount > diamondBalance) {
       toast({ variant: "destructive", title: "Invalid Amount" })
@@ -111,11 +120,23 @@ export default function AgencyMemberPage() {
         </div>
 
         <div className="space-y-6">
+          {!isSaturday && (
+            <div className="p-5 bg-red-50 rounded-2xl border border-red-100 flex items-start gap-4 animate-in fade-in duration-500">
+              <Calendar className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-[10px] font-black text-red-900 uppercase tracking-widest">Closed Today</p>
+                <p className="text-[9px] font-bold text-red-700 leading-relaxed uppercase tracking-widest">
+                  Withdrawal requests are strictly limited to **Saturdays**. Please return then.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase text-gray-400 ml-1">Diamonds to Cash</Label>
               <div className="relative">
-                <Input type="number" placeholder={`Min ${minDiamondsForCash}`} value={diamondsToUse} onChange={(e) => setDiamondsToUse(e.target.value)} className="rounded-2xl h-16 pl-12 border-gray-100 bg-gray-50 text-lg font-bold" />
+                <Input disabled={!isSaturday} type="number" placeholder={`Min ${minDiamondsForCash}`} value={diamondsToUse} onChange={(e) => setDiamondsToUse(e.target.value)} className="rounded-2xl h-16 pl-12 border-gray-100 bg-gray-50 text-lg font-bold" />
                 <Gem className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
               </div>
             </div>
@@ -123,13 +144,13 @@ export default function AgencyMemberPage() {
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase text-gray-400 ml-1">M-Pesa Number</Label>
               <div className="relative">
-                <Input type="tel" placeholder="07XX XXX XXX" value={mpesaNumber} onChange={(e) => setMpesaNumber(e.target.value)} className="rounded-2xl h-16 pl-12 border-gray-100 bg-gray-50 text-lg font-bold tracking-widest" />
+                <Input disabled={!isSaturday} type="tel" placeholder="07XX XXX XXX" value={mpesaNumber} onChange={(e) => setMpesaNumber(e.target.value)} className="rounded-2xl h-16 pl-12 border-gray-100 bg-gray-50 text-lg font-bold tracking-widest" />
                 <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#00A2FF]" />
               </div>
             </div>
           </div>
 
-          {Number(diamondsToUse) > 0 && (
+          {Number(diamondsToUse) > 0 && isSaturday && (
             <div className="p-5 rounded-2xl border flex items-center justify-between bg-green-50 border-green-100 animate-in zoom-in-95">
               <div className="flex items-center gap-3"><Banknote className="w-5 h-5 text-green-600" /><span className="text-[10px] font-bold text-black uppercase tracking-widest">You'll Receive</span></div>
               <span className="text-xl font-bold text-green-600">Ksh {expectedKes}</span>
@@ -146,7 +167,7 @@ export default function AgencyMemberPage() {
             </div>
           </div>
 
-          <Button className="w-full h-16 rounded-full bg-green-600 text-white font-bold uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all" onClick={handleWithdraw} disabled={isProcessing || !diamondsToUse || Number(diamondsToUse) < minDiamondsForCash || !mpesaNumber}>
+          <Button className="w-full h-16 rounded-full bg-green-600 text-white font-bold uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all" onClick={handleWithdraw} disabled={isProcessing || !diamondsToUse || Number(diamondsToUse) < minDiamondsForCash || !mpesaNumber || !isSaturday}>
             {isProcessing ? <Loader2 className="animate-spin" /> : <div className="flex items-center gap-2"><ArrowRightLeft className="w-5 h-5" />Request Payout</div>}
           </Button>
         </div>

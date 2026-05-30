@@ -295,6 +295,10 @@ export async function resolveReportAction(adminUid: string, reportId: string, re
 export async function requestWithdrawalAction(userUid: string, diamonds: number, amount_kes: number, agencyId: string, mpesaNumber: string) {
   const supabase = getSupabaseAdmin();
   try {
+    // POLICY: Withdrawals only on Saturdays
+    const day = new Date().getDay();
+    if (day !== 6) throw new Error("Withdrawals are only allowed on Saturdays.");
+
     const ts = Date.now();
     const { error: deductErr } = await supabase.rpc("increment_diamonds", { p_user_id: userUid, p_amount: -diamonds });
     if (deductErr) throw new Error("Insufficient diamonds");
@@ -481,10 +485,39 @@ export async function playSlotsAction(userId: string, stake: number) {
 
 export async function sendMysteryNoteAction(senderUid: string, text: string, count: number) {
   const supabase = getSupabaseAdmin();
+  const ts = Date.now();
   try {
     const cost = count * 10;
     const { error: dErr } = await supabase.rpc("increment_coins", { p_user_id: senderUid, p_amount: -cost });
     if (dErr) throw new Error("Insufficient coins");
+
+    // Fetch potential recipients (opposite gender, active)
+    const { data: sender } = await supabase.from('users').select('gender').eq('uid', senderUid).single();
+    const targetGender = sender?.gender === 'male' ? 'female' : 'male';
+    
+    const { data: targets } = await supabase
+      .from('users')
+      .select('uid')
+      .eq('gender', targetGender)
+      .eq('onboarding_complete', true)
+      .neq('uid', senderUid)
+      .limit(count);
+
+    if (targets) {
+      for (const t of targets) {
+        const chatId = `direct_${[senderUid, t.uid].sort()[0]}_${[senderUid, t.uid].sort()[1]}`;
+        await supabase.from('chats').upsert({ 
+          id: chatId, 
+          last_message: text.slice(0, 100), 
+          last_message_at: ts, 
+          participant_ids: [senderUid, t.uid],
+          last_sender_id: senderUid,
+          updated_at: new Date().toISOString()
+        });
+        await supabase.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text, timestamp: ts });
+      }
+    }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };

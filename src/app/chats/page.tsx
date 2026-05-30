@@ -134,7 +134,7 @@ function ChatsContent() {
       setPartnerProfile(data);
     });
 
-    // Fetch Messages relative to cleared timestamp
+    // Fetch Messages relative to cleared timestamp (Soft Delete)
     supabase.from('chats').select('cleared_at').eq('id', cid).maybeSingle().then(({ data: chatMeta }) => {
       const clearedAt = (chatMeta?.cleared_at as Record<string, number>)?.[currentUser.id] || 0;
       
@@ -264,7 +264,7 @@ function ChatsContent() {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-black text-center uppercase tracking-tight">Delete Conversation?</AlertDialogTitle>
             <AlertDialogDescription className="text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              This will clear the chat history for you. The other person will still see the messages.
+              This will clear the chat history for you. If you start a chat with this user again, it will be blank.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3 mt-4">
