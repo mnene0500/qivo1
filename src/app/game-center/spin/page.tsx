@@ -1,10 +1,9 @@
-
 "use client"
 
-import { useState, useRef, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, Coins, Trophy, Loader2, Sparkles, Info, Star } from "lucide-react"
+import { ChevronLeft, Coins, Trophy, Loader2, Sparkles, Star } from "lucide-react"
 import { useUser } from "@/firebase/auth/use-user"
 import { useToast } from "@/hooks/use-toast"
 import { useBalance } from "@/lib/providers/BalanceProvider"
@@ -26,7 +25,6 @@ export default function SpinToWinPage() {
   const [rotation, setRotation] = useState(0)
   const [lastWin, setLastWin] = useState<number | null>(null)
 
-  // Dynamic Visual Prizes based on Stake
   const currentPrizes = useMemo(() => {
     if (selectedStake === 20) return [0, 5, 10, 0, 20, 0, 50, 5, 0, 10, 20, 0, 5, 0, 30, 0, 10, 50, 0, 15];
     if (selectedStake <= 100) return [0, 20, 50, 0, 100, 0, 200, 20, 0, 50, 100, 0, 20, 0, 150, 0, 50, 200, 0, 80];
@@ -56,7 +54,7 @@ export default function SpinToWinPage() {
           setIsSpinning(false)
           setLastWin(res.winAmount)
           if (res.winAmount > 0) {
-            toast({ title: `You Won ${res.winAmount} Coins!`, description: "Winning added to your wallet." })
+            toast({ title: `You Won ${res.winAmount} Coins!` })
           } else {
             toast({ title: "No Win", description: "Better luck next spin!" })
           }
@@ -72,12 +70,8 @@ export default function SpinToWinPage() {
 
   return (
     <div className="flex-1 bg-[#0A0A0A] min-h-screen flex flex-col select-none overflow-hidden relative">
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,#4F46E5_0%,transparent_70%)]" />
-      </div>
-
       <header className="px-4 h-16 flex items-center justify-between sticky top-0 z-[60] bg-black/40 backdrop-blur-md">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full text-white/60 hover:text-white"><ChevronLeft className="w-6 h-6" /></Button>
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full text-white/60"><ChevronLeft className="w-6 h-6" /></Button>
         <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full border border-white/10">
           <Coins className="w-3.5 h-3.5 text-yellow-500 fill-current" />
           <span className="text-xs font-black text-white">{coins}</span>
@@ -95,9 +89,7 @@ export default function SpinToWinPage() {
             <div className="w-8 h-10 bg-amber-500" style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} />
           </div>
 
-          <div 
-            className="w-full h-full rounded-full border-[8px] border-amber-900/50 shadow-[0_0_80px_rgba(245,158,11,0.15)] bg-black overflow-hidden relative"
-          >
+          <div className="w-full h-full rounded-full border-[8px] border-amber-900/50 bg-black overflow-hidden relative">
             <svg 
               viewBox="0 0 100 100" 
               className="w-full h-full transition-transform duration-[5000ms] cubic-bezier(0.1, 0, 0.1, 1)"
@@ -113,7 +105,7 @@ export default function SpinToWinPage() {
                 )
               })}
             </svg>
-            <div className="absolute inset-[42%] bg-amber-600 rounded-full border-2 border-amber-900 shadow-inner flex items-center justify-center z-20">
+            <div className="absolute inset-[42%] bg-amber-600 rounded-full border-2 border-amber-900 flex items-center justify-center z-20">
               <Star className="w-4 h-4 text-white fill-current" />
             </div>
           </div>
@@ -128,7 +120,7 @@ export default function SpinToWinPage() {
                ))}
              </div>
           </div>
-          <Button onClick={handleSpin} disabled={isSpinning} className={cn("w-full h-18 py-7 rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all", isSpinning ? "bg-white/10 text-gray-500" : "bg-white text-black hover:bg-amber-500")}>
+          <Button onClick={handleSpin} disabled={isSpinning} className={cn("w-full h-18 py-7 rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl transition-all", isSpinning ? "bg-white/10 text-gray-500" : "bg-white text-black hover:bg-amber-500")}>
             {isSpinning ? <Loader2 className="w-6 h-6 animate-spin" /> : "Stake & Spin"}
           </Button>
         </div>
@@ -136,7 +128,7 @@ export default function SpinToWinPage() {
 
       {lastWin !== null && lastWin > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-10 animate-in fade-in zoom-in duration-300" onClick={() => setLastWin(null)}>
-           <div className="bg-amber-500 p-10 rounded-[3rem] text-center space-y-6 shadow-[0_0_100px_rgba(245,158,11,0.5)] border-4 border-white/20">
+           <div className="bg-amber-500 p-10 rounded-[3rem] text-center space-y-6 border-4 border-white/20 shadow-2xl">
              <Trophy className="w-20 h-20 text-black mx-auto animate-bounce" />
              <div className="space-y-1">
                <h3 className="text-4xl font-black text-black tracking-tighter uppercase italic">Big Win!</h3>

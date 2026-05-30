@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -76,13 +75,9 @@ export default function HomePage() {
         let finalData = pageNum === 0 ? data : [...users, ...data];
         
         if (reshuffle && finalData.length > 3) {
-          // RESHUFFLE LOGIC:
-          // Keep the very top users (active now) but shuffle the order slightly
-          // specifically "move first to middle, push others up" as requested
+          // RESHUFFLE LOGIC: Cyclic shift for top users
           const active = finalData.slice(0, 4);
           const others = finalData.slice(4);
-          
-          // Cyclic shift for active ones
           const shiftedActive = [active[1], active[2], active[0], active[3]];
           finalData = [...shiftedActive, ...others];
         }
@@ -107,7 +102,6 @@ export default function HomePage() {
   }, [isInitialized, currentUser, router, profile]);
 
   useEffect(() => {
-    // Only fetch on tab change or if cache is empty
     if (profile && (users.length === 0 || activeTab)) {
       fetchUsers(0);
     }
@@ -120,11 +114,11 @@ export default function HomePage() {
   return (
     <div className="flex flex-col w-full bg-white select-none">
       <div className="px-4 grid grid-cols-2 gap-3 py-6 bg-white shrink-0">
-        <button onClick={() => router.push('/mystery-note')} className="h-28 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-600 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-1 text-white shadow-xl shadow-blue-100 relative overflow-hidden group">
-          <FileText className="w-6 h-6 mb-1 drop-shadow-md" /><p className="text-sm font-black uppercase tracking-widest">Message</p><p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Blast</p>
+        <button onClick={() => router.push('/mystery-note')} className="h-28 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-600 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-1 text-white shadow-xl relative overflow-hidden">
+          <FileText className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest">Message</p><p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Blast</p>
         </button>
-        <button onClick={() => router.push('/tasks')} className="h-28 bg-gradient-to-br from-purple-900 via-purple-800 to-purple-600 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-1 text-white shadow-xl shadow-purple-100 relative overflow-hidden group">
-          <Target className="w-6 h-6 mb-1 drop-shadow-md" /><p className="text-sm font-black uppercase tracking-widest">Task</p><p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Center</p>
+        <button onClick={() => router.push('/tasks')} className="h-28 bg-gradient-to-br from-purple-900 via-purple-800 to-purple-600 rounded-[2rem] p-6 flex flex-col items-start justify-center gap-1 text-white shadow-xl relative overflow-hidden">
+          <Target className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest">Task</p><p className="text-[10px] font-bold opacity-60 uppercase tracking-tighter">Center</p>
         </button>
       </div>
 
@@ -146,7 +140,7 @@ export default function HomePage() {
             </button>
           ))}
         </div>
-        <button onClick={handleRefresh} className={cn("p-2 text-gray-400 active:rotate-180 transition-transform", isRefreshing && "animate-spin")}><RotateCw className="w-4 h-4" /></button>
+        <button onClick={handleRefresh} className={cn("p-2 text-gray-400 transition-transform", isRefreshing && "animate-spin")}><RotateCw className="w-4 h-4" /></button>
       </div>
 
       <main className="px-4 pt-4 pb-24">
@@ -172,7 +166,7 @@ export default function HomePage() {
                 </div>
                 <button 
                   onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }} 
-                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-2xl hover:bg-[#00A2FF] transition-all"
+                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white"
                 >
                   <MessageSquare className="w-4 h-4 fill-current" />
                 </button>

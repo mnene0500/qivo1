@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -57,10 +56,10 @@ export async function completeOnboardingAction(payload: {
       .from('users')
       .select('uid')
       .eq('country', payload.country)
-      .limit(20);
+      .limit(10);
 
     // If more than 5 users from same region/ip profile, suspect alt
-    const isSuspectedAlt = existingProfiles && existingProfiles.length > 10;
+    const isSuspectedAlt = existingProfiles && existingProfiles.length > 5;
 
     const defaultPhoto = payload.gender === 'male' 
       ? `https://picsum.photos/seed/${payload.uid}/400/400` 
@@ -296,7 +295,7 @@ export async function resolveReportAction(adminUid: string, reportId: string, re
 export async function requestWithdrawalAction(userUid: string, diamonds: number, amount_kes: number, agencyId: string, mpesaNumber: string) {
   const supabase = getSupabaseAdmin();
   try {
-    // POLICY: Withdrawals only on Saturdays
+    // POLICY: Withdrawals only on Saturdays (6)
     const day = new Date().getDay();
     if (day !== 6) throw new Error("Withdrawals are only allowed on Saturdays.");
 

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -72,7 +71,6 @@ function ChatsContent() {
 
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
 
-  // 1. Fetch Chat Summaries
   const fetchSummaries = useCallback(async () => {
     if (!currentUser?.id) return
     setLoadingSummaries(true)
@@ -128,7 +126,6 @@ function ChatsContent() {
     }
   }, [currentUser?.id]);
 
-  // 2. Fetch Chat Details
   useEffect(() => {
     if (!startWithId || !currentUser?.id) return;
 
@@ -136,12 +133,10 @@ function ChatsContent() {
     setChatId(cid);
     setLoadingDetail(true);
 
-    // Fetch Partner Immediately
     supabase.from('users').select('*').eq('uid', startWithId).single().then(({ data }) => {
       setPartnerProfile(data);
     });
 
-    // Fetch Messages relative to cleared timestamp
     supabase.from('chats').select('cleared_at').eq('id', cid).maybeSingle().then(({ data: chatMeta }) => {
       const clearedAt = (chatMeta?.cleared_at as Record<string, number>)?.[currentUser.id] || 0;
       
@@ -217,7 +212,7 @@ function ChatsContent() {
   const onTouchStart = (cid: string) => {
     longPressTimer.current = setTimeout(() => {
       setChatToDelete(cid)
-    }, 800)
+    }, 1000)
   }
 
   const onTouchEnd = () => {
@@ -333,7 +328,7 @@ function ChatsContent() {
                    <button 
                     key={g.name} 
                     onClick={() => handleSendGift(g)}
-                    className="flex flex-col items-center gap-2 p-4 bg-gray-50 rounded-2xl hover:bg-pink-50 hover:text-pink-600 transition-all border border-transparent active:scale-95"
+                    className="flex flex-col items-center gap-2 p-4 bg-gray-50 rounded-2xl hover:bg-pink-50 hover:text-pink-600 transition-all border border-transparent"
                    >
                      <span className="text-3xl">{g.icon}</span>
                      <div className="flex flex-col items-center">
