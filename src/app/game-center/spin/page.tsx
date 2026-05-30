@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useRef, useMemo } from "react"
@@ -25,18 +24,12 @@ export default function SpinToWinPage() {
   const [isSpinning, setIsSpinning] = useState(false)
   const [rotation, setRotation] = useState(0)
   const [lastWin, setLastWin] = useState<number | null>(null)
-  
-  const wheelRef = useRef<SVGSVGElement>(null)
 
-  // Dynamic Visual Prizes based on Stake (Matched with Server Logic)
+  // Dynamic Visual Prizes based on Stake
   const currentPrizes = useMemo(() => {
-    if (selectedStake === 20) {
-      return [0, 5, 10, 0, 20, 0, 50, 5, 0, 10, 20, 0, 5, 0, 30, 0, 10, 50, 0, 15];
-    } else if (selectedStake === 50 || selectedStake === 100) {
-      return [0, 20, 50, 0, 100, 0, 200, 20, 0, 50, 100, 0, 20, 0, 150, 0, 50, 200, 0, 80];
-    } else {
-      return [0, 100, 200, 0, 500, 0, 1000, 100, 0, 200, 500, 0, 100, 0, 750, 0, 200, 1000, 0, 400];
-    }
+    if (selectedStake === 20) return [0, 5, 10, 0, 20, 0, 50, 5, 0, 10, 20, 0, 5, 0, 30, 0, 10, 50, 0, 15];
+    if (selectedStake <= 100) return [0, 20, 50, 0, 100, 0, 200, 20, 0, 50, 100, 0, 20, 0, 150, 0, 50, 200, 0, 80];
+    return [0, 100, 200, 0, 500, 0, 1000, 100, 0, 200, 500, 0, 100, 0, 750, 0, 200, 1000, 0, 400];
   }, [selectedStake]);
 
   const handleSpin = async () => {
@@ -55,18 +48,16 @@ export default function SpinToWinPage() {
       if (res.success && res.index !== undefined) {
         const fullSpins = 8 + Math.floor(Math.random() * 4)
         const targetAngle = fullSpins * 360 + (res.index * SECTOR_ANGLE)
-        
         const newRotation = rotation + targetAngle
         setRotation(newRotation)
 
-        // DELAY REVEAL: 5.5s delay for 5s animation to ensure it stops fully
         setTimeout(() => {
           setIsSpinning(false)
           setLastWin(res.winAmount)
           if (res.winAmount > 0) {
             toast({ title: `You Won ${res.winAmount} Coins!`, description: "Winning added to your wallet." })
           } else {
-            toast({ title: "No Win This Time", description: "Better luck next spin!" })
+            toast({ title: "No Win", description: "Better luck next spin!" })
           }
         }, 5500)
       } else {
@@ -85,9 +76,7 @@ export default function SpinToWinPage() {
       </div>
 
       <header className="px-4 h-16 flex items-center justify-between sticky top-0 z-[60] bg-black/40 backdrop-blur-md">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full text-white/60 hover:text-white">
-          <ChevronLeft className="w-6 h-6" />
-        </Button>
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full text-white/60 hover:text-white"><ChevronLeft className="w-6 h-6" /></Button>
         <div className="flex items-center gap-2 bg-black/50 px-4 py-1.5 rounded-full border border-white/10">
           <Coins className="w-3.5 h-3.5 text-yellow-500 fill-current" />
           <span className="text-xs font-black text-white">{coins}</span>
@@ -100,14 +89,11 @@ export default function SpinToWinPage() {
           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.3em]">20 High-Reward Slots</p>
         </div>
 
-        {/* WHEEL CONTAINER */}
         <div className="relative w-80 h-80 flex items-center justify-center">
-          {/* ARROW INDICATOR */}
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-50 filter drop-shadow-xl">
-            <div className="w-8 h-10 bg-amber-500 clip-path-polygon-[50%_100%,0%_0%,100%_0%] rotate-180" style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} />
+            <div className="w-8 h-10 bg-amber-500" style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} />
           </div>
 
-          {/* THE WHEEL */}
           <div 
             className="w-full h-full rounded-full border-[8px] border-amber-900/50 shadow-[0_0_80px_rgba(245,158,11,0.15)] bg-black overflow-hidden relative transition-transform duration-[5000ms] cubic-bezier(0.1, 0, 0.1, 1)"
             style={{ transform: `rotate(-${rotation}deg)` }}
@@ -115,25 +101,10 @@ export default function SpinToWinPage() {
             <svg viewBox="0 0 100 100" className="w-full h-full">
               {currentPrizes.map((prize, i) => {
                 const angle = i * SECTOR_ANGLE
-                const isWin = prize > 0
                 return (
                   <g key={i} transform={`rotate(${angle} 50 50)`}>
-                    <path
-                      d={`M 50 50 L 50 0 A 50 50 0 0 1 ${50 + 50 * Math.sin((SECTOR_ANGLE * Math.PI) / 180)} ${50 - 50 * Math.cos((SECTOR_ANGLE * Math.PI) / 180)} Z`}
-                      fill={i % 2 === 0 ? '#111' : '#1a1a1a'}
-                      stroke="#222"
-                      strokeWidth="0.1"
-                    />
-                    <text
-                      x="50"
-                      y="15"
-                      transform={`rotate(${SECTOR_ANGLE / 2} 50 15)`}
-                      fill={isWin ? (prize >= 500 ? '#F59E0B' : '#888') : '#333'}
-                      className="text-[2.5px] font-black uppercase tracking-tighter"
-                      textAnchor="middle"
-                    >
-                      {prize === 1000 ? '⭐1K' : prize === 0 ? 'MISS' : prize}
-                    </text>
+                    <path d={`M 50 50 L 50 0 A 50 50 0 0 1 ${50 + 50 * Math.sin((SECTOR_ANGLE * Math.PI) / 180)} ${50 - 50 * Math.cos((SECTOR_ANGLE * Math.PI) / 180)} Z`} fill={i % 2 === 0 ? '#111' : '#1a1a1a'} stroke="#222" strokeWidth="0.1" />
+                    <text x="50" y="15" transform={`rotate(${SECTOR_ANGLE / 2} 50 15)`} fill={prize > 0 ? (prize >= 500 ? '#F59E0B' : '#888') : '#333'} className="text-[2.5px] font-black uppercase tracking-tighter" textAnchor="middle">{prize === 0 ? 'MISS' : prize}</text>
                   </g>
                 )
               })}
@@ -144,60 +115,29 @@ export default function SpinToWinPage() {
           </div>
         </div>
 
-        {/* CONTROLS */}
         <div className="w-full max-w-sm space-y-8">
           <div className="space-y-3">
              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Set Your Stake</p>
              <div className="flex justify-between gap-1.5">
                {STAKES.map((stake) => (
-                 <button
-                   key={stake}
-                   disabled={isSpinning}
-                   onClick={() => { setSelectedStake(stake); setLastWin(null); }}
-                   className={cn(
-                     "flex-1 h-11 rounded-xl border font-black text-[10px] transition-all active:scale-90",
-                     selectedStake === stake 
-                       ? "bg-amber-500 border-amber-400 text-black shadow-lg" 
-                       : "bg-white/5 border-white/5 text-white/40"
-                   )}
-                 >
-                   {stake}
-                 </button>
+                 <button key={stake} disabled={isSpinning} onClick={() => { setSelectedStake(stake); setLastWin(null); }} className={cn("flex-1 h-11 rounded-xl border font-black text-[10px] transition-all", selectedStake === stake ? "bg-amber-500 border-amber-400 text-black shadow-lg" : "bg-white/5 border-white/5 text-white/40")}>{stake}</button>
                ))}
              </div>
           </div>
-
-          <Button
-            onClick={handleSpin}
-            disabled={isSpinning || coins < selectedStake}
-            className={cn(
-              "w-full h-18 py-7 rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all",
-              isSpinning ? "bg-white/10 text-gray-500" : "bg-white text-black hover:bg-amber-500"
-            )}
-          >
+          <Button onClick={handleSpin} disabled={isSpinning} className={cn("w-full h-18 py-7 rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all", isSpinning ? "bg-white/10 text-gray-500" : "bg-white text-black hover:bg-amber-500")}>
             {isSpinning ? <Loader2 className="w-6 h-6 animate-spin" /> : "Stake & Spin"}
           </Button>
-
-          <div className="flex items-center justify-center gap-6 pt-2 text-gray-600">
-            <div className="flex items-center gap-2"><Star className="w-3 h-3" /><span className="text-[7px] font-black uppercase tracking-widest">Real-time Payout</span></div>
-            <div className="flex items-center gap-2"><Info className="w-3 h-3" /><span className="text-[7px] font-black uppercase tracking-widest">Fair Play Verified</span></div>
-          </div>
         </div>
       </main>
 
-      {/* WIN OVERLAY */}
       {lastWin !== null && lastWin > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-10 animate-in fade-in zoom-in duration-300" onClick={() => setLastWin(null)}>
            <div className="bg-amber-500 p-10 rounded-[3rem] text-center space-y-6 shadow-[0_0_100px_rgba(245,158,11,0.5)] border-4 border-white/20">
              <Trophy className="w-20 h-20 text-black mx-auto animate-bounce" />
              <div className="space-y-1">
                <h3 className="text-4xl font-black text-black tracking-tighter uppercase italic">Big Win!</h3>
-               <div className="flex items-center justify-center gap-3 text-white bg-black px-6 py-2 rounded-full mt-4">
-                 <Coins className="w-6 h-6 fill-current text-yellow-500" />
-                 <span className="text-3xl font-black">+{lastWin}</span>
-               </div>
+               <div className="flex items-center justify-center gap-3 text-white bg-black px-6 py-2 rounded-full mt-4"><Coins className="w-6 h-6 fill-current text-yellow-500" /><span className="text-3xl font-black">+{lastWin}</span></div>
              </div>
-             <p className="text-[9px] font-black text-black/60 uppercase tracking-[0.2em]">Added to Wallet</p>
            </div>
         </div>
       )}

@@ -129,6 +129,7 @@ export async function sendMessageAction(payload: { chatId: string; senderId: str
     const isFree = sender?.is_owner || sender?.is_special_user || sender?.is_coin_seller || recipient?.is_special_user || recipient?.is_coin_seller || recipient?.is_owner;
 
     if (sender?.gender === 'male' && !isFree) {
+      // Use RPC to atomatically check and deduct
       const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: payload.senderId, p_amount: -cost });
       if (deductErr) return { success: false, error: "insufficient_funds" };
       
@@ -289,7 +290,9 @@ export async function toggleUserRoleAction(ownerUid: string, targetMatchFlowId: 
 export async function deleteUserCompletelyAction(uid: string) {
   const supabase = getSupabaseAdmin();
   try {
-    await supabase.auth.admin.deleteUser(uid);
+    // 1. Delete auth entry (this cascades to profiles in public.users if references are set to cascade)
+    const { error } = await supabase.auth.admin.deleteUser(uid);
+    if (error) throw error;
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -380,9 +383,22 @@ export async function dailyCheckInAction(uid: string) {
 export async function playSpinGameAction(userId: string, stake: number) {
   const supabase = getSupabaseAdmin();
   try {
-    await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: -stake });
+    const ts = Date.now();
+    const { error: dErr } = await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: -stake });
+    if (dErr) throw new Error("Insufficient coins");
+
     const win = Math.random() > 0.8 ? stake * 2 : 0;
-    if (win > 0) await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: win });
+    if (win > 0) {
+      await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: win });
+      await supabase.from('coin_history').insert({
+        user_id: userId, amount: win, type: 'win', description: 'Spin Win', timestamp: ts
+      });
+    } else {
+      await supabase.from('coin_history').insert({
+        user_id: userId, amount: -stake, type: 'loss', description: 'Spin Loss', timestamp: ts
+      });
+    }
+    
     await trimHistory(supabase, userId, 'coin_history');
     return { success: true, winAmount: win, index: Math.floor(Math.random() * 20) };
   } catch (err: any) {
@@ -393,11 +409,36 @@ export async function playSpinGameAction(userId: string, stake: number) {
 export async function playSlotsAction(userId: string, stake: number) {
   const supabase = getSupabaseAdmin();
   try {
-    await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: -stake });
-    const win = Math.random() > 0.9 ? stake * 2 : 0;
-    if (win > 0) await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: win });
+    const ts = Date.now();
+    const { error: dErr } = await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: -stake });
+    if (dErr) throw new Error("Insufficient coins");
+
+    const symbols = ["bar", "cherry", "crown"];
+    const result = [
+      symbols[Math.floor(Math.random() * symbols.length)],
+      symbols[Math.floor(Math.random() * symbols.length)],
+      symbols[Math.floor(Math.random() * symbols.length)]
+    ];
+
+    const isMatch = result[0] === result[1] && result[1] === result[2];
+    let winAmount = 0;
+    let message = "Better luck next pull!";
+
+    if (isMatch) {
+      winAmount = stake * 2;
+      message = "JACKPOT! Doubled your stake!";
+      await supabase.rpc("increment_coins", { p_user_id: userId, p_amount: winAmount });
+      await supabase.from('coin_history').insert({
+        user_id: userId, amount: winAmount, type: 'win', description: 'Slots Jackpot', timestamp: ts
+      });
+    } else {
+      await supabase.from('coin_history').insert({
+        user_id: userId, amount: -stake, type: 'loss', description: 'Slots Loss', timestamp: ts
+      });
+    }
+
     await trimHistory(supabase, userId, 'coin_history');
-    return { success: true, winAmount: win, slots: ["bar", "bar", "bar"], message: win > 0 ? "WINNER!" : "Try again!" };
+    return { success: true, winAmount, slots: result, message };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
