@@ -6,12 +6,12 @@ import { headers } from 'next/headers';
 
 /**
  * @fileOverview Definitive Server Actions for QIVO Production.
- * Optimized for Vercel and Supabase with full logic implementation.
+ * Fully implemented and exported to prevent "is not a function" errors.
  */
 
 function filterSensitiveContent(text: string): string {
   const sensitivePatterns = [
-    /\d{3,}/g, // Any sequence of 3+ digits (Phone numbers)
+    /\d{3,}/g, // Block phone numbers
     /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\b/gi,
     /\b(sifuri|moja|mbili|tatu|nne|tano|sita|saba|nane|tisa|kumi)\b/gi,
     /\b(fuck|bitch|idiot|stupid|scam|fraud|malaya|pumbavu|nguruwe)\b/gi 
@@ -48,7 +48,6 @@ export async function completeOnboardingAction(payload: {
     });
     if (profileErr) throw profileErr;
 
-    // Fixed: Male profiles always receive 500 coins. Female profiles 150 diamonds.
     if (payload.gender === 'male') {
       await supabase.rpc("increment_coins", { p_user_id: payload.uid, p_amount: 500 });
       await supabase.from('coin_history').insert({ user_id: payload.uid, amount: 500, type: 'bonus', description: 'Welcome Bonus', timestamp });
@@ -80,7 +79,6 @@ export async function sendMessageAction(payload: { chatId: string; senderId: str
       await trimHistory(supabase, payload.senderId, 'coin_history');
     }
     
-    // ATOMIC UPSERT: Ensures chat list visibility instantly
     await supabase.from('chats').upsert({ 
       id: payload.chatId, 
       last_message: safeText.slice(0, 100), 
@@ -132,7 +130,6 @@ export async function awardCoinsAction(ownerUid: string, targetUid: string, amou
     if (!owner?.is_owner && !owner?.is_coin_seller && !owner?.is_special_user) throw new Error("Unauthorized");
     
     if (!owner.is_owner && !owner.is_special_user) {
-      // Merchants (Coin Sellers) deduct from their own balance
       const { error: dErr } = await supabase.rpc("increment_coins", { p_user_id: ownerUid, p_amount: -amount });
       if (dErr) throw new Error("Insufficient merchant balance");
     }
@@ -149,7 +146,7 @@ export async function toggleUserRoleAction(ownerUid: string, targetMatchFlowId: 
   const supabase = getSupabaseAdmin();
   try {
     const { data: owner } = await supabase.from('users').select('is_owner').eq('uid', ownerUid).single();
-    if (!owner?.is_owner) throw new Error("Unauthorized access to role management.");
+    if (!owner?.is_owner) throw new Error("Unauthorized");
 
     const { error } = await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchFlowId);
     if (error) throw error;
@@ -187,7 +184,6 @@ export async function dailyCheckInAction(uid: string) {
 export async function deleteUserCompletelyAction(targetUid: string) {
   const supabase = getSupabaseAdmin();
   try {
-    // 1. Wipe all economy records first
     await Promise.all([
       supabase.from('balances').delete().eq('user_id', targetUid),
       supabase.from('coin_history').delete().eq('user_id', targetUid),
@@ -196,7 +192,6 @@ export async function deleteUserCompletelyAction(targetUid: string) {
       supabase.from('reports').delete().or(`reporter_id.eq.${targetUid},reported_id.eq.${targetUid}`)
     ]);
 
-    // 2. Remove the profile
     const { error } = await supabase.from('users').delete().eq('uid', targetUid);
     if (error) throw error;
 
@@ -302,7 +297,6 @@ export async function updateWithdrawalStatusAction(requestId: string, status: 'p
 export async function requestWithdrawalAction(userUid: string, diamonds: number, amount_kes: number, agencyId: string, mpesaNumber: string) {
   const supabase = getSupabaseAdmin();
   try {
-    // Rigid Production Check: Only Saturdays
     if (new Date().getDay() !== 6) throw new Error("Withdrawals are only allowed on Saturdays.");
     
     const { error: deductErr } = await supabase.rpc("increment_diamonds", { p_user_id: userUid, p_amount: -diamonds });

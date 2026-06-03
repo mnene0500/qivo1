@@ -11,7 +11,9 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Defensive check to prevent "Failed to Fetch" on misconfigured environments
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase Environment Variables are missing. Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in Vercel.");
+  if (typeof window !== 'undefined') {
+    console.warn("Supabase Environment Variables are missing. Authentication and Database features will fail until added to Vercel.");
+  }
 }
 
 export const supabase = createClient(

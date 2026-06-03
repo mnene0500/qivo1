@@ -11,18 +11,25 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 const PESAPAL_BASE_URL = "https://pay.pesapal.com/v3";
 
 async function getAuthToken() {
+  const consumerKey = process.env.PESAPAL_CONSUMER_KEY;
+  const consumerSecret = process.env.PESAPAL_CONSUMER_SECRET;
+
+  if (!consumerKey || !consumerSecret) {
+    throw new Error("PesaPal Credentials missing in Vercel Settings.");
+  }
+
   const res = await fetch(`${PESAPAL_BASE_URL}/api/Auth/RequestToken`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      consumer_key: process.env.PESAPAL_CONSUMER_KEY,
-      consumer_secret: process.env.PESAPAL_CONSUMER_SECRET
+      consumer_key: consumerKey,
+      consumer_secret: consumerSecret
     })
   });
   const data = await res.json();
   if (!data.token) {
     console.error("[PesaPal Auth Error]:", data);
-    throw new Error("PesaPal Authentication Failed. Check credentials in Vercel.");
+    throw new Error("PesaPal Authentication Failed.");
   }
   return data.token;
 }
@@ -33,7 +40,6 @@ export async function initiatePesaPalPayment(userId: string, amount: number, coi
     const token = await getAuthToken();
     const orderId = crypto.randomUUID();
 
-    // 1. Create a tracking record
     await supabase.from('pending_payments').insert({
       order_id: orderId,
       user_id: userId,
@@ -82,22 +88,18 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
     
     const data = await res.json();
     
-    // Status Code 1 is "Completed" in PesaPal v3
     if (data.status_code === 1 || data.payment_status_description === "Completed") {
       const supabase = getSupabaseAdmin();
       
-      // Check if already processed
       const { data: existing } = await supabase.from('processed_payments').select('*').eq('order_tracking_id', orderTrackingId).maybeSingle();
       if (existing) return { success: true, coins: existing.coins, message: "Already processed." };
 
-      // Get the original tracking record
       const { data: pending } = await supabase.from('pending_payments').select('*').eq('order_id', merchantReference).single();
       if (!pending) throw new Error("Payment record matching this reference not found.");
 
       let coins = 0;
       const amt = Number(pending.amount);
       
-      // Tiered Coin Logic (Synced with Recharge Packages)
       if (amt === 1) coins = 5;
       else if (amt === 80) coins = 500;
       else if (amt === 120) coins = 1000;
@@ -108,7 +110,6 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       else if (amt === 2000) coins = 20000;
       else coins = Math.floor(amt * 8.33);
 
-      // Atomic Update
       const { error: rpcErr } = await supabase.rpc("increment_coins", { p_user_id: pending.user_id, p_amount: coins });
       if (rpcErr) throw rpcErr;
 
@@ -133,7 +134,7 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       return { success: true, coins };
     }
     
-    return { success: false, error: "Payment is still processing at PesaPal." };
+    return { success: false, error: "Payment is still processing." };
   } catch (err: any) {
     console.error("[Verification Error]:", err.message);
     return { success: false, error: err.message };
