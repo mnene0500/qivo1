@@ -78,7 +78,7 @@ export async function sendMessageAction(payload: { chatId: string; senderId: str
       await trimHistory(supabase, payload.senderId, 'coin_history');
     }
     
-    // ATOMIC UPSERT: Ensures chat is revived and visible to both parties
+    // ATOMIC UPSERT: Ensures chat is revived and visible to both parties instantly
     const { error: upsertErr } = await supabase.from('chats').upsert({ 
       id: payload.chatId, 
       last_message: safeText.slice(0, 100), 
@@ -119,10 +119,15 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
     const chatId = `direct_${[senderUid, recipientUid].sort()[0]}_${[senderUid, recipientUid].sort()[1]}`;
     const text = `[Gift: ${giftName}]`;
     
+    // ATOMIC UPSERT: Vital for visibility and unread sync
     await supabase.from('chats').upsert({ 
-      id: chatId, last_message: text, last_message_at: ts, 
-      participant_ids: [senderUid, recipientUid], last_sender_id: senderUid, updated_at: new Date().toISOString()
-    });
+      id: chatId, 
+      last_message: text, 
+      last_message_at: ts, 
+      participant_ids: [senderUid, recipientUid], 
+      last_sender_id: senderUid, 
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
 
     await supabase.from('messages').insert({ chat_id: chatId, sender_id: senderUid, text: text, is_gift: true, timestamp: ts });
     await supabase.from('coin_history').insert({ user_id: senderUid, amount: -coinAmount, type: 'gift', description: `Sent ${giftName}`, timestamp: ts });
@@ -394,7 +399,16 @@ export async function sendMysteryNoteAction(userId: string, text: string, recipi
     if (recipients) {
       for (const r of recipients) {
         const chatId = `direct_${[userId, r.uid].sort()[0]}_${[userId, r.uid].sort()[1]}`;
-        await supabase.from('chats').upsert({ id: chatId, last_message: text, last_message_at: ts, participant_ids: [userId, r.uid], last_sender_id: userId, updated_at: new Date().toISOString() });
+        // ATOMIC UPSERT for every recipient to ensure visibility
+        await supabase.from('chats').upsert({ 
+          id: chatId, 
+          last_message: text, 
+          last_message_at: ts, 
+          participant_ids: [userId, r.uid], 
+          last_sender_id: userId, 
+          updated_at: new Date().toISOString() 
+        }, { onConflict: 'id' });
+        
         await supabase.from('messages').insert({ chat_id: chatId, sender_id: userId, text: text, timestamp: ts });
       }
     }
