@@ -7,13 +7,14 @@ import { supabase } from "@/lib/supabase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { Send, ChevronLeft, Gift, BadgeCheck, Loader2, MessageSquare, CheckCircle2, RotateCw } from "lucide-react"
+import { Send, ChevronLeft, Gift, BadgeCheck, Loader2, MessageSquare, CheckCircle2, RotateCw, PlusCircle, Coins } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
 import { clearChatAction, sendMessageAction, markChatAsReadAction, sendGiftAction } from "@/app/actions/matchflow-actions"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { useBalance } from "@/lib/providers/BalanceProvider"
 
 interface ChatSummary {
   id: string; 
@@ -28,9 +29,30 @@ interface ChatSummary {
 
 const GIFTS = [
   { name: "Rose", cost: 15, icon: "🌹" }, 
+  { name: "Chocolate", cost: 20, icon: "🍫" }, 
+  { name: "Coffee", cost: 30, icon: "☕" }, 
+  { name: "Beer", cost: 40, icon: "🍺" }, 
   { name: "Heart", cost: 50, icon: "❤️" }, 
+  { name: "Pizza", cost: 60, icon: "🍕" }, 
+  { name: "Flowers", cost: 80, icon: "💐" }, 
+  { name: "Teddy", cost: 100, icon: "🧸" }, 
+  { name: "Perfume", cost: 150, icon: "🧴" }, 
   { name: "Crown", cost: 200, icon: "👑" }, 
-  { name: "Diamond", cost: 500, icon: "💎" }
+  { name: "Ring", cost: 300, icon: "💍" }, 
+  { name: "Diamond", cost: 500, icon: "💎" },
+  { name: "Fireworks", cost: 750, icon: "🎆" }, 
+  { name: "Rocket", cost: 1000, icon: "🚀" }, 
+  { name: "Watch", cost: 1200, icon: "⌚" }, 
+  { name: "Car", cost: 2000, icon: "🚗" }, 
+  { name: "Plane", cost: 5000, icon: "✈️" }, 
+  { name: "Supercar", cost: 7000, icon: "🏎️" }, 
+  { name: "Yacht", cost: 10000, icon: "🛥️" }, 
+  { name: "Castle", cost: 15000, icon: "🏰" }, 
+  { name: "Private Jet", cost: 20000, icon: "🛩️" }, 
+  { name: "Island", cost: 25000, icon: "🏝️" }, 
+  { name: "Mega Yacht", cost: 30000, icon: "🛳️" }, 
+  { name: "Galaxy", cost: 40000, icon: "🌌" }, 
+  { name: "Universe", cost: 50000, icon: "🪐" }
 ];
 
 function ChatsContent() {
@@ -38,6 +60,7 @@ function ChatsContent() {
   const router = useRouter()
   const { toast } = useToast()
   const { user: currentUser } = useUser()
+  const { coins } = useBalance()
   const startWithId = searchParams.get("startWith")
   
   const [summaries, setSummaries] = useState<ChatSummary[]>([])
@@ -170,6 +193,10 @@ function ChatsContent() {
 
   const handleSendGift = async (g: typeof GIFTS[0]) => {
     if (!currentUser?.id || !startWithId || isSending) return;
+    if (coins < g.cost) {
+      toast({ variant: "destructive", title: "Insufficient Coins", description: "Top up your wallet to send this gift." });
+      return;
+    }
     setIsSending(true);
     setLastGiftSent(null);
     try {
@@ -289,53 +316,71 @@ function ChatsContent() {
 
       <footer className="p-4 border-t bg-white shrink-0 pb-[env(safe-area-inset-bottom,20px)]">
         <div className="flex items-center gap-2 max-w-5xl mx-auto w-full">
-          <Dialog onOpenChange={(open) => !open && setLastGiftSent(null)}>
-            <DialogTrigger asChild>
+          <Sheet onOpenChange={(open) => !open && setLastGiftSent(null)}>
+            <SheetTrigger asChild>
               <Button size="icon" variant="ghost" className="rounded-full text-pink-500 hover:bg-pink-50 transition-colors">
                 <Gift className="w-6 h-6" />
               </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-[2.5rem] p-6 border-none shadow-2xl">
-               <DialogHeader><DialogTitle className="text-center font-black uppercase text-xs tracking-widest">Send Appreciation</DialogTitle></DialogHeader>
-               
-               {lastGiftSent ? (
-                 <div className="flex flex-col items-center justify-center p-8 space-y-6 animate-in zoom-in-95">
-                    <div className="w-24 h-24 bg-pink-50 rounded-full flex items-center justify-center text-5xl shadow-xl shadow-pink-100">
-                      {lastGiftSent.icon}
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-[3rem] p-6 border-none shadow-2xl bg-black text-white h-[70vh] flex flex-col overflow-hidden">
+               <SheetHeader className="shrink-0 mb-6">
+                 <div className="flex items-center justify-between px-4">
+                    <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full border border-white/5">
+                       <Coins className="w-3.5 h-3.5 text-yellow-500 fill-current" />
+                       <span className="text-xs font-black">{coins}</span>
                     </div>
-                    <div className="text-center">
-                      <p className="text-lg font-black text-black uppercase tracking-tight">Gift Sent!</p>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">You're making someone's day</p>
-                    </div>
+                    <SheetTitle className="text-center font-black uppercase text-[10px] tracking-[0.2em] text-gray-400">Send Appreciation</SheetTitle>
                     <Button 
-                      onClick={() => handleSendGift(lastGiftSent)} 
-                      disabled={isSending}
-                      className="w-full h-14 rounded-full bg-pink-500 text-white font-black uppercase tracking-widest text-[10px] shadow-lg active:scale-95"
+                      onClick={() => router.push('/recharge')} 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 rounded-full bg-[#00A2FF] hover:bg-[#00A2FF]/90 text-white text-[9px] font-black uppercase px-4 shadow-lg shadow-blue-500/20"
                     >
-                      {isSending ? <Loader2 className="animate-spin" /> : <div className="flex items-center gap-2"><RotateCw className="w-4 h-4" /> Send One More</div>}
+                      <PlusCircle className="w-3 h-3 mr-1" /> Top Up
                     </Button>
-                    <Button variant="ghost" onClick={() => setLastGiftSent(null)} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Send different gift</Button>
                  </div>
-               ) : (
-                 <div className="grid grid-cols-2 gap-3 mt-4">
-                    {GIFTS.map(g => (
-                      <button 
-                        key={g.name} 
-                        onClick={() => handleSendGift(g)} 
-                        className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-2xl hover:bg-pink-50 transition-all border border-transparent hover:border-pink-100 active:scale-95"
+               </SheetHeader>
+               
+               <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
+                 {lastGiftSent ? (
+                   <div className="flex flex-col items-center justify-center p-8 space-y-6 animate-in zoom-in-95">
+                      <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center text-5xl shadow-xl border border-white/5">
+                        {lastGiftSent.icon}
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-black text-white uppercase tracking-tight">Gift Sent!</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">You're making someone's day</p>
+                      </div>
+                      <Button 
+                        onClick={() => handleSendGift(lastGiftSent)} 
+                        disabled={isSending}
+                        className="w-full h-14 rounded-full bg-pink-500 text-white font-black uppercase tracking-widest text-[10px] shadow-lg active:scale-95"
                       >
-                        <span className="text-3xl mb-2">{g.icon}</span>
-                        <span className="text-[10px] font-black uppercase text-gray-500">{g.name}</span>
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="text-xs font-bold text-black">{g.cost}</span>
-                          <CheckCircle2 className="w-3 h-3 text-yellow-500" />
-                        </div>
-                      </button>
-                    ))}
-                 </div>
-               )}
-            </DialogContent>
-          </Dialog>
+                        {isSending ? <Loader2 className="animate-spin" /> : <div className="flex items-center gap-2"><RotateCw className="w-4 h-4" /> Send One More</div>}
+                      </Button>
+                      <Button variant="ghost" onClick={() => setLastGiftSent(null)} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Send different gift</Button>
+                   </div>
+                 ) : (
+                   <div className="grid grid-cols-3 gap-3">
+                      {GIFTS.map(g => (
+                        <button 
+                          key={g.name} 
+                          onClick={() => handleSendGift(g)} 
+                          className="flex flex-col items-center justify-center p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-all border border-transparent hover:border-white/10 active:scale-95 group"
+                        >
+                          <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">{g.icon}</span>
+                          <span className="text-[8px] font-black uppercase text-gray-400 truncate w-full text-center">{g.name}</span>
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[10px] font-bold text-yellow-500">{g.cost}</span>
+                            <Coins className="w-2.5 h-2.5 text-yellow-500 fill-current" />
+                          </div>
+                        </button>
+                      ))}
+                   </div>
+                 )}
+               </div>
+            </SheetContent>
+          </Sheet>
 
           <input 
             value={newMessage} 

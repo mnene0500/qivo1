@@ -43,13 +43,11 @@ export default function HomePage() {
 
     if (activeTab === 'nearby') query = query.eq('country', myProfile.country);
     
-    // Prioritize active users
     const { data } = await query.order('updated_at', { ascending: false }).limit(40);
 
     if (data) {
       let final = data as any[];
       if (reshuffle && final.length > 5) {
-        // Cyclic shuffle requested: first moves to middle
         const top = final[0];
         const rest = final.slice(1);
         const mid = Math.floor(rest.length / 2);
@@ -73,14 +71,18 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col w-full bg-white select-none">
-      {/* BLUE HEADER SECTION */}
       <div className="bg-[#00A2FF] pt-10 pb-4 shadow-xl">
         <div className="px-4 grid grid-cols-2 gap-3 py-6">
-          <button onClick={() => router.push('/mystery-note')} className="h-28 bg-white/10 backdrop-blur-md rounded-[2rem] p-6 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all">
-            <FileText className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest leading-tight">Message<br/>Blast</p>
+          <button 
+            onClick={() => router.push('/mystery-note')} 
+            className="h-28 bg-orange-500 rounded-[2rem] p-6 flex flex-col items-start justify-center text-white shadow-lg active:scale-95 transition-all"
+          >
+            <FileText className="w-6 h-6 mb-1" />
+            <p className="text-sm font-black uppercase tracking-widest leading-tight">Message<br/>Blast</p>
           </button>
           <button onClick={() => router.push('/tasks')} className="h-28 bg-white/10 backdrop-blur-md rounded-[2rem] p-6 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all">
-            <Target className="w-6 h-6 mb-1" /><p className="text-sm font-black uppercase tracking-widest leading-tight">Task<br/>Center</p>
+            <Target className="w-6 h-6 mb-1" />
+            <p className="text-sm font-black uppercase tracking-widest leading-tight">Task<br/>Center</p>
           </button>
         </div>
 
