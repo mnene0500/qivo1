@@ -7,13 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { ChevronLeft, Mail, Loader2, ShieldCheck } from "lucide-react"
+import { ChevronLeft, Mail, Loader2, ShieldCheck, Lock, AtSign } from "lucide-react"
 
-/**
- * @fileOverview Unified Auth Page.
- * Updated to use router.replace() for all successful auth actions to prevent 
- * back-button navigation into the auth stack once logged in.
- */
 export default function UnifiedAuthPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -44,10 +39,8 @@ export default function UnifiedAuthPage() {
       if (error) throw error
       
       toast({ title: "Welcome Back!" })
-      // Use replace to remove auth from history stack
       router.replace("/")
     } catch (error: any) {
-      console.error("[Login Error]:", error.message)
       toast({ variant: "destructive", title: "Login failed", description: error.message })
     } finally {
       setLoading(false)
@@ -57,15 +50,10 @@ export default function UnifiedAuthPage() {
   const handleGoogleLogin = async () => {
     setSocialLoading(true)
     try {
-      const redirectTo = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+          redirectTo: window.location.origin,
         }
       })
       if (error) throw error
@@ -90,7 +78,6 @@ export default function UnifiedAuthPage() {
       
       if (data.user) {
         toast({ title: "Account Created", description: "Welcome! Let's set up your profile." })
-        // Use replace to ensure user can't "back" into registration
         router.replace("/fastonboard")
       }
     } catch (error: any) {
@@ -101,35 +88,34 @@ export default function UnifiedAuthPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col p-6 space-y-10 bg-white min-h-screen select-none relative">
-      <header className="flex items-center">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => router.back()} 
-          className="rounded-full"
-        >
-          <ChevronLeft className="w-6 h-6 text-black" />
+    <div className="flex-1 flex flex-col p-6 bg-white min-h-screen select-none overflow-y-auto no-scrollbar">
+      <header className="flex items-center justify-between h-14 mb-8">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full bg-gray-50">
+          <ChevronLeft className="w-5 h-5 text-black" />
         </Button>
-        <h2 className="text-xl font-bold text-[#00A2FF] flex-1 text-center pr-10 uppercase tracking-tighter">QIVO Access</h2>
+        <div className="flex items-center gap-2">
+           <div className="w-8 h-8 bg-blue-500 rounded-lg rotate-3" />
+           <span className="font-logo text-xl text-[#00A2FF]">Qivo</span>
+        </div>
+        <div className="w-10" />
       </header>
 
-      <div className="flex-1 flex flex-col justify-center space-y-8 max-w-sm mx-auto w-full">
-        <div className="text-center space-y-2">
+      <div className="flex-1 flex flex-col max-w-sm mx-auto w-full space-y-10">
+        <div className="space-y-2">
           <h1 className="text-4xl font-black text-black tracking-tight">
-            {view === 'login' ? 'Welcome' : 'Join QIVO'}
+            {view === 'login' ? 'Sign In' : 'Create Account'}
           </h1>
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-            {view === 'login' ? 'Sign in to your account' : 'Start your journey today'}
+          <p className="text-sm text-gray-400 font-medium">
+            {view === 'login' ? 'Connect with your community' : 'Join thousands of amazing people'}
           </p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           <Button 
             disabled={socialLoading}
             onClick={handleGoogleLogin}
             variant="outline"
-            className="w-full rounded-full h-14 text-base font-bold border-2 border-gray-100 text-black hover:bg-gray-50 flex items-center justify-center gap-2"
+            className="w-full rounded-2xl h-16 text-sm font-black border-2 border-gray-100 text-black hover:bg-gray-50 flex items-center justify-center gap-3 active:scale-95 transition-all shadow-sm"
           >
             {socialLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -139,45 +125,71 @@ export default function UnifiedAuthPage() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
             )}
-            Continue with Google
+            Google
           </Button>
 
-          <div className="relative flex items-center py-2">
+          <div className="relative flex items-center">
             <div className="flex-grow border-t border-gray-100"></div>
-            <span className="flex-shrink mx-4 text-[10px] font-black text-gray-300 uppercase">Or use Email</span>
+            <span className="flex-shrink mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Or Secure Email</span>
             <div className="flex-grow border-t border-gray-100"></div>
           </div>
-        </div>
 
-        <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-[10px] font-black uppercase text-gray-400 ml-1">Email Address</Label>
-              <Input id="email" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-2xl h-14 border-gray-100 bg-gray-50 font-bold text-sm text-black" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-[10px] font-black uppercase text-gray-400 ml-1">Password</Label>
-              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="rounded-2xl h-14 border-gray-100 bg-gray-50 font-bold text-sm text-black" />
-            </div>
-            {view === 'register' && (
-              <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-[#00A2FF] transition-all" style={{ width: `${passwordStrength}%` }} />
+          <form onSubmit={view === 'login' ? handleLogin : handleRegister} className="space-y-5">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Email Address</Label>
+                <div className="relative group">
+                  <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300 group-focus-within:text-[#00A2FF] transition-colors" />
+                  <Input 
+                    type="email" 
+                    placeholder="name@example.com" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    className="rounded-2xl h-16 pl-12 border-gray-100 bg-gray-50 focus:bg-white text-sm font-bold transition-all" 
+                  />
+                </div>
               </div>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-gray-400 ml-1">Password</Label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300 group-focus-within:text-[#00A2FF] transition-colors" />
+                  <Input 
+                    type="password" 
+                    placeholder="••••••••" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className="rounded-2xl h-16 pl-12 border-gray-100 bg-gray-50 focus:bg-white text-sm font-bold transition-all" 
+                  />
+                </div>
+                {view === 'register' && (
+                  <div className="w-full h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                    <div className="h-full bg-[#00A2FF] transition-all duration-500" style={{ width: `${passwordStrength}%` }} />
+                  </div>
+                )}
+              </div>
+            </div>
 
-          <div className="space-y-4 pt-4">
-            <Button type="submit" disabled={loading || socialLoading} className="w-full rounded-full h-14 text-base font-bold bg-[#00A2FF] hover:bg-[#0081CC] shadow-xl shadow-blue-100 flex items-center justify-center gap-2">
+            <Button 
+              type="submit" 
+              disabled={loading || socialLoading} 
+              className="w-full rounded-2xl h-16 text-sm font-black bg-black text-white hover:bg-zinc-800 shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+            >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                <>{view === 'login' ? <Mail className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />} {view === 'login' ? 'Login' : 'Register'}</>
+                <>{view === 'login' ? <Mail className="w-5 h-5 text-blue-400" /> : <ShieldCheck className="w-5 h-5 text-green-400" />} {view === 'login' ? 'Sign In' : 'Continue'}</>
               )}
             </Button>
 
-            <Button type="button" variant="ghost" disabled={loading || socialLoading} onClick={() => setView(view === 'login' ? 'register' : 'login')} className="w-full h-10 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-transparent">
-              {view === 'login' ? "Don't have an account? Create one" : "Already have an account? Login"}
+            <Button 
+              type="button" 
+              variant="ghost" 
+              disabled={loading || socialLoading} 
+              onClick={() => setView(view === 'login' ? 'register' : 'login')} 
+              className="w-full h-12 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] hover:bg-transparent hover:text-black transition-colors"
+            >
+              {view === 'login' ? "New here? Create account" : "Have an account? Sign in"}
             </Button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   )
