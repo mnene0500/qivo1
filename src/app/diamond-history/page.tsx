@@ -18,32 +18,50 @@ interface Transaction {
   timestamp: number
 }
 
+const PAGE_SIZE = 20;
+
 export default function DiamondHistoryPage() {
   const router = useRouter()
   const { user } = useUser()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
 
-  const fetchHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async (pageNum = 0) => {
     if (!user?.id) return
-    setLoading(true)
+    if (pageNum === 0) setLoading(true)
+    else setLoadingMore(true)
+
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
     const { data, error } = await supabase
       .from('diamond_history')
       .select('id, amount, type, description, timestamp')
       .eq('user_id', user.id)
       .order('timestamp', { ascending: false })
-      .limit(50); // Fixed size: latest 50
+      .range(from, to);
     
     if (!error && data) {
-      setTransactions(data)
+      if (pageNum === 0) setTransactions(data)
+      else setTransactions(prev => [...prev, ...data])
+      setHasMore(data.length === PAGE_SIZE)
     }
     setLoading(false)
+    setLoadingMore(false)
   }, [user?.id])
 
   useEffect(() => {
-    fetchHistory()
+    fetchHistory(0)
   }, [fetchHistory])
+
+  const loadMore = () => {
+    const next = page + 1;
+    setPage(next);
+    fetchHistory(next);
+  }
 
   return (
     <div className="flex-1 bg-white min-h-screen flex flex-col select-none">
@@ -67,9 +85,6 @@ export default function DiamondHistoryPage() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            <div className="bg-purple-50/50 p-4 text-center border-b">
-              <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Displaying 50 Latest Activities</p>
-            </div>
             {transactions.map((tx) => {
               const isCredit = tx.amount > 0
               return (
@@ -94,6 +109,14 @@ export default function DiamondHistoryPage() {
                 </div>
               )
             })}
+            {hasMore && (
+              <div className="p-8 flex justify-center">
+                <Button onClick={loadMore} disabled={loadingMore} variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-[#00A2FF]">
+                  {loadingMore ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Load more activity
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </main>

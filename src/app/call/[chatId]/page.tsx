@@ -3,19 +3,13 @@
 
 import { useEffect, useState, useRef, use } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { PhoneOff, Mic, MicOff, Video, VideoOff, User, Loader2, AlertCircle, Minimize2, Volume2, VolumeX } from "lucide-react"
+import { PhoneOff, Mic, MicOff, Video, VideoOff, User, Loader2, AlertCircle, Minimize2, Volume2, VolumeX, RefreshCw } from "lucide-react"
 import { useUser } from "@/firebase/auth/use-user"
 import { supabase } from "@/lib/supabase"
 import { generateAgoraTokenAction, deductCallCoinsAction, endCallAction } from "@/app/actions/call-actions"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-
-/**
- * @fileOverview Hardened Agora Call Page.
- * Fixed: Sanitized Channel Name for Agora.
- * Added: Loudspeaker/Earpiece toggle UI.
- */
 
 export default function CallPage({ params }: { params: Promise<{ chatId: string }> }) {
   const { chatId } = use(params)
@@ -43,6 +37,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   const [isRinging, setIsRinging] = useState(true)
   const [permissionError, setPermissionError] = useState<string | null>(null)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
 
   const localVideoRef = useRef<HTMLDivElement>(null)
   const remoteVideoRef = useRef<HTMLDivElement>(null)
@@ -145,7 +140,6 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
           }
         }
 
-        // FIXED: Using tokenData.channelName (sanitized) instead of raw chatId
         const tokenData = await generateAgoraTokenAction(chatId, user.id);
         await client.join(tokenData.appId, tokenData.channelName, tokenData.token, tokenData.uid);
         
@@ -165,6 +159,13 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     init()
     return () => { shutdownAgora() }
   }, [chatId, user?.id, type, callId])
+
+  const switchCamera = async () => {
+    if (!rtc.current.localVideoTrack || type !== 'video') return;
+    const newMode = facingMode === 'user' ? 'environment' : 'user';
+    await rtc.current.localVideoTrack.setFacingMode(newMode);
+    setFacingMode(newMode);
+  };
 
   const shutdownAgora = async () => {
     if (rtc.current.localAudioTrack) { rtc.current.localAudioTrack.stop(); rtc.current.localAudioTrack.close(); }
@@ -199,15 +200,6 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     </div>
   )
 
-  if (isMinimized) return (
-    <div className="fixed bottom-24 right-4 z-[999] w-20 h-20 rounded-full bg-[#00A2FF] shadow-2xl flex items-center justify-center border-4 border-white active:scale-95 transition-all cursor-pointer" onClick={() => setIsMinimized(false)}>
-      <div className="relative">
-        <Avatar className="w-16 h-16"><AvatarImage src={partnerProfile?.photo_url} /><AvatarFallback><User /></AvatarFallback></Avatar>
-        <div className="absolute -top-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white animate-pulse" />
-      </div>
-    </div>
-  )
-
   const formattedTime = `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`;
 
   return (
@@ -223,21 +215,9 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
                </Avatar>
              </div>
              <h2 className="text-white text-2xl font-black mt-8 tracking-tight">{partnerProfile?.name || 'Connecting...'}</h2>
-             <p className={cn(
-               "text-[10px] font-black uppercase tracking-[0.4em] mt-4 transition-colors",
-               remoteUser ? "text-green-500" : "text-zinc-500"
-             )}>
+             <p className={cn("text-[10px] font-black uppercase tracking-[0.4em] mt-4 transition-colors", remoteUser ? "text-green-500" : "text-zinc-500")}>
                {remoteUser ? `Connected • ${formattedTime}` : 'Ringing...'}
              </p>
-          </div>
-        )}
-      </div>
-
-      <div className="absolute top-12 left-6 z-50 flex items-center gap-3">
-        <button onClick={() => setIsMinimized(true)} className="p-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 text-white shadow-xl active:scale-90 transition-transform"><Minimize2 className="w-5 h-5" /></button>
-        {remoteUser && (
-          <div className="px-4 py-2 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-white font-black text-xs tracking-widest animate-in fade-in">
-            {formattedTime}
           </div>
         )}
       </div>
@@ -247,7 +227,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
           "absolute transition-all duration-500 overflow-hidden border-2 border-white/20 shadow-2xl z-20", 
           remoteUser ? "top-12 right-6 w-32 aspect-[3/4] rounded-3xl" : "inset-0 rounded-none z-[5]"
         )}>
-          <div ref={localVideoRef} className={cn("w-full h-full bg-zinc-800", (cameraOff || !rtc.current.localVideoTrack) && "opacity-0")} />
+          <div ref={localVideoRef} className={cn("w-full h-full bg-zinc-800", (cameraOff || !rtc.current.localVideoTrack) && "opacity-0", facingMode === 'user' && "scale-x-[-1]")} />
           {(cameraOff || !rtc.current.localVideoTrack) && (
             <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80 backdrop-blur-md">
                <VideoOff className="w-8 h-8 text-white/20" />
@@ -256,39 +236,26 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         </div>
       )}
 
-      <div className="absolute bottom-12 inset-x-0 px-6 flex items-center justify-center gap-3 z-50">
-        <button 
-          onClick={() => { setMuted(!muted); rtc.current.localAudioTrack?.setEnabled(muted); }} 
-          className={cn(
-            "w-14 h-14 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl transition-all flex items-center justify-center", 
-            muted ? "bg-red-500 text-white" : "bg-white/10 text-white"
-          )}
-        >
+      <div className="absolute bottom-12 inset-x-0 px-6 flex flex-wrap items-center justify-center gap-3 z-50">
+        <button onClick={() => { setMuted(!muted); rtc.current.localAudioTrack?.setEnabled(muted); }} className={cn("w-14 h-14 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl flex items-center justify-center", muted ? "bg-red-500" : "bg-white/10 text-white")}>
           {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
         </button>
 
-        <button 
-          onClick={() => setIsLoudspeaker(!isLoudspeaker)} 
-          className={cn(
-            "w-14 h-14 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl transition-all flex items-center justify-center", 
-            !isLoudspeaker ? "bg-black/80 text-white" : "bg-white/10 text-white"
-          )}
-        >
+        <button onClick={() => setIsLoudspeaker(!isLoudspeaker)} className={cn("w-14 h-14 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl flex items-center justify-center", !isLoudspeaker ? "bg-black/80" : "bg-white/10 text-white")}>
           {isLoudspeaker ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </button>
         
-        <button onClick={() => handleEndCall(true)} className="w-20 h-20 rounded-full bg-red-600 text-white shadow-2xl shadow-red-500/40 border-4 border-white/10 flex items-center justify-center active:scale-95 transition-all mx-2"><PhoneOff className="w-8 h-8" /></button>
+        <button onClick={() => handleEndCall(true)} className="w-20 h-20 rounded-full bg-red-600 text-white shadow-2xl shadow-red-500/40 border-4 border-white/10 flex items-center justify-center active:scale-95 mx-2"><PhoneOff className="w-8 h-8" /></button>
         
         {type === 'video' && (
-          <button 
-            onClick={() => { setCameraOff(!cameraOff); rtc.current.localVideoTrack?.setEnabled(cameraOff); }} 
-            className={cn(
-              "w-14 h-14 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl transition-all flex items-center justify-center", 
-              cameraOff ? "bg-red-500 text-white" : "bg-white/10 text-white"
-            )}
-          >
-            {cameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-          </button>
+          <>
+            <button onClick={() => { setCameraOff(!cameraOff); rtc.current.localVideoTrack?.setEnabled(cameraOff); }} className={cn("w-14 h-14 rounded-full backdrop-blur-xl border border-white/10 shadow-2xl flex items-center justify-center", cameraOff ? "bg-red-500" : "bg-white/10 text-white")}>
+              {cameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+            </button>
+            <button onClick={switchCamera} className="w-14 h-14 rounded-full backdrop-blur-xl bg-white/10 border border-white/10 text-white shadow-2xl flex items-center justify-center active:rotate-180 transition-transform duration-500">
+               <RefreshCw className="w-5 h-5" />
+            </button>
+          </>
         )}
       </div>
     </div>

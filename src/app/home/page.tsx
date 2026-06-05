@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
@@ -20,34 +21,34 @@ interface UserProfile {
   updated_at: string;
 }
 
-let cachedUsers: UserProfile[] = [];
-
-function shuffleArray<T>(array: T[]): T[] {
-  const newArr = [...array];
-  for (let i = newArr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-  }
-  return newArr;
-}
+const PAGE_SIZE = 12;
 
 export default function HomePage() {
   const router = useRouter()
   const { user: currentUser, isInitialized } = useUser()
   const [activeTab, setActiveTab] = useState<'recommend' | 'nearby'>('recommend')
-  const [loading, setLoading] = useState(cachedUsers.length === 0)
-  const [users, setUsers] = useState<UserProfile[]>(cachedUsers)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
   const [profile, setProfile] = useState<any>(null)
+  
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const fetchUsers = useCallback(async (reshuffle = false) => {
+  const fetchUsers = useCallback(async (pageNum = 0, reshuffle = false) => {
     if (!currentUser?.id) return;
-    if (users.length === 0) setLoading(true);
+    if (pageNum === 0) setLoading(true);
+    else setLoadingMore(true);
 
     const { data: myProfile } = await supabase.from('users').select('*').eq('uid', currentUser.id).single();
     if (!myProfile) return;
     setProfile(myProfile);
 
     const oppositeGender = myProfile.gender === 'male' ? 'female' : 'male';
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
     let query = supabase.from('users')
       .select('*')
       .eq('onboarding_complete', true)
@@ -57,30 +58,47 @@ export default function HomePage() {
 
     if (activeTab === 'nearby') query = query.eq('country', myProfile.country);
     
-    const { data } = await query.order('updated_at', { ascending: false }).limit(60);
+    const { data } = await query
+      .order('updated_at', { ascending: false })
+      .range(from, to);
 
     if (data) {
-      const allUsers = data as UserProfile[];
-      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const onlineUsers = allUsers.filter(u => u.updated_at >= fiveMinsAgo);
-      const offlineUsers = allUsers.filter(u => u.updated_at < fiveMinsAgo);
-
-      let final: UserProfile[] = [];
-      if (reshuffle) {
-        final = [...shuffleArray(onlineUsers), ...shuffleArray(offlineUsers)];
+      if (pageNum === 0) {
+        setUsers(data as any);
       } else {
-        final = [...onlineUsers, ...offlineUsers];
+        setUsers(prev => [...prev, ...(data as any)]);
       }
-
-      setUsers(final);
-      cachedUsers = final;
+      setHasMore(data.length === PAGE_SIZE);
     }
     setLoading(false);
-  }, [currentUser?.id, activeTab, users.length]);
+    setLoadingMore(false);
+  }, [currentUser?.id, activeTab]);
 
   useEffect(() => {
-    if (isInitialized) fetchUsers();
+    if (isInitialized) fetchUsers(0);
   }, [isInitialized, activeTab, fetchUsers]);
+
+  // SCROLL RESTORATION
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem('home_scroll_pos');
+    if (savedScroll && !loading) {
+      setTimeout(() => {
+        window.scrollTo(0, parseInt(savedScroll));
+      }, 100);
+    }
+    const handleScroll = () => {
+      sessionStorage.setItem('home_scroll_pos', window.scrollY.toString());
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500 && !loadingMore && hasMore) {
+        setPage(p => {
+          const next = p + 1;
+          fetchUsers(next);
+          return next;
+        });
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loading, loadingMore, hasMore, fetchUsers]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return 21;
@@ -89,36 +107,40 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col w-full bg-white select-none">
-      <div className="bg-[#00A2FF] pt-2 pb-3 shadow-xl rounded-b-[2rem]">
+    <div className="flex flex-col w-full bg-white select-none min-h-screen">
+      <div className="bg-[#00A2FF] pt-2 pb-3 shadow-xl rounded-b-[2.5rem] sticky top-0 z-50">
         <div className="px-4 grid grid-cols-2 gap-3 py-4">
-          <button onClick={() => router.push('/mystery-note')} className="h-32 bg-orange-500 rounded-[2.5rem] p-6 flex flex-col items-start justify-center text-white shadow-lg active:scale-95 transition-all">
-            <FileText className="w-6 h-6 mb-2" />
-            <p className="text-[13px] font-black uppercase tracking-widest leading-tight">Message<br/>Blast</p>
+          <button onClick={() => router.push('/mystery-note')} className="h-28 bg-gradient-to-br from-orange-400 to-orange-600 rounded-[2rem] p-5 flex flex-col items-start justify-center text-white shadow-lg active:scale-95 transition-all relative overflow-hidden group">
+            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <FileText className="w-5 h-5 mb-2 relative z-10" />
+            <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10">Message<br/>Blast</p>
           </button>
-          <button onClick={() => router.push('/tasks')} className="h-32 bg-white/10 backdrop-blur-md rounded-[2.5rem] p-6 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all">
-            <Target className="w-6 h-6 mb-2" />
-            <p className="text-[13px] font-black uppercase tracking-widest leading-tight">Task<br/>Center</p>
+          <button onClick={() => router.push('/tasks')} className="h-28 bg-white/10 backdrop-blur-md rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
+            <Target className="w-5 h-5 mb-2 relative z-10" />
+            <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10">Task<br/>Center</p>
           </button>
         </div>
 
-        <div className="px-5 py-2 flex items-center justify-between h-10">
+        <div className="px-5 py-1 flex items-center justify-between h-8">
           <div className="flex items-center gap-6">
             {['recommend', 'nearby'].map((t) => (
-              <button key={t} onClick={() => setActiveTab(t as any)} className={cn("text-[10px] font-black uppercase tracking-widest transition-all", activeTab === t ? "text-white scale-110" : "text-white/40")}>
+              <button key={t} onClick={() => { setPage(0); setActiveTab(t as any); }} className={cn("text-[9px] font-black uppercase tracking-widest transition-all", activeTab === t ? "text-white scale-110" : "text-white/40")}>
                 {t}
               </button>
             ))}
           </div>
-          <button onClick={() => fetchUsers(true)} className="p-2 text-white/60 active:rotate-180 transition-transform duration-500">
-            <RotateCw className="w-3.5 h-3.5" />
+          <button onClick={() => fetchUsers(0)} className="p-2 text-white/60 active:rotate-180 transition-transform duration-500">
+            <RotateCw className="w-3 h-3" />
           </button>
         </div>
       </div>
 
       <main className="px-4 pt-6 pb-24">
         {loading ? (
-          <div className="grid grid-cols-2 gap-3">{[1,2,3,4].map(i => <div key={i} className="aspect-[1/1.3] bg-gray-50 rounded-[2rem] animate-pulse" />)}</div>
+          <div className="grid grid-cols-2 gap-3">
+            {[1,2,3,4,5,6].map(i => <div key={i} className="aspect-[1/1.3] bg-gray-50 rounded-[2rem] animate-pulse" />)}
+          </div>
         ) : users.length === 0 ? (
           <div className="py-40 text-center opacity-40 uppercase font-black text-xs">No profiles found</div>
         ) : (
@@ -127,7 +149,7 @@ export default function HomePage() {
               const isOnline = new Date(u.updated_at).getTime() > Date.now() - 5 * 60 * 1000;
               return (
                 <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-[2rem] shadow-xl active:scale-[0.98] transition-all" onClick={() => router.push(`/users/${u.uid}`)}>
-                  <Image src={u.photo_url} alt={u.name} fill className="object-cover" sizes="50vw" priority />
+                  <Image src={u.photo_url} alt={u.name} fill className="object-cover" sizes="50vw" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   {isOnline && (
                     <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-black/20 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
@@ -145,12 +167,14 @@ export default function HomePage() {
                       <span className="text-[9px] font-bold opacity-60 uppercase truncate">{u.country}</span>
                     </div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); router.push(`/chats?startWith=${u.uid}`); }} className="absolute top-4 right-4 h-8 px-4 rounded-full bg-[#00A2FF] flex items-center justify-center text-white text-[9px] font-black uppercase tracking-widest shadow-xl border-none active:scale-90 transition-transform">
-                    CHAT
-                  </button>
                 </Card>
               )
             })}
+          </div>
+        )}
+        {loadingMore && (
+          <div className="py-10 flex justify-center w-full">
+            <Loader2 className="w-6 h-6 animate-spin text-[#00A2FF]" />
           </div>
         )}
       </main>
