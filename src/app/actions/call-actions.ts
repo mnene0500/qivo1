@@ -8,7 +8,7 @@ import { RtcTokenBuilder, RtcRole } from 'agora-token';
  * @fileOverview Hardened Agora Token Generation and Billing Engine.
  * Rates: Audio 70/min, Video 150/min. 
  * Logic: 10s free preview, deduct at 11s, then at the start of every minute.
- * Added: Busy Check and DND support.
+ * Added: Busy Check with 10-minute expiry and DND support.
  */
 
 export async function generateAgoraTokenAction(channelName: string, uid: string) {
@@ -19,8 +19,8 @@ export async function generateAgoraTokenAction(channelName: string, uid: string)
     throw new Error("Agora Credentials missing in Vercel Settings.");
   }
 
-  // Create a stable numeric UID from the string UID
-  const numericUid = Math.abs(uid.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a }, 0));
+  // Create a stable numeric UID from the string UID (32-bit unsigned int)
+  const numericUid = Math.abs(uid.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a }, 0)) >>> 0;
   const role = RtcRole.PUBLISHER;
   const expirationTimeInSeconds = 3600;
   const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -53,12 +53,14 @@ export async function startCallAction(chatId: string, callerId: string, receiver
       return { success: false, error: `${receiver.name} has activated Do Not Disturb.` };
     }
 
-    // 2. Check if receiver is already in an active call
+    // 2. Check if receiver is already in an active call (Filtered to last 10 mins)
+    const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: activeCalls } = await supabase
       .from('calls')
       .select('id')
       .or(`caller_id.eq.${receiverId},receiver_id.eq.${receiverId}`)
-      .in('status', ['calling', 'active']);
+      .in('status', ['calling', 'active'])
+      .gt('created_at', tenMinsAgo);
     
     if (activeCalls && activeCalls.length > 0) {
       return { success: false, error: `${receiver?.name || 'User'} is currently on another call.` };
@@ -75,8 +77,10 @@ export async function startCallAction(chatId: string, callerId: string, receiver
       }
     }
 
-    // Clean up old calls for this chat
-    await supabase.from('calls').update({ status: 'ended' }).eq('chat_id', chatId).neq('status', 'ended');
+    // Clean up old calls for this chat or caller
+    await supabase.from('calls').update({ status: 'ended' })
+      .or(`chat_id.eq.${chatId},caller_id.eq.${callerId}`)
+      .neq('status', 'ended');
 
     const { data, error } = await supabase.from('calls').insert({
       chat_id: chatId,

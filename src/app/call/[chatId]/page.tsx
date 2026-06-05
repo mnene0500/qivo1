@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 
 /**
  * @fileOverview Overhauled Agora Call Page with PIP and 10s Free Logic.
+ * Fixed: Sequenced hardware initialization for mobile stability.
  */
 
 export default function CallPage({ params }: { params: Promise<{ chatId: string }> }) {
@@ -107,34 +108,45 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
         client.on("user-left", () => { if (mounted.current) handleEndCall(false) })
 
+        // 1. Request Audio FIRST (Sequenced for mobile stability)
+        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack().catch(e => {
+          throw new Error("Microphone permission denied or in use.");
+        });
+        rtc.current.localAudioTrack = audioTrack;
+
+        // 2. Request Video SECOND if needed
         if (type === 'video') {
-          const videoTrack = await AgoraRTC.createCameraVideoTrack({ facingMode: "user" })
-          rtc.current.localVideoTrack = videoTrack
-          if (localVideoRef.current) videoTrack.play(localVideoRef.current)
+          const videoTrack = await AgoraRTC.createCameraVideoTrack({ facingMode: "user" }).catch(e => {
+            console.warn("Camera failed, continuing as audio only", e);
+            return null;
+          });
+          if (videoTrack) {
+            rtc.current.localVideoTrack = videoTrack;
+            if (localVideoRef.current) videoTrack.play(localVideoRef.current);
+          }
         }
 
-        const tokenData = await generateAgoraTokenAction(chatId, user.id)
-        await client.join(tokenData.appId, tokenData.channelName, tokenData.token, tokenData.uid)
+        // 3. Generate Token and Join
+        const tokenData = await generateAgoraTokenAction(chatId, user.id);
+        await client.join(tokenData.appId, tokenData.channelName, tokenData.token, tokenData.uid);
         
-        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
-        rtc.current.localAudioTrack = audioTrack
+        const tracks = [rtc.current.localAudioTrack];
+        if (rtc.current.localVideoTrack) tracks.push(rtc.current.localVideoTrack);
         
-        const tracks = [audioTrack]
-        if (rtc.current.localVideoTrack) tracks.push(rtc.current.localVideoTrack)
-        await client.publish(tracks)
-        setJoined(true)
-      } catch (err) {
-        setPermissionError("Permissions denied or setup failed.");
+        await client.publish(tracks);
+        setJoined(true);
+      } catch (err: any) {
+        setPermissionError(err.message || "Hardware setup failed. Ensure permissions are granted.");
       }
     }
     init()
     return () => { shutdownAgora() }
-  }, [chatId, user?.id])
+  }, [chatId, user?.id, type])
 
   const shutdownAgora = async () => {
     if (rtc.current.localAudioTrack) { rtc.current.localAudioTrack.stop(); rtc.current.localAudioTrack.close(); }
     if (rtc.current.localVideoTrack) { rtc.current.localVideoTrack.stop(); rtc.current.localVideoTrack.close(); }
-    if (rtc.current.client) { await rtc.current.client.leave(); }
+    if (rtc.current.client) { await rtc.current.client.leave().catch(() => {}); }
   }
 
   const handleEndCall = async (manual = true) => {
@@ -149,7 +161,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     return `${m}:${ss.toString().padStart(2, '0')}`
   }
 
-  if (permissionError) return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-10 text-center"><AlertCircle className="w-12 h-12 text-red-500 mb-4" /><h2 className="text-white font-bold">Hardware Error</h2><p className="text-gray-500 text-sm mb-8">{permissionError}</p><Button onClick={() => router.back()}>Go Back</Button></div>
+  if (permissionError) return <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-10 text-center z-[200]"><AlertCircle className="w-12 h-12 text-red-500 mb-4" /><h2 className="text-white font-bold text-xl mb-2">Hardware Error</h2><p className="text-gray-400 text-sm mb-10 leading-relaxed">{permissionError}</p><Button onClick={() => router.back()} className="rounded-2xl h-14 px-10 bg-[#00A2FF] text-white font-black uppercase tracking-widest text-xs">Go Back</Button></div>
 
   if (isMinimized) return (
     <div className="fixed bottom-24 right-4 z-[999] w-20 h-20 rounded-full bg-blue-500 shadow-2xl flex items-center justify-center border-4 border-white active:scale-95 transition-all cursor-pointer" onClick={() => setIsMinimized(false)}>
@@ -169,10 +181,10 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
                {isRinging && <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />}
                <Avatar className="w-40 h-40 border-4 border-white/10 shadow-2xl relative z-10">
                  <AvatarImage src={partnerProfile?.photo_url} className="object-cover" />
-                 <AvatarFallback><User className="w-16 h-16" /></AvatarFallback>
+                 <AvatarFallback><User className="w-16 h-16 text-zinc-700" /></AvatarFallback>
                </Avatar>
              </div>
-             <h2 className="text-white text-2xl font-black mt-8">{partnerProfile?.name || 'Connecting...'}</h2>
+             <h2 className="text-white text-2xl font-black mt-8 tracking-tight">{partnerProfile?.name || 'Connecting...'}</h2>
              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em] mt-4">
                {remoteUser ? formatDuration(duration) : 'Ringing...'}
              </p>
@@ -181,12 +193,12 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
       </div>
 
       <div className="absolute top-12 left-6 z-50">
-        <button onClick={() => setIsMinimized(true)} className="p-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 text-white shadow-xl"><Minimize2 className="w-5 h-5" /></button>
+        <button onClick={() => setIsMinimized(true)} className="p-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 text-white shadow-xl active:scale-90 transition-transform"><Minimize2 className="w-5 h-5" /></button>
       </div>
 
       {type === 'video' && (
         <div className={cn("absolute transition-all duration-500 overflow-hidden border-2 border-white/20 shadow-2xl z-20", remoteUser ? "top-12 right-6 w-32 aspect-[3/4] rounded-3xl" : "inset-0 rounded-none z-[5]")}>
-          <div ref={localVideoRef} className={cn("w-full h-full bg-zinc-800", cameraOff && "opacity-0")} />
+          <div ref={localVideoRef} className={cn("w-full h-full bg-zinc-800", (cameraOff || !rtc.current.localVideoTrack) && "opacity-0")} />
         </div>
       )}
 
