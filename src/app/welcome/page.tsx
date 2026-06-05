@@ -11,8 +11,8 @@ import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
 /**
- * @fileOverview Cinematic Welcome Page v2.1.
- * Refined branding and restored video background.
+ * @fileOverview Cinematic Welcome Page v2.2.
+ * Fixed: Video background reliability and refined all-caps branding.
  */
 export default function WelcomePage() {
   const [loading, setLoading] = useState(false)
@@ -42,7 +42,7 @@ export default function WelcomePage() {
 
   return (
     <div className="fixed inset-0 bg-black overflow-hidden select-none">
-      {/* RESTORED VIDEO BACKGROUND */}
+      {/* CINEMATIC VIDEO BACKGROUND */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10" />
         <video 
@@ -50,7 +50,7 @@ export default function WelcomePage() {
           loop 
           muted 
           playsInline 
-          className="w-full h-full object-cover opacity-60 grayscale-[20%]"
+          className="w-full h-full object-cover opacity-60 grayscale-[10%]"
         >
           <source src="https://assets.mixkit.co/videos/preview/mixkit-people-dancing-at-a-party-with-strobe-lights-4008-large.mp4" type="video/mp4" />
         </video>
@@ -58,11 +58,10 @@ export default function WelcomePage() {
 
       <div className="relative z-20 h-full flex flex-col px-8 pt-24 pb-16 justify-between items-center text-center">
         <div className="space-y-4 pt-20">
-          {/* REDUCED FONT SIZE */}
           <h1 className="text-6xl font-logo font-black text-white drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] tracking-tight">QIVO</h1>
           <div className="flex items-center justify-center gap-3">
              <div className="h-[1px] w-6 bg-white/20" />
-             <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+             <div className="w-1.5 h-1.5 bg-[#00A2FF] rounded-full animate-pulse" />
              <div className="h-[1px] w-6 bg-white/20" />
           </div>
         </div>
@@ -74,7 +73,7 @@ export default function WelcomePage() {
               onClick={() => router.push("/auth")}
               className="w-full h-20 rounded-[2.5rem] bg-white text-black hover:bg-white/90 font-black text-xs tracking-[0.2em] uppercase shadow-[0_20px_50px_rgba(255,255,255,0.1)] active:scale-95 transition-all"
             >
-              <Mail className="w-5 h-5 mr-3 text-blue-500" /> Continue with Email
+              <Mail className="w-5 h-5 mr-3 text-[#00A2FF]" /> Continue with Email
             </Button>
 
             <Button 

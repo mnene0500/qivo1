@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef, use } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { PhoneOff, Mic, MicOff, Video, VideoOff, User, Loader2, AlertCircle, SwitchCamera, Minimize2, Maximize2 } from "lucide-react"
+import { PhoneOff, Mic, MicOff, Video, VideoOff, User, Loader2, AlertCircle, Minimize2 } from "lucide-react"
 import { useUser } from "@/firebase/auth/use-user"
 import { supabase } from "@/lib/supabase"
 import { generateAgoraTokenAction, deductCallCoinsAction, endCallAction } from "@/app/actions/call-actions"
@@ -12,8 +12,10 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 /**
- * @fileOverview Overhauled Agora Call Page with PIP and Status Logging.
- * Fixed: Timer starts ONLY on connection. Automatic termination for insufficient coins.
+ * @fileOverview Hardened Agora Call Page with Connection-Locked Billing.
+ * Deduction Schedule:
+ * - Minute 1: Deduct at 11th second (10s free trial).
+ * - Minute 2+: Deduct at start of each minute (61s, 121s, etc.).
  */
 
 export default function CallPage({ params }: { params: Promise<{ chatId: string }> }) {
@@ -66,7 +68,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
     return () => { supabase.removeChannel(channel) }
   }, [callId])
 
-  // ACCURATE TIMER & BILLING: Starts only when connected (remoteUser present)
+  // TIMER & BILLING: Starts ONLY when connected (remoteUser present)
   useEffect(() => {
     if (joined && remoteUser && user?.id && partnerId) {
       billingTimer.current = setInterval(async () => {
@@ -74,13 +76,16 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         
         setDuration(prev => {
           const next = prev + 1
-          // Logic: 10s free, deduct at 11s (1st min), then at 61s, 121s...
+          
+          // BILLING LOGIC:
+          // 1st Min: Deduct at 11s.
+          // 2nd Min+: Deduct at start (61s, 121s...).
           const isDeductionPoint = next === 11 || (next > 60 && (next - 1) % 60 === 0);
           
           if (isDeductionPoint) {
             deductCallCoinsAction(user.id, type, partnerId).then(res => {
               if (!res.success && mounted.current) {
-                // Terminate call due to insufficient funds
+                // Instantly end call if funds are missing
                 handleEndCall(true, 'Insufficient Balance');
               }
             })
@@ -116,13 +121,13 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
 
         client.on("user-left", () => { if (mounted.current) handleEndCall(false) })
 
-        // 1. Request Microphone
+        // 1. Mic Req
         const audioTrack = await AgoraRTC.createMicrophoneAudioTrack().catch(e => {
-          throw new Error("Microphone permission denied. Please enable it in browser settings.");
+          throw new Error("Microphone permission required.");
         });
         rtc.current.localAudioTrack = audioTrack;
 
-        // 2. Request Camera (if video)
+        // 2. Camera Req
         if (type === 'video') {
           const videoTrack = await AgoraRTC.createCameraVideoTrack({ facingMode: "user" }).catch(e => {
             console.warn("Camera failed", e);
@@ -188,7 +193,7 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
   )
 
   if (isMinimized) return (
-    <div className="fixed bottom-24 right-4 z-[999] w-20 h-20 rounded-full bg-blue-500 shadow-2xl flex items-center justify-center border-4 border-white active:scale-95 transition-all cursor-pointer" onClick={() => setIsMinimized(false)}>
+    <div className="fixed bottom-24 right-4 z-[999] w-20 h-20 rounded-full bg-[#00A2FF] shadow-2xl flex items-center justify-center border-4 border-white active:scale-95 transition-all cursor-pointer" onClick={() => setIsMinimized(false)}>
       <div className="relative">
         <Avatar className="w-16 h-16"><AvatarImage src={partnerProfile?.photo_url} /><AvatarFallback><User /></AvatarFallback></Avatar>
         <div className="absolute -top-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white animate-pulse" />
@@ -221,11 +226,10 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         )}
       </div>
 
-      {/* TOP CONTROLS */}
       <div className="absolute top-12 left-6 z-50 flex items-center gap-3">
         <button onClick={() => setIsMinimized(true)} className="p-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 text-white shadow-xl active:scale-90 transition-transform"><Minimize2 className="w-5 h-5" /></button>
         {remoteUser && (
-          <div className="px-4 py-2 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-white font-black text-xs tracking-widest">
+          <div className="px-4 py-2 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-white font-black text-xs tracking-widest animate-in fade-in">
             {formattedTime}
           </div>
         )}
@@ -237,7 +241,6 @@ export default function CallPage({ params }: { params: Promise<{ chatId: string 
         </div>
       )}
 
-      {/* BOTTOM CONTROLS */}
       <div className="absolute bottom-12 inset-x-0 px-8 flex items-center justify-center gap-4 z-50">
         <button 
           onClick={() => { setMuted(!muted); rtc.current.localAudioTrack?.setEnabled(muted); }} 
