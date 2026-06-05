@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
            </div>
            <div>
              <h2 className="text-xl font-black uppercase tracking-tight">Data Protection</h2>
-             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Version 2.0 Compliance</p>
+             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Privacy Framework</p>
            </div>
         </div>
 
@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3">
           <h2 className="text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">2. Processing & Storage</h2>
           <p className="text-[13px] text-gray-600 font-bold leading-relaxed">
-            Your data is stored in encrypted cloud environments. Real-time messages are end-to-end transmitted and stored securely. We do not sell user data to third-party advertisers.
+            Your data is stored in encrypted cloud environments. Real-time messages are transmitted and stored securely. We do not sell user data to third-party advertisers.
           </p>
         </section>
 
@@ -63,7 +63,7 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <div className="pt-10 border-t border-gray-50 text-center opacity-30">
-          <p className="text-[9px] font-black uppercase tracking-widest">QIVO High-Security Social Node</p>
+          <p className="text-[9px] font-black uppercase tracking-widest">QIVO Ecosystem</p>
         </div>
       </main>
     </div>

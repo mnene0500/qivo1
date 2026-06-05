@@ -23,14 +23,14 @@ export default function TermsOfServicePage() {
            </div>
            <div>
              <h2 className="text-xl font-black uppercase tracking-tight">Legal Protocol</h2>
-             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Effective Jan 1, 2024</p>
+             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active User Agreement</p>
            </div>
         </div>
 
         <section className="space-y-3">
           <h2 className="text-xs font-black text-black uppercase tracking-widest border-l-4 border-[#00A2FF] pl-3">1. Binding Agreement</h2>
           <p className="text-[13px] text-gray-600 font-bold leading-relaxed">
-            By accessing QIVO, you enter a binding legal contract. You agree to utilize the platform exclusively for genuine social networking and abide by all local and international laws.
+            By accessing QIVO, you enter a binding legal contract. You agree to utilize the platform exclusively for genuine social networking and abide by all applicable laws.
           </p>
         </section>
 
@@ -63,7 +63,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <div className="pt-10 border-t border-gray-50 text-center opacity-30">
-          <p className="text-[9px] font-black uppercase tracking-widest">Governed by Laws of the Republic of Kenya</p>
+          <p className="text-[9px] font-black uppercase tracking-widest">QIVO Global Standards</p>
         </div>
       </main>
     </div>
