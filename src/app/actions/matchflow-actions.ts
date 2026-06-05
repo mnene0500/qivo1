@@ -315,3 +315,224 @@ export async function reportUserAction(payload: { reporterId: string; reportedId
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
+
+export async function activateReadReceiptsAction(uid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const cost = 200;
+    const { data: balance } = await supabase.from('balances').select('coins').eq('user_id', uid).single();
+    if ((Number(balance?.coins) || 0) < cost) return { success: false, error: "insufficient_funds" };
+
+    const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: uid, p_amount: -cost });
+    if (deductErr) throw deductErr;
+
+    await supabase.from('users').update({ has_read_receipts: true }).eq('uid', uid);
+    await supabase.from('coin_history').insert({
+      user_id: uid,
+      amount: -cost,
+      type: 'feature_unlock',
+      description: 'Activated Read Receipts',
+      timestamp: Date.now()
+    });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function activateVisitorTrackingAction(uid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const cost = 400;
+    const { data: balance } = await supabase.from('balances').select('coins').eq('user_id', uid).single();
+    if ((Number(balance?.coins) || 0) < cost) return { success: false, error: "insufficient_funds" };
+
+    const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: uid, p_amount: -cost });
+    if (deductErr) throw deductErr;
+
+    await supabase.from('users').update({ has_visitor_tracking: true }).eq('uid', uid);
+    await supabase.from('coin_history').insert({
+      user_id: uid,
+      amount: -cost,
+      type: 'feature_unlock',
+      description: 'Activated Visitor Tracking',
+      timestamp: Date.now()
+    });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function logProfileVisitAction(visitorId: string, visitedId: string) {
+  if (visitorId === visitedId) return;
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: existing } = await supabase
+      .from('profile_visits')
+      .select('count')
+      .eq('visitor_id', visitorId)
+      .eq('visited_id', visitedId)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from('profile_visits')
+        .update({ count: (existing.count || 0) + 1, last_visit_at: new Date().toISOString() })
+        .eq('visitor_id', visitorId)
+        .eq('visited_id', visitedId);
+    } else {
+      await supabase.from('profile_visits')
+        .insert({ visitor_id: visitorId, visited_id: visitedId, count: 1 });
+    }
+  } catch (e) {}
+}
+
+export async function toggleUserRoleAction(adminUid: string, targetMatchFlowId: string, role: string, value: boolean) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', adminUid).single();
+    if (!admin?.is_admin) throw new Error("Unauthorized");
+    await supabase.from('users').update({ [role]: value }).eq('match_flow_id', targetMatchFlowId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resolveReportAction(adminUid: string, reportId: string, reporterUid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: admin } = await supabase.from('users').select('is_admin').eq('uid', adminUid).single();
+    if (!admin?.is_admin) throw new Error("Unauthorized");
+    await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
+    await supabase.rpc("increment_coins", { p_user_id: reporterUid, p_amount: 10 });
+    await supabase.from('coin_history').insert({ user_id: reporterUid, amount: 10, type: 'reward', description: 'Report Bounty', timestamp: Date.now() });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function reviewRecruitmentAction(applicantUid: string, status: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    await supabase.from('users').update({ agency_status: status }).eq('uid', applicantUid);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateWithdrawalStatusAction(requestId: string, status: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    await supabase.from('withdrawals').update({ status }).eq('id', requestId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function createAgencyAction(uid: string, name: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    await supabase.from('agencies').insert({ code, agent_uid: uid, name });
+    await supabase.from('users').update({ is_agent: true, agency_id: code, agency_status: 'approved' }).eq('uid', uid);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function joinAgencyAction(uid: string, code: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { data: agency } = await supabase.from('agencies').select('code').eq('code', code).maybeSingle();
+    if (!agency) throw new Error("Invalid Agency Code");
+    await supabase.from('users').update({ agency_id: code, agency_status: 'pending' }).eq('uid', uid);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function leaveAgencyAction(uid: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    await supabase.from('users').update({ agency_id: null, agency_status: null }).eq('uid', uid);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function convertDiamondsToCoinsAction(uid: string, diamondAmount: number, coinAmount: number) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error: dErr } = await supabase.rpc("increment_diamonds", { p_user_id: uid, p_amount: -diamondAmount });
+    if (dErr) throw dErr;
+    const { error: cErr } = await supabase.rpc("increment_coins", { p_user_id: uid, p_amount: coinAmount });
+    if (cErr) throw cErr;
+    await supabase.from('diamond_history').insert({ user_id: uid, amount: -diamondAmount, type: 'conversion', description: 'Exchanged for Coins', timestamp: Date.now() });
+    await supabase.from('coin_history').insert({ user_id: uid, amount: coinAmount, type: 'conversion', description: 'Received from Diamond Exchange', timestamp: Date.now() });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function playSpinGameAction(uid: string, stake: number) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: uid, p_amount: -stake });
+    if (deductErr) throw deductErr;
+    const prizes = stake <= 50 ? [0, 5, 10, 0, 20, 0, 50, 5, 0, 10, 20, 0, 5, 0, 30, 0, 10, 50, 0, 15] : [0, 100, 200, 0, 500, 0, 1000, 100, 0, 200, 500, 0, 100, 0, 750, 0, 200, 1000, 0, 400];
+    const winIndex = Math.floor(Math.random() * prizes.length);
+    const winAmount = prizes[winIndex];
+    if (winAmount > 0) {
+      await supabase.rpc("increment_coins", { p_user_id: uid, p_amount: winAmount });
+      await supabase.from('coin_history').insert({ user_id: uid, amount: winAmount - stake, type: 'game', description: 'Spin to Win', timestamp: Date.now() });
+    } else {
+      await supabase.from('coin_history').insert({ user_id: uid, amount: -stake, type: 'game', description: 'Spin to Win (Loss)', timestamp: Date.now() });
+    }
+    return { success: true, index: winIndex, winAmount };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function playSlotsAction(uid: string, stake: number) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error: deductErr } = await supabase.rpc("increment_coins", { p_user_id: uid, p_amount: -stake });
+    if (deductErr) throw deductErr;
+    const symbols = ["bar", "cherry", "crown"];
+    const slots = [symbols[Math.floor(Math.random() * 3)], symbols[Math.floor(Math.random() * 3)], symbols[Math.floor(Math.random() * 3)]];
+    let winAmount = 0, message = "Try again!";
+    if (slots[0] === slots[1] && slots[1] === slots[2]) {
+      winAmount = stake * 2;
+      message = `Triple ${slots[0]}! You won ${winAmount} coins!`;
+      await supabase.rpc("increment_coins", { p_user_id: uid, p_amount: winAmount });
+      await supabase.from('coin_history').insert({ user_id: uid, amount: winAmount - stake, type: 'game', description: 'Slot Machine Win', timestamp: Date.now() });
+    } else {
+      await supabase.from('coin_history').insert({ user_id: uid, amount: -stake, type: 'game', description: 'Slot Machine Loss', timestamp: Date.now() });
+    }
+    return { success: true, slots, winAmount, message };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function requestWithdrawalAction(uid: string, diamonds: number, amountKes: number, agencyId: string, mpesaNumber: string) {
+  const supabase = getSupabaseAdmin();
+  try {
+    const { error: dErr } = await supabase.rpc("increment_diamonds", { p_user_id: uid, p_amount: -diamonds });
+    if (dErr) throw dErr;
+    await supabase.from('withdrawals').insert({ user_id: uid, agency_id: agencyId, diamonds, amount_kes: amountKes, mpesa_number: mpesaNumber, status: 'pending', timestamp: Date.now() });
+    await supabase.from('diamond_history').insert({ user_id: uid, amount: -diamonds, type: 'withdrawal', description: `Payout Request: ${amountKes} KES`, timestamp: Date.now() });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
