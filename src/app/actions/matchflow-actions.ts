@@ -169,6 +169,8 @@ export async function awardCoinsAction(userUid: string, targetUid: string, amoun
     const { data: actor } = await supabase.from('users').select('is_admin, is_coin_seller').eq('uid', userUid).single();
     if (!actor?.is_admin && !actor?.is_coin_seller) throw new Error("Unauthorized");
     
+    const historyDesc = actor.is_admin ? "System Award" : "Recharge with Coinseller";
+
     if (actor.is_coin_seller && !actor.is_admin) {
       const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', userUid).single();
       if ((Number(bal?.coins) || 0) < amount) throw new Error("Insufficient merchant balance");
@@ -180,7 +182,7 @@ export async function awardCoinsAction(userUid: string, targetUid: string, amoun
     }
     
     await supabase.rpc("increment_coins", { p_user_id: targetUid, p_amount: amount });
-    await supabase.from('coin_history').insert({ user_id: targetUid, amount, type: 'awarded', description: `Received from Partner`, timestamp: Date.now() });
+    await supabase.from('coin_history').insert({ user_id: targetUid, amount, type: 'awarded', description: historyDesc, timestamp: Date.now() });
     return { success: true, message: `Transferred ${amount} coins.` };
   } catch (err: any) {
     return { success: false, error: err.message };
