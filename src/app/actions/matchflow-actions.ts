@@ -9,7 +9,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 function filterSensitiveContent(text: string): string {
   const sensitivePatterns = [
-    /\d{3,}/g, 
+    /\d{3,}/g, // Strictly block sequences of 3+ digits (Phone numbers/Scams)
     /\b(fuck|bitch|idiot|stupid|scam|fraud|malaya|pumbavu|nguruwe)\b/gi 
   ];
   let filtered = text;
@@ -227,6 +227,7 @@ export async function deleteUserCompletelyAction(targetUid: string) {
 export async function sendMysteryNoteAction(userId: string, text: string, recipientCount: number) {
   const supabase = getSupabaseAdmin();
   const cost = recipientCount * 10;
+  const safeText = filterSensitiveContent(text);
   
   try {
     const { data: sender } = await supabase.from('users').select('blocking, blocked_by').eq('uid', userId).single();
@@ -252,8 +253,8 @@ export async function sendMysteryNoteAction(userId: string, text: string, recipi
       
       for (const r of recipients) {
         const chatId = `direct_${[userId, r.uid].sort()[0]}_${[userId, r.uid].sort()[1]}`;
-        await supabase.from('chats').upsert({ id: chatId, last_message: text, last_message_at: Date.now(), participant_ids: [userId, r.uid], last_sender_id: userId, updated_at: new Date().toISOString() });
-        await supabase.from('messages').insert({ chat_id: chatId, sender_id: userId, text: text, timestamp: Date.now() });
+        await supabase.from('chats').upsert({ id: chatId, last_message: safeText.slice(0, 100), last_message_at: Date.now(), participant_ids: [userId, r.uid], last_sender_id: userId, updated_at: new Date().toISOString() });
+        await supabase.from('messages').insert({ chat_id: chatId, sender_id: userId, text: safeText, timestamp: Date.now() });
       }
     }
     return { success: true };
@@ -532,3 +533,4 @@ export async function requestWithdrawalAction(uid: string, diamonds: number, amo
     return { success: false, error: err.message };
   }
 }
+

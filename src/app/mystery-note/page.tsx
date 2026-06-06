@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -49,6 +48,12 @@ export default function MysteryNotePage() {
   const handleSend = async () => {
     if (!user?.id || !message.trim()) return
     
+    // Anti-scam: Block numbers
+    if (/\d{3,}/.test(message)) {
+      toast({ variant: "destructive", title: "Security Block", description: "Sharing phone numbers or IDs is not allowed in blasts." });
+      return;
+    }
+
     const currentCoins = Number(userCoins ?? 0);
     const requiredCoins = Number(totalCost);
 
@@ -84,7 +89,6 @@ export default function MysteryNotePage() {
 
   return (
     <div className="flex-1 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600 min-h-screen flex flex-col select-none relative overflow-hidden animate-in fade-in duration-700">
-      {/* ANIMATED AMBIENCE (Low Z-Index) */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
         <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/10 rounded-full blur-[100px] animate-pulse" />
         <div className="absolute bottom-20 -left-20 w-80 h-80 bg-blue-400/10 rounded-full blur-[80px]" />
@@ -124,7 +128,7 @@ export default function MysteryNotePage() {
             <div className="relative group z-20">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-[2rem] blur-xl opacity-0 group-focus-within:opacity-20 transition-opacity" />
               <Textarea 
-                placeholder="Broadcast your mood, a question, or a greeting to the world..." 
+                placeholder="Broadcast your mood, a question, or a greeting..." 
                 value={message} 
                 onChange={(e) => setMessage(e.target.value)} 
                 className="bg-white rounded-[2.5rem] min-h-[180px] border-none text-slate-900 font-bold p-8 text-base shadow-inner focus-visible:ring-4 focus-visible:ring-white/20 transition-all placeholder:text-slate-300 relative z-30" 

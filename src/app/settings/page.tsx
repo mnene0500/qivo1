@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -118,19 +117,6 @@ export default function SettingsPage() {
     setIsActivating(false)
   }
 
-  const handleActivateVisitors = async () => {
-    if (!user) return
-    setIsActivating(true)
-    const res = await activateVisitorTrackingAction(user.id)
-    if (res.success) {
-      toast({ title: "Visitor Tracking Activated!" })
-      setProfile({ ...profile, has_visitor_tracking: true })
-    } else {
-      toast({ variant: "destructive", title: "Activation Failed", description: res.error === 'insufficient_funds' ? "You need 400 coins." : "Error occurred." })
-    }
-    setIsActivating(false)
-  }
-
   const handleSignOut = async () => {
     try {
       localStorage.clear();
@@ -232,52 +218,6 @@ export default function SettingsPage() {
                     <CheckCircle2 className="w-4 h-4" />
                   </div>
                   <span className="text-sm font-black tracking-tight text-slate-900">Read Receipts</span>
-                </div>
-                <span className="text-[8px] font-black text-green-500 uppercase tracking-widest">Active</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h2 className="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] ml-2">Premium Features</h2>
-          <div className="bg-white rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm">
-            {profile && !profile.has_visitor_tracking ? (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <div className="flex items-center justify-between py-4 px-5 active:bg-gray-50 transition-colors cursor-pointer bg-white group hideBorder">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-50 text-purple-500">
-                        <Zap className="w-4 h-4" />
-                      </div>
-                      <span className="text-sm font-black tracking-tight text-slate-900">Profile Visitors</span>
-                    </div>
-                    <span className="px-2.5 py-0.5 bg-purple-500 text-white text-[7px] font-black uppercase rounded-full">Unlock</span>
-                  </div>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="rounded-[2.5rem] p-8 border-none shadow-2xl w-[85vw] max-w-sm">
-                  <AlertDialogHeader className="items-center text-center">
-                    <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mb-4">
-                      <Zap className="w-8 h-8 text-purple-500" />
-                    </div>
-                    <AlertDialogTitle className="text-xl font-black tracking-tight uppercase">Who Visited?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-xs font-medium text-gray-400 pt-1">See exactly who has been checking out your profile with a one-time activation.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <div className="flex flex-col gap-3 mt-6">
-                    <Button onClick={handleActivateVisitors} disabled={isActivating} className="w-full h-14 rounded-xl bg-purple-600 text-white font-black uppercase text-xs">
-                      {isActivating ? <Loader2 className="animate-spin" /> : <><Coins className="w-3.5 h-3.5 mr-2" /> Pay 400 Coins</>}
-                    </Button>
-                    <AlertDialogCancel className="w-full h-12 rounded-xl border-none bg-gray-50 text-gray-400 font-black uppercase text-[10px]">Maybe Later</AlertDialogCancel>
-                  </div>
-                </AlertDialogContent>
-              </AlertDialog>
-            ) : (
-              <div className="flex items-center justify-between py-4 px-5 bg-white group hideBorder">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-green-50 text-green-500">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <span className="text-sm font-black tracking-tight text-slate-900">Visitor Tracking</span>
                 </div>
                 <span className="text-[8px] font-black text-green-500 uppercase tracking-widest">Active</span>
               </div>

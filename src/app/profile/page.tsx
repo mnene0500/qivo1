@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
@@ -30,22 +29,16 @@ export default function MePage() {
   const [agencyCode, setAgencyCode] = useState("")
   const [agencyName, setAgencyName] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
-  const [visitCount, setVisitCount] = useState(0)
 
   const fetchProfile = useCallback(async () => {
     if (!user?.id) return
     
     try {
-      const [profileRes, visitRes] = await Promise.all([
-        supabase.from('users').select('*').eq('uid', user.id).maybeSingle(),
-        supabase.from('profile_visits').select('count', { count: 'exact', head: true }).eq('visited_id', user.id)
-      ]);
-
-      if (profileRes.data) {
-        setProfile(profileRes.data)
-        cachedProfile = profileRes.data
+      const { data } = await supabase.from('users').select('*').eq('uid', user.id).maybeSingle();
+      if (data) {
+        setProfile(data)
+        cachedProfile = data
       }
-      setVisitCount(visitRes.count || 0)
     } catch (e) {
       console.error("Profile load error")
     }
@@ -127,20 +120,6 @@ export default function MePage() {
       
       <div className="relative z-10">
         <header className="pt-12 pb-8 px-6 flex flex-col items-center text-center">
-          <div className="absolute top-10 right-6">
-            <button 
-              onClick={() => router.push('/visitors')}
-              className="group relative w-12 h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-xl active:scale-90 transition-all text-white"
-            >
-              <Users className="w-5 h-5" />
-              {visitCount > 0 && (
-                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black min-w-[18px] h-4.5 px-1 rounded-full flex items-center justify-center border-2 border-white shadow-lg animate-in zoom-in-95">
-                  {visitCount > 99 ? '99+' : visitCount}
-                </div>
-              )}
-            </button>
-          </div>
-
           <div className="relative mb-4">
             <div className="relative w-28 h-28 rounded-full overflow-hidden bg-white/20 backdrop-blur-xl p-1 shadow-2xl">
               <div className="w-full h-full rounded-full overflow-hidden bg-gray-100">

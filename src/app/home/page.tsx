@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -33,15 +32,13 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(true)
   const [profile, setProfile] = useState<any>(null)
 
-  // Fisher-Yates Shuffle algorithm for client-side reshuffling
   const shuffleArray = (array: any[]) => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[shuffled[i]]];
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    // Note: We'll keep it simple for the user request: mix them up!
-    return shuffled.sort(() => Math.random() - 0.5);
+    return shuffled;
   };
 
   const fetchUsers = useCallback(async (pageNum = 0, isManualRefresh = false) => {
@@ -76,7 +73,6 @@ export default function HomePage() {
 
     if (activeTab === 'nearby') query = query.eq('country', myProfile.country);
     
-    // Manual refresh reshuffles the whole pool by using a different order or client-side mixing
     const { data } = await query
       .order('updated_at', { ascending: false })
       .range(from, to);
@@ -84,7 +80,6 @@ export default function HomePage() {
     if (data) {
       let finalData = data as any;
       
-      // If manually refreshing, shuffle the incoming batch
       if (isManualRefresh) {
         finalData = shuffleArray(finalData);
       }
@@ -94,7 +89,7 @@ export default function HomePage() {
       } else {
         setUsers(prev => {
           const existingIds = new Set(prev.map(u => u.uid));
-          const filteredNew = finalData.filter((u: any) => !existingIds.has(u.uid));
+          const filteredNew = finalData.filter((u: any) => u && !existingIds.has(u.uid));
           return [...prev, ...filteredNew];
         });
       }
@@ -126,27 +121,29 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col w-full bg-white select-none min-h-screen">
-      {/* SCROLLABLE TOP BUTTONS */}
-      <div className="bg-[#00A2FF] pt-2 pb-4">
-        <div className="px-4 grid grid-cols-2 gap-3 py-4">
+      <div className="bg-[#00A2FF] pt-1 pb-3">
+        <div className="px-4 grid grid-cols-2 gap-3 py-3">
           <button 
             onClick={() => router.push('/mystery-note')} 
-            className="h-28 bg-[#1E3A8A] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/10 active:scale-95 transition-all relative overflow-hidden group shadow-lg"
+            className="h-28 bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-xl shadow-blue-900/10"
           >
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full -mr-8 -mt-8" />
             <FileText className="w-5 h-5 mb-2 relative z-10" />
-            <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10">Message<br/>Blast</p>
+            <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10 drop-shadow-sm">Message<br/>Blast</p>
           </button>
           <button 
             onClick={() => router.push('/tasks')} 
-            className="h-28 bg-[#6B21A8] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-lg"
+            className="h-28 bg-gradient-to-br from-[#6B21A8] to-[#9333EA] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-xl shadow-purple-900/10"
           >
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full -mr-8 -mt-8" />
             <Target className="w-5 h-5 mb-2 relative z-10" />
-            <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10">Task<br/>Center</p>
+            <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10 drop-shadow-sm">Task<br/>Center</p>
           </button>
         </div>
       </div>
 
-      {/* STICKY TAB BAR */}
       <div className="sticky top-0 z-[60] bg-[#00A2FF] shadow-lg border-none">
         <div className="px-5 h-14 flex items-center justify-between">
           <div className="flex items-center gap-8">
@@ -186,7 +183,8 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {users.map((u) => {
-              const isOnline = new Date(u.updated_at).getTime() > Date.now() - 5 * 60 * 1000;
+              if (!u) return null;
+              const isOnline = u.updated_at && (new Date(u.updated_at).getTime() > Date.now() - 5 * 60 * 1000);
               return (
                 <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-[2rem] shadow-xl active:scale-[0.98] transition-all" onClick={() => router.push(`/users/${u.uid}`)}>
                   <Image src={u.photo_url} alt={u.name} fill className="object-cover" sizes="50vw" />
