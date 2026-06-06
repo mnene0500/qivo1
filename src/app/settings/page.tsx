@@ -4,11 +4,28 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronLeft, ChevronRight, ShieldAlert, Info, RefreshCw, CreditCard, LogOut, Trash2, Loader2, Ban, ShieldCheck, Moon, Link as LinkIcon, User, Eye, EyeOff, Coins, Zap, CheckCircle2 } from "lucide-react"
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  ShieldAlert, 
+  Info, 
+  CreditCard, 
+  LogOut, 
+  Trash2, 
+  Loader2, 
+  ShieldCheck, 
+  Moon, 
+  Link as LinkIcon, 
+  User, 
+  Eye, 
+  Coins, 
+  CheckCircle2,
+  ShieldX
+} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
-import { deleteUserCompletelyAction, activateReadReceiptsAction, activateVisitorTrackingAction } from "@/app/actions/matchflow-actions"
+import { deleteUserCompletelyAction, activateReadReceiptsAction } from "@/app/actions/matchflow-actions"
 import { Switch } from "@/components/ui/switch"
 import Link from "next/link"
 import {
@@ -128,22 +145,6 @@ export default function SettingsPage() {
     }
   }
 
-  const handleClearCache = async () => {
-    try {
-      const keys = Object.keys(localStorage);
-      for (const key of keys) {
-        if (!key.includes('auth-token')) {
-          localStorage.removeItem(key);
-        }
-      }
-      sessionStorage.clear()
-      toast({ title: "App refreshed", description: "Storage cleared successfully." })
-      setTimeout(() => window.location.reload(), 1000)
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error" })
-    }
-  }
-
   const handleDeleteAccount = async () => {
     if (!user || deleteConfirmText.toUpperCase() !== "DELETE") return
 
@@ -226,6 +227,13 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-3">
+          <h2 className="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] ml-2">Privacy & Safety</h2>
+          <div className="bg-white rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm">
+            <SettingItem label="Blocked List" href="/blocked-list" icon={<ShieldX className="w-4 h-4" />} hideBorder />
+          </div>
+        </div>
+
+        <div className="space-y-3">
           <h2 className="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] ml-2">Account</h2>
           <div className="bg-white rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm">
             <AlertDialog>
@@ -255,6 +263,13 @@ export default function SettingsPage() {
               </AlertDialogContent>
             </AlertDialog>
             <SettingItem label="Charge Settings" href="/pricing" icon={<CreditCard className="w-4 h-4" />} hideBorder />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-[9px] font-black text-gray-400 uppercase tracking-[0.3em] ml-2">Information</h2>
+          <div className="bg-white rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm">
+            <SettingItem label="About QIVO" href="/about" icon={<Info className="w-4 h-4" />} hideBorder />
           </div>
         </div>
 
@@ -311,10 +326,6 @@ export default function SettingsPage() {
               </AlertDialog>
             )}
           </div>
-        </div>
-
-        <div className="pt-10 text-center space-y-1 opacity-20">
-           <p className="text-[8px] font-black uppercase tracking-[0.4em] text-slate-400">Qivo Native v1.2.6</p>
         </div>
       </main>
     </div>
