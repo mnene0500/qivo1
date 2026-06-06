@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -328,7 +327,9 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
-        <div className="h-20" />
+        
+        {/* LARGE BOTTOM SPACER FOR PREMIUM NAVIGATION FLOW */}
+        <div className="h-40" />
       </main>
     </div>
   )

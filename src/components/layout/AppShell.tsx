@@ -9,7 +9,7 @@ import { GlobalCallOverlay } from "../GlobalCallOverlay"
 
 /**
  * @fileOverview Viewport-Centric App Shell with Hardware Navigation Stability.
- * Optimized for mobile history pops and scroll restoration.
+ * Optimized for mobile history pops and hydration consistency.
  */
 
 function ShellContent({ children }: { children: React.ReactNode }) {
@@ -25,6 +25,8 @@ function ShellContent({ children }: { children: React.ReactNode }) {
 
   const isChatDetail = pathname === '/chats' && searchParams.has('startWith')
   const isCallScreen = pathname?.startsWith('/call/');
+  
+  // showNav logic is stable between server and client first pass as user is null on both
   const showNav = user && ['/home', '/chats', '/profile'].includes(pathname || "") && !isChatDetail && !isCallScreen;
 
   // RECOVERY: Reliably restore scroll on history pop (back button)
@@ -33,7 +35,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       const storageKey = `scroll_${pathname}${searchParams.toString()}`;
       const saved = sessionStorage.getItem(storageKey);
       
-      // Delay slightly to allow Next.js to finish DOM swap
       const timer = setTimeout(() => {
         if (mainRef.current) {
           if (saved) {
@@ -48,7 +49,6 @@ function ShellContent({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, searchParams, mounted])
 
-  // PERSIST: Capture scroll before navigating away
   const handleScroll = (e: React.UIEvent<HTMLElement>) => {
     if (pathname) {
       const storageKey = `scroll_${pathname}${searchParams.toString()}`;
@@ -57,7 +57,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-white relative">
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-white relative">
       <main 
         ref={mainRef}
         onScroll={handleScroll}
