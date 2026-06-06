@@ -6,7 +6,7 @@ import { savePushSubscriptionAction } from "@/app/actions/matchflow-actions"
 
 /**
  * @fileOverview Manages PWA Web Push subscriptions and permissions.
- * NOTE: Actual notifications require VAPID keys set in Vercel environment variables.
+ * Explicitly requests notification access on mount.
  */
 export function PushNotificationManager() {
   const { user } = useUser()
@@ -16,41 +16,49 @@ export function PushNotificationManager() {
       return
     }
 
-    const subscribeUser = async () => {
+    const initPush = async () => {
       try {
-        const registration = await navigator.serviceWorker.ready
-        
-        // Request permission if not granted
+        // 1. Check/Request Permission
         let permission = Notification.permission;
         if (permission === 'default') {
           permission = await Notification.requestPermission();
         }
 
         if (permission !== 'granted') {
-          console.warn("[Push Manager]: Permission denied or not requested.");
+          console.warn("[Push Manager]: Notification permission denied.");
           return;
         }
 
-        // Standard subscription logic
-        // NEXT_PUBLIC_VAPID_PUBLIC_KEY must be provided for production alerts
+        // 2. Wait for service worker to be ready
+        const registration = await navigator.serviceWorker.ready;
+        
+        // 3. Check for existing subscription
+        let subscription = await registration.pushManager.getSubscription();
+
+        // 4. Subscribe if not already subscribed
         const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
         
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: vapidPublicKey ? urlBase64ToUint8Array(vapidPublicKey) : undefined
-        })
+        if (!subscription && vapidPublicKey) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+          });
+        }
 
-        const subJson = subscription.toJSON()
-        if (subJson.endpoint) {
-          await savePushSubscriptionAction(user.id, subJson.endpoint, subJson)
+        // 5. Save to database
+        if (subscription) {
+          const subJson = subscription.toJSON();
+          if (subJson.endpoint) {
+            await savePushSubscriptionAction(user.id, subJson.endpoint, subJson);
+          }
         }
       } catch (err) {
-        console.error("[Push Subscription Error]:", err)
+        console.error("[Push Subscription Error]:", err);
       }
     }
 
-    subscribeUser()
-  }, [user?.id])
+    initPush();
+  }, [user?.id]);
 
   return null
 }

@@ -1,34 +1,36 @@
-
 /**
- * QIVO Service Worker v1.0
- * Handles background push notifications.
+ * QIVO Service Worker for Web Push Notifications.
+ * Listens for 'push' events and displays system alerts.
  */
 
 self.addEventListener('push', function(event) {
   if (event.data) {
-    try {
-      const data = event.data.json();
-      const options = {
-        body: data.body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        vibrate: [100, 50, 100],
-        data: {
-          url: data.url || '/'
-        }
-      };
+    const payload = event.data.json();
+    
+    const options = {
+      body: payload.body,
+      icon: '/icon-192.png',
+      badge: '/notification.png',
+      vibrate: [100, 50, 100],
+      data: {
+        url: payload.url || '/'
+      },
+      actions: [
+        { action: 'open', title: 'View' }
+      ]
+    };
 
-      event.waitUntil(
-        self.registration.showNotification(data.title, options)
-      );
-    } catch (e) {
-      console.error("Push Event Parse Error:", e);
-    }
+    event.waitUntil(
+      self.registration.showNotification(payload.title, options)
+    );
   }
 });
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
+  
+  const urlToOpen = event.notification.data.url;
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       if (clientList.length > 0) {
@@ -38,9 +40,9 @@ self.addEventListener('notificationclick', function(event) {
             client = clientList[i];
           }
         }
-        return client.focus();
+        return client.focus().then(() => client.navigate(urlToOpen));
       }
-      return clients.openWindow(event.notification.data.url);
+      return clients.openWindow(urlToOpen);
     })
   );
 });
