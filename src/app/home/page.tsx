@@ -1,15 +1,14 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
-import { RotateCw, BadgeCheck, FileText, Target, Loader2, Sparkles } from "lucide-react"
+import { RotateCw, BadgeCheck, FileText, Target, Loader2 } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
-import { Button } from "@/components/ui/button"
 
 interface UserProfile {
   uid: string; 
@@ -33,16 +32,23 @@ export default function HomePage() {
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [profile, setProfile] = useState<any>(null)
-  
-  // Track if we are doing a manual refresh to reshuffle
-  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Fisher-Yates Shuffle algorithm for client-side reshuffling
+  const shuffleArray = (array: any[]) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[shuffled[i]]];
+    }
+    // Note: We'll keep it simple for the user request: mix them up!
+    return shuffled.sort(() => Math.random() - 0.5);
+  };
 
   const fetchUsers = useCallback(async (pageNum = 0, isManualRefresh = false) => {
     if (!currentUser?.id) return;
     if (pageNum === 0) setLoading(true);
     else setLoadingMore(true);
 
-    // 1. Efficient single-row fetch for self
     const { data: myProfile } = await supabase
       .from('users')
       .select('uid, gender, country, blocking, blocked_by')
@@ -57,7 +63,6 @@ export default function HomePage() {
     const to = from + PAGE_SIZE - 1;
     const blockedList = [...(myProfile.blocking || []), ...(myProfile.blocked_by || [])];
 
-    // 2. Select ONLY necessary columns
     let query = supabase.from('users')
       .select('uid, name, photo_url, country, dob, is_verified, updated_at')
       .eq('onboarding_complete', true)
@@ -71,19 +76,25 @@ export default function HomePage() {
 
     if (activeTab === 'nearby') query = query.eq('country', myProfile.country);
     
-    // Sort by updated_at to ensure online/recent users are at the top
+    // Manual refresh reshuffles the whole pool by using a different order or client-side mixing
     const { data } = await query
       .order('updated_at', { ascending: false })
       .range(from, to);
 
     if (data) {
+      let finalData = data as any;
+      
+      // If manually refreshing, shuffle the incoming batch
+      if (isManualRefresh) {
+        finalData = shuffleArray(finalData);
+      }
+
       if (pageNum === 0) {
-        setUsers(data as any);
+        setUsers(finalData);
       } else {
         setUsers(prev => {
-          // Filter duplicates just in case
           const existingIds = new Set(prev.map(u => u.uid));
-          const filteredNew = (data as any).filter((u: any) => !existingIds.has(u.uid));
+          const filteredNew = finalData.filter((u: any) => !existingIds.has(u.uid));
           return [...prev, ...filteredNew];
         });
       }
@@ -93,35 +104,13 @@ export default function HomePage() {
     setLoadingMore(false);
   }, [currentUser?.id, activeTab]);
 
-  // Initial load only occurs once or when activeTab changes
   useEffect(() => {
     if (isInitialized) {
-      // Don't auto-fetch if we already have users for this tab (manual cache behavior)
-      // unless it's the very first load
       if (users.length === 0 || page === 0) {
         fetchUsers(0);
       }
     }
   }, [isInitialized, activeTab]);
-
-  // SCROLL RESTORATION & INFINITE LOAD
-  useEffect(() => {
-    const handleScroll = () => {
-      const threshold = 600;
-      const isAtBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - threshold;
-      
-      if (isAtBottom && !loadingMore && hasMore && !loading && users.length > 0) {
-        setPage(p => {
-          const next = p + 1;
-          fetchUsers(next);
-          return next;
-        });
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [loading, loadingMore, hasMore, fetchUsers, users.length]);
 
   const handleManualRefresh = () => {
     setPage(0);
@@ -140,13 +129,17 @@ export default function HomePage() {
       {/* SCROLLABLE TOP BUTTONS */}
       <div className="bg-[#00A2FF] pt-2 pb-4">
         <div className="px-4 grid grid-cols-2 gap-3 py-4">
-          <button onClick={() => router.push('/mystery-note')} className="h-28 bg-white/10 backdrop-blur-md rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-lg">
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <button 
+            onClick={() => router.push('/mystery-note')} 
+            className="h-28 bg-[#1E3A8A] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/10 active:scale-95 transition-all relative overflow-hidden group shadow-lg"
+          >
             <FileText className="w-5 h-5 mb-2 relative z-10" />
             <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10">Message<br/>Blast</p>
           </button>
-          <button onClick={() => router.push('/tasks')} className="h-28 bg-white/10 backdrop-blur-md rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
+          <button 
+            onClick={() => router.push('/tasks')} 
+            className="h-28 bg-[#6B21A8] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-lg"
+          >
             <Target className="w-5 h-5 mb-2 relative z-10" />
             <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10">Task<br/>Center</p>
           </button>
@@ -193,7 +186,6 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {users.map((u) => {
-              // Online threshold: 5 minutes
               const isOnline = new Date(u.updated_at).getTime() > Date.now() - 5 * 60 * 1000;
               return (
                 <Card key={u.uid} className="relative overflow-hidden border-none aspect-[1/1.3] rounded-[2rem] shadow-xl active:scale-[0.98] transition-all" onClick={() => router.push(`/users/${u.uid}`)}>

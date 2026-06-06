@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ChevronLeft, Coins, Users, Loader2, Send, Sparkles, MessageSquare, Zap, Target } from "lucide-react"
+import { ChevronLeft, Coins, Loader2, Send, Zap, Target } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { sendMysteryNoteAction } from "@/app/actions/matchflow-actions"
 import { cn } from "@/lib/utils"
@@ -84,12 +84,10 @@ export default function MysteryNotePage() {
 
   return (
     <div className="flex-1 bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600 min-h-screen flex flex-col select-none relative overflow-hidden animate-in fade-in duration-700">
-      {/* ANIMATED AMBIENCE */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+      {/* ANIMATED AMBIENCE (Low Z-Index) */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
         <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/10 rounded-full blur-[100px] animate-pulse" />
         <div className="absolute bottom-20 -left-20 w-80 h-80 bg-blue-400/10 rounded-full blur-[80px]" />
-        <Sparkles className="absolute top-1/4 left-10 w-8 h-8 text-white/20 animate-bounce duration-[3000ms]" />
-        <Sparkles className="absolute bottom-1/4 right-10 w-6 h-6 text-white/10 animate-bounce duration-[5000ms]" />
       </div>
       
       <header className="px-4 h-16 flex items-center justify-between bg-transparent z-50">
@@ -123,18 +121,18 @@ export default function MysteryNotePage() {
                </div>
             </div>
 
-            <div className="relative group">
+            <div className="relative group z-20">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-[2rem] blur-xl opacity-0 group-focus-within:opacity-20 transition-opacity" />
               <Textarea 
                 placeholder="Broadcast your mood, a question, or a greeting to the world..." 
                 value={message} 
                 onChange={(e) => setMessage(e.target.value)} 
-                className="bg-white rounded-[2.5rem] min-h-[180px] border-none text-slate-900 font-bold p-8 text-base shadow-inner focus-visible:ring-4 focus-visible:ring-white/20 transition-all placeholder:text-slate-300" 
+                className="bg-white rounded-[2.5rem] min-h-[180px] border-none text-slate-900 font-bold p-8 text-base shadow-inner focus-visible:ring-4 focus-visible:ring-white/20 transition-all placeholder:text-slate-300 relative z-30" 
               />
             </div>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-8 relative z-20">
             <div className="space-y-4">
               <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] text-center">Transmission Reach</p>
               <div className="flex flex-wrap justify-center gap-3">
