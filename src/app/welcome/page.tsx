@@ -10,8 +10,8 @@ import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
 /**
- * @fileOverview Cinematic Welcome Page v2.2.
- * Fixed: Video background reliability and refined all-caps branding.
+ * @fileOverview Cinematic Welcome Page v2.3.
+ * Updated: Uses local backgroundvideo.mp4 for high-fidelity branding.
  */
 export default function WelcomePage() {
   const [loading, setLoading] = useState(false)
@@ -51,7 +51,7 @@ export default function WelcomePage() {
           playsInline 
           className="w-full h-full object-cover opacity-60 grayscale-[10%]"
         >
-          <source src="https://assets.mixkit.co/videos/preview/mixkit-people-dancing-at-a-party-with-strobe-lights-4008-large.mp4" type="video/mp4" />
+          <source src="/backgroundvideo.mp4" type="video/mp4" />
         </video>
       </div>
 
@@ -65,7 +65,7 @@ export default function WelcomePage() {
           </div>
         </div>
 
-        <div className="w-full max-w-sm space-y-6">
+        <div className="w-full max-sm space-y-6">
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-700">
             <Button 
               disabled={loading}
