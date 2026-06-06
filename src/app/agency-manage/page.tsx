@@ -1,12 +1,11 @@
-
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, Check, X, Loader2, User, Users, Briefcase, Banknote, MessageSquare, Copy } from "lucide-react"
+import { ChevronLeft, Check, X, Loader2, User, Users, Briefcase, Banknote, MessageSquare, Copy, Smartphone } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
 import { reviewRecruitmentAction, updateWithdrawalStatusAction } from "@/app/actions/matchflow-actions"
@@ -120,10 +119,10 @@ export default function AgencyManagePage() {
   if (loading) return <div className="flex-1 flex items-center justify-center min-h-screen bg-white"><Loader2 className="animate-spin text-[#00A2FF] w-8 h-8" /></div>
 
   return (
-    <div className="flex-1 bg-white min-h-screen flex flex-col select-none">
+    <div className="flex-1 bg-white min-h-screen flex flex-col select-none animate-in fade-in duration-300">
       <header className="px-4 h-16 flex items-center justify-between border-b bg-white sticky top-0 z-50">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full"><ChevronLeft className="w-6 h-6 text-black" /></Button>
-        <h1 className="text-sm font-black text-black uppercase tracking-widest">Agency Center</h1>
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full active:scale-90 transition-transform"><ChevronLeft className="w-6 h-6 text-black" /></Button>
+        <h1 className="text-sm font-black text-black uppercase tracking-[0.2em]">Agency Center</h1>
         <div className="w-10" />
       </header>
 
@@ -138,11 +137,11 @@ export default function AgencyManagePage() {
             onClick={() => setActiveTab(tab.id as any)} 
             className={cn(
               "flex-1 py-4 flex flex-col items-center gap-1 border-b-2 transition-all", 
-              activeTab === tab.id ? "border-[#00A2FF] text-[#00A2FF]" : "border-transparent text-gray-400"
+              activeTab === tab.id ? "border-[#00A2FF] text-[#00A2FF]" : "border-transparent text-gray-300"
             )}
           >
-            <tab.icon className="w-5 h-5" />
-            <span className="text-[10px] font-bold uppercase tracking-tighter">{tab.label}</span>
+            <tab.icon className="w-4 h-4" />
+            <span className="text-[9px] font-black uppercase tracking-widest">{tab.label}</span>
           </button>
         ))}
       </div>
@@ -151,16 +150,19 @@ export default function AgencyManagePage() {
         {activeTab === 'recruitment' && (
           <div className="space-y-4">
             {applicants.length === 0 ? (
-              <div className="p-12 text-center text-gray-300 text-xs font-bold uppercase tracking-widest">No pending applications</div>
+              <div className="py-32 text-center opacity-30 px-12 text-center space-y-4">
+                 <Briefcase className="w-12 h-12 mx-auto text-gray-300" />
+                 <p className="font-black text-[10px] uppercase tracking-widest">No Applications</p>
+              </div>
             ) : applicants.map(app => (
-              <div key={app.uid} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl animate-in fade-in slide-in-from-right-4">
+              <div key={app.uid} className="flex items-center justify-between p-5 bg-gray-50 rounded-[2rem] animate-in slide-in-from-right-4">
                 <div className="flex items-center gap-3">
-                  <Avatar className="w-10 h-10"><AvatarImage src={app.photo_url} /><AvatarFallback><User /></AvatarFallback></Avatar>
-                  <span className="font-bold text-sm">{app.name}</span>
+                  <Avatar className="w-12 h-12 border-2 border-white shadow-sm"><AvatarImage src={app.photo_url} className="object-cover"/><AvatarFallback><User /></AvatarFallback></Avatar>
+                  <span className="font-black text-sm text-black">{app.name}</span>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" disabled={isProcessing} onClick={() => handleReview(app.uid, 'approved')} className="bg-green-500 rounded-full h-9 w-9 shadow-lg shadow-green-100"><Check className="w-4 h-4 text-white" /></Button>
-                  <Button size="icon" disabled={isProcessing} onClick={() => handleReview(app.uid, 'rejected')} variant="outline" className="border-red-200 text-red-500 rounded-full h-9 w-9"><X className="w-4 h-4" /></Button>
+                  <Button size="icon" disabled={isProcessing} onClick={() => handleReview(app.uid, 'approved')} className="bg-black text-white rounded-full h-10 w-10 shadow-lg active:scale-90 transition-transform"><Check className="w-4 h-4" /></Button>
+                  <Button size="icon" variant="ghost" disabled={isProcessing} onClick={() => handleReview(app.uid, 'rejected')} className="text-red-500 rounded-full h-10 w-10 active:scale-90 transition-transform"><X className="w-4 h-4" /></Button>
                 </div>
               </div>
             ))}
@@ -168,39 +170,43 @@ export default function AgencyManagePage() {
         )}
 
         {activeTab === 'members' && (
-          <div className="space-y-4">
-            <h2 className="text-[10px] font-bold uppercase text-gray-400 tracking-widest px-1">Agency Agent</h2>
-            <div className="flex items-center gap-3 p-4 bg-[#00A2FF]/5 border border-[#00A2FF]/10 rounded-2xl">
-              <Avatar className="w-12 h-12 border-2 border-[#00A2FF]">
-                <AvatarImage src={profile?.photo_url} />
-                <AvatarFallback><User /></AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <span className="font-bold text-sm block">{profile?.name} (You)</span>
-                <span className="text-[9px] font-bold text-[#00A2FF] uppercase tracking-widest">Agency Owner</span>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <h2 className="text-[9px] font-black uppercase text-gray-400 tracking-[0.3em] ml-2">Agency Agent</h2>
+              <div className="flex items-center gap-4 p-5 bg-[#00A2FF]/5 border border-[#00A2FF]/10 rounded-[2rem] shadow-sm">
+                <Avatar className="w-14 h-14 border-4 border-white shadow-md">
+                  <AvatarImage src={profile?.photo_url} className="object-cover" />
+                  <AvatarFallback><User /></AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <span className="font-black text-sm block text-slate-900 tracking-tight">{profile?.name} (You)</span>
+                  <span className="text-[8px] font-black text-[#00A2FF] uppercase tracking-[0.2em] bg-white px-2 py-0.5 rounded-full border border-[#00A2FF]/10 inline-block mt-1">Owner</span>
+                </div>
               </div>
             </div>
             
-            <h2 className="text-[10px] font-bold uppercase text-gray-400 tracking-widest px-1 mt-6">Team Members</h2>
             <div className="space-y-3">
-              {members.length === 0 ? (
-                <div className="p-12 text-center text-gray-300 text-xs font-bold uppercase tracking-widest">No members yet</div>
-              ) : (
-                members.map(member => (
-                  <div key={member.uid} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-black/5">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10 border border-white">
-                        <AvatarImage src={member.photo_url} />
-                        <AvatarFallback><User /></AvatarFallback>
-                      </Avatar>
-                      <span className="font-bold text-sm text-black">{member.name}</span>
+              <h2 className="text-[9px] font-black uppercase text-gray-400 tracking-[0.3em] ml-2">Active Team</h2>
+              <div className="space-y-3">
+                {members.length === 0 ? (
+                  <div className="py-20 text-center opacity-30 text-[10px] font-black uppercase tracking-widest">No active members</div>
+                ) : (
+                  members.map(member => (
+                    <div key={member.uid} className="flex items-center justify-between p-5 bg-white border rounded-[2rem] shadow-sm">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="w-12 h-12 border border-slate-100 shadow-sm">
+                          <AvatarImage src={member.photo_url} className="object-cover" />
+                          <AvatarFallback><User /></AvatarFallback>
+                        </Avatar>
+                        <span className="font-black text-sm text-slate-900 tracking-tight">{member.name}</span>
+                      </div>
+                      <Button size="icon" variant="ghost" onClick={() => router.push(`/chats?startWith=${member.uid}`)} className="rounded-full bg-slate-50 text-[#00A2FF] h-10 w-10 active:scale-90 transition-transform">
+                        <MessageSquare className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => router.push(`/chats?startWith=${member.uid}`)} className="rounded-full bg-white shadow-sm text-[#00A2FF] border border-blue-50">
-                      <MessageSquare className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -208,31 +214,35 @@ export default function AgencyManagePage() {
         {activeTab === 'withdrawals' && (
           <div className="space-y-4">
             {withdrawals.length === 0 ? (
-              <div className="p-12 text-center text-gray-300 text-xs font-bold uppercase tracking-widest">No pending payouts</div>
+              <div className="py-32 text-center opacity-30 px-12 text-center space-y-4">
+                 <Banknote className="w-12 h-12 mx-auto text-gray-300" />
+                 <p className="font-black text-[10px] uppercase tracking-widest">No Pending Payouts</p>
+              </div>
             ) : withdrawals.map(req => (
-              <div key={req.id} className="p-5 bg-white border rounded-2xl shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4">
+              <div key={req.id} className="p-6 bg-white border rounded-[2.5rem] shadow-xl space-y-6 animate-in slide-in-from-bottom-4">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="font-bold text-sm">UID: {req.user_id.slice(0, 8)}...</h4>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Requested: {format(req.timestamp, "MMM d, HH:mm")}</p>
+                    <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 mb-1">Requester UID</h4>
+                    <p className="font-black text-sm text-black font-mono tracking-tighter">#{req.user_id.slice(0, 8).toUpperCase()}</p>
+                    <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest mt-2">{format(new Date(Number(req.timestamp)), "MMM d, HH:mm")}</p>
                   </div>
                   <div className="text-right cursor-pointer" onClick={() => handleCopy(req.amount_kes.toString(), "Amount")}>
-                    <p className="text-lg font-black text-green-600 flex items-center gap-1.5 justify-end">Ksh {req.amount_kes} <Copy className="w-3 h-3 opacity-30" /></p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">{req.diamonds} Diamonds</p>
+                    <p className="text-2xl font-black text-green-600 tracking-tighter">Ksh {req.amount_kes}</p>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">{req.diamonds} Diamonds</p>
                   </div>
                 </div>
                 
-                <div className="p-4 bg-gray-50 rounded-xl border flex items-center justify-between cursor-pointer active:bg-gray-100 transition-colors" onClick={() => handleCopy(req.mpesa_number, "M-Pesa Number")}>
+                <div className="p-5 bg-gray-50 rounded-2xl border border-black/[0.03] flex items-center justify-between cursor-pointer active:bg-gray-100 transition-colors" onClick={() => handleCopy(req.mpesa_number, "M-Pesa Number")}>
                   <div>
-                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Destination M-Pesa</p>
-                    <p className="text-sm font-black text-black tracking-widest">{req.mpesa_number || "---"}</p>
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Smartphone className="w-2.5 h-2.5" /> Destination M-Pesa</p>
+                    <p className="text-lg font-black text-black tracking-[0.1em]">{req.mpesa_number || "---"}</p>
                   </div>
-                  <Copy className="w-4 h-4 text-[#00A2FF]" />
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#00A2FF] shadow-sm"><Copy className="w-4 h-4" /></div>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button disabled={isProcessing} onClick={() => handleWithdrawalReview(req.id, 'paid')} className="flex-1 bg-green-600 text-white font-bold h-12 rounded-full uppercase tracking-widest text-[10px] shadow-lg shadow-green-100">Paid</Button>
-                  <Button disabled={isProcessing} onClick={() => handleWithdrawalReview(req.id, 'rejected')} variant="outline" className="flex-1 border-red-200 text-red-500 font-bold h-12 rounded-full uppercase tracking-widest text-[10px]">Reject</Button>
+                <div className="flex gap-3 pt-2">
+                  <Button disabled={isProcessing} onClick={() => handleWithdrawalReview(req.id, 'paid')} className="flex-1 bg-black text-white font-black h-14 rounded-2xl uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-all">Confirm Payment</Button>
+                  <Button disabled={isProcessing} onClick={() => handleWithdrawalReview(req.id, 'rejected')} variant="ghost" className="flex-1 text-red-500 font-black h-14 rounded-2xl uppercase tracking-widest text-[10px] hover:bg-red-50 active:scale-95 transition-all">Reject</Button>
                 </div>
               </div>
             ))}

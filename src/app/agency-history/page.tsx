@@ -1,7 +1,6 @@
-
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useUser } from "@/firebase/auth/use-user"
 import { useRouter } from "next/navigation"
@@ -42,55 +41,59 @@ export default function AgencyHistoryPage() {
 
     fetchWithdrawals()
 
-    const channel = supabase.channel(`agency-withdrawals:${user.id}`)
-      .on('postgres_changes', { event: '*', table: 'withdrawals', filter: `user_id=eq.${user.id}` }, () => fetchWithdrawals())
+    // Real-time status updates
+    const channel = supabase.channel(`member-payouts:${user.id}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        table: 'withdrawals', 
+        filter: `user_id=eq.${user.id}` 
+      }, () => fetchWithdrawals())
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [user?.id])
 
   return (
-    <div className="flex-1 bg-white min-h-screen flex flex-col">
+    <div className="flex-1 bg-white min-h-screen flex flex-col select-none animate-in fade-in duration-500">
       <header className="px-4 h-16 flex items-center justify-between border-b sticky top-0 bg-white z-50">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
           <ChevronLeft className="w-6 h-6 text-black" />
         </Button>
-        <h1 className="text-base font-black text-black">Payout History</h1>
+        <h1 className="text-sm font-black text-black uppercase tracking-widest">Payout History</h1>
         <div className="w-10" />
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-y-auto no-scrollbar pb-20">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-[#00A2FF]" />
           </div>
         ) : withdrawals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 px-12 text-center space-y-4 opacity-40">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-[2rem] flex items-center justify-center">
               <Banknote className="w-8 h-8 text-gray-400" />
             </div>
             <div className="space-y-1">
-              <p className="font-black text-sm uppercase tracking-widest">No Payouts Yet</p>
-              <p className="text-[10px] font-bold text-gray-400">Your withdrawal requests will appear here.</p>
+              <p className="font-black text-[10px] uppercase tracking-[0.2em]">No Activity</p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-relaxed">Your withdrawal requests<br/>will appear here</p>
             </div>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
             {withdrawals.map((req) => (
-              <div key={req.id} className="p-6 hover:bg-gray-50/50 transition-colors">
-                <div className="flex justify-between items-start mb-4">
+              <div key={req.id} className="p-6 hover:bg-gray-50/50 transition-colors animate-in slide-in-from-bottom-2">
+                <div className="flex justify-between items-start mb-3">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-lg font-black text-black">Ksh {req.amount_kes}</p>
-                      <StatusBadge status={req.status} />
-                    </div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      {format(req.timestamp, "MMM d, HH:mm")} • {req.diamonds} Diamonds
+                    <p className="text-xl font-black text-black tracking-tight">Ksh {req.amount_kes}</p>
+                    <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                      {format(new Date(Number(req.timestamp)), "MMM d, HH:mm")}
                     </p>
                   </div>
+                  <StatusBadge status={req.status} />
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl w-fit">
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Agency ID: {req.agency_id}</p>
+                <div className="flex items-center justify-between gap-2 px-4 py-3 bg-gray-50 rounded-2xl border border-black/[0.03]">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Diamonds Exchanged</p>
+                  <p className="text-xs font-black text-black">{req.diamonds}</p>
                 </div>
               </div>
             ))}
@@ -112,7 +115,7 @@ function StatusBadge({ status }: { status: WithdrawalRequest['status'] }) {
   const Icon = config.icon
 
   return (
-    <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest", config.className)}>
+    <div className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest", config.className)}>
       <Icon className="w-3 h-3" />
       {config.text}
     </div>
