@@ -7,7 +7,7 @@ import { headers } from 'next/headers';
 
 /**
  * @fileOverview Definitive Server Actions for QIVO Production.
- * Optimized atomic operations with strict economic locks.
+ * Optimized atomic operations with strict economic locks and anti-fraud IP tracking.
  */
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -74,7 +74,7 @@ export async function completeOnboardingAction(payload: {
       .eq('registration_ip', clientIp);
     
     if (ipAccCount !== null && ipAccCount >= 3) {
-      throw new Error("Device limit reached.");
+      throw new Error("Device limit reached. Max 3 accounts per network.");
     }
 
     const { error } = await supabase.from('users').upsert({
@@ -202,10 +202,11 @@ export async function sendGiftAction(senderUid: string, recipientUid: string, co
 
     const { data: recipient } = await supabase.from('users').select('gender').eq('uid', recipientUid).single();
     
+    // Male users now receive 40% as DIAMONDS as requested
     if (recipient?.gender === 'male') {
       const reward = Math.floor(coinAmount * 0.4);
-      await supabase.rpc("increment_coins", { p_user_id: recipientUid, p_amount: reward });
-      await supabase.from('coin_history').insert({ user_id: recipientUid, amount: reward, type: 'gift_income', description: `Gift from admirer: ${giftName}`, timestamp: ts });
+      await supabase.rpc("increment_diamonds", { p_user_id: recipientUid, p_amount: reward });
+      await supabase.from('diamond_history').insert({ user_id: recipientUid, amount: reward, type: 'gift', description: `Gift from admirer: ${giftName}`, timestamp: ts });
     } else {
       const reward = Math.floor(coinAmount * 0.5);
       await supabase.rpc("increment_diamonds", { p_user_id: recipientUid, p_amount: reward });

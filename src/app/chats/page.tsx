@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react"
@@ -11,7 +12,15 @@ import { cn } from "@/lib/utils"
 import { useUser } from "@/firebase/auth/use-user"
 import { format } from "date-fns"
 import { clearChatAction, sendMessageAction, markChatAsReadAction, sendGiftAction } from "@/app/actions/matchflow-actions"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useBalance } from "@/lib/providers/BalanceProvider"
 import { startCallAction } from "@/app/actions/call-actions"
@@ -149,7 +158,7 @@ function ChatsContent() {
     const loadInitialMessages = async () => {
       const { data: chatData } = await supabase.from('chats').select('id, cleared_at, last_seen_at').eq('id', cid).maybeSingle();
       setChatInfo(chatData);
-      const clearedAt = (chatData?.cleared_at as any)?.[currentUser.id] || 0;
+      const clearedAt = (chatInfo?.cleared_at as any)?.[currentUser.id] || 0;
       
       const { data: msgs } = await supabase.from('messages')
         .select('id, chat_id, sender_id, text, timestamp, is_gift, image_url')
@@ -287,7 +296,15 @@ function ChatsContent() {
           ))
         )}
       </main>
-      <AlertDialog open={!!chatToDelete} onOpenChange={() => setChatToDelete(null)}><AlertDialogContent className="rounded-[2rem] p-8 max-w-[85vw]"><AlertDialogHeader><AlertDialogTitle className="font-black text-center uppercase tracking-tight">Delete Chat?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter className="gap-3 mt-4"><AlertDialogCancel className="h-12 rounded-xl font-black text-[10px] uppercase tracking-widest border-none bg-gray-50">Keep</AlertDialogCancel><AlertDialogAction onClick={() => { if (chatToDelete) { clearChatAction(currentUser!.id, chatToDelete); setSummaries(prev => prev.filter(s => s.id !== chatToDelete)); setChatToDelete(null); } }} className="h-12 rounded-xl bg-red-500 font-black text-[10px] uppercase tracking-widest border-none text-white shadow-lg shadow-red-100">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={!!chatToDelete} onOpenChange={() => setChatToDelete(null)}>
+        <AlertDialogContent className="rounded-[2rem] p-8 max-w-[85vw]">
+          <AlertDialogHeader><AlertDialogTitle className="font-black text-center uppercase tracking-tight">Delete Chat?</AlertDialogTitle></AlertDialogHeader>
+          <AlertDialogFooter className="gap-3 mt-4">
+            <AlertDialogCancel className="h-12 rounded-xl font-black text-[10px] uppercase tracking-widest border-none bg-gray-50">Keep</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (chatToDelete) { clearChatAction(currentUser!.id, chatToDelete); setSummaries(prev => prev.filter(s => s.id !== chatToDelete)); setChatToDelete(null); } }} className="h-12 rounded-xl bg-red-500 font-black text-[10px] uppercase tracking-widest border-none text-white shadow-lg shadow-red-100">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 

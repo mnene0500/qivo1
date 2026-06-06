@@ -1,39 +1,47 @@
-self.addEventListener('push', function(event) {
-  if (event.data) {
-    try {
-      const data = event.data.json();
-      const options = {
-        body: data.body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        vibrate: [100, 50, 100],
-        data: {
-          url: data.url || '/'
-        }
-      };
-      event.waitUntil(
-        self.registration.showNotification(data.title, options)
-      );
-    } catch (e) {
-      console.error('Error parsing push data:', e);
-    }
+
+/**
+ * QIVO Production Service Worker
+ * Handles real-time push notification display and hardware interaction.
+ */
+
+self.addEventListener('push', (event) => {
+  if (!(self.Notification && self.Notification.permission === 'granted')) {
+    return;
   }
+
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'New Notification';
+  const options = {
+    body: data.body || 'You have a new message on QIVO.',
+    icon: '/icon-192.png',
+    badge: '/notification.png',
+    vibrate: [100, 50, 100],
+    data: {
+      url: data.url || '/'
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
 });
 
-self.addEventListener('notificationclick', function(event) {
+self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  
+  const targetUrl = event.notification.data.url;
+
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(windowClients => {
-      // If a window is already open, focus it and navigate
-      for (var i = 0; i < windowClients.length; i++) {
-        var client = windowClients[i];
-        if (client.url === event.notification.data.url && 'focus' in client) {
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      // If a window is already open, focus it
+      for (const client of clientList) {
+        if (client.url === targetUrl && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no window is open, open a new one
+      // Otherwise, open a new window
       if (clients.openWindow) {
-        return clients.openWindow(event.notification.data.url);
+        return clients.openWindow(targetUrl);
       }
     })
   );
