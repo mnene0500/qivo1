@@ -1,45 +1,50 @@
 
 /**
  * QIVO Production Service Worker
- * Handles real-time push notification display and hardware interaction.
+ * Handles background push notifications and app focus logic.
  */
 
-self.addEventListener('push', (event) => {
-  if (!(self.Notification && self.Notification.permission === 'granted')) {
-    return;
+self.addEventListener('push', function(event) {
+  if (!event.data) return;
+
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body,
+      icon: '/icon-192.png',
+      badge: '/notification.png',
+      vibrate: [100, 50, 100],
+      data: {
+        url: data.url || '/'
+      },
+      actions: [
+        { action: 'open', title: 'View Now' }
+      ]
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(data.title, options)
+    );
+  } catch (err) {
+    console.error("Push parse error:", err);
   }
-
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || 'New Notification';
-  const options = {
-    body: data.body || 'You have a new message on QIVO.',
-    icon: '/icon-192.png',
-    badge: '/notification.png',
-    vibrate: [100, 50, 100],
-    data: {
-      url: data.url || '/'
-    }
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
 });
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   
   const targetUrl = event.notification.data.url;
 
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((clientList) => {
-      // If a window is already open, focus it
-      for (const client of clientList) {
-        if (client.url === targetUrl && 'focus' in client) {
+    clients.matchAll({ type: 'window' }).then(windowClients => {
+      // Check if there is already a window open with this URL
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.includes(targetUrl) && 'focus' in client) {
           return client.focus();
         }
       }
-      // Otherwise, open a new window
+      // If not, open a new window
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }

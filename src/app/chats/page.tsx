@@ -129,12 +129,15 @@ function ChatsContent() {
     if (!chatId || !currentUser?.id || loadingOldMsgs || !hasMoreMsgs) return;
     setLoadingMoreMsgs(true);
     const oldestTs = messages.length > 0 ? messages[messages.length - 1].timestamp : Date.now();
-    const clearedAt = (chatInfo?.cleared_at as any)?.[currentUser.id] || 0;
+    
+    // FETCH LATEST CLEARED_AT TIMESTAMP FROM DB TO ENSURE INTEGRITY
+    const { data: latestChat } = await supabase.from('chats').select('cleared_at').eq('id', chatId).single();
+    const clearedAt = (latestChat?.cleared_at as any)?.[currentUser.id] || 0;
     
     const { data: msgs } = await supabase.from('messages')
       .select('id, chat_id, sender_id, text, timestamp, is_gift, image_url')
       .eq('chat_id', chatId)
-      .gt('timestamp', clearedAt)
+      .gt('timestamp', clearedAt) // CRITICAL: Only load non-deleted messages
       .lt('timestamp', oldestTs)
       .order('timestamp', { ascending: false })
       .limit(MSG_PAGE_SIZE);
@@ -158,12 +161,12 @@ function ChatsContent() {
     const loadInitialMessages = async () => {
       const { data: chatData } = await supabase.from('chats').select('id, cleared_at, last_seen_at').eq('id', cid).maybeSingle();
       setChatInfo(chatData);
-      const clearedAt = (chatInfo?.cleared_at as any)?.[currentUser.id] || 0;
+      const clearedAt = (chatData?.cleared_at as any)?.[currentUser.id] || 0;
       
       const { data: msgs } = await supabase.from('messages')
         .select('id, chat_id, sender_id, text, timestamp, is_gift, image_url')
         .eq('chat_id', cid)
-        .gt('timestamp', clearedAt)
+        .gt('timestamp', clearedAt) // CRITICAL: Filter out old messages
         .order('timestamp', { ascending: false })
         .limit(MSG_PAGE_SIZE);
         
@@ -357,7 +360,7 @@ function ChatsContent() {
           )
         })}
         {hasMoreMsgs && (
-          <Button variant="ghost" onClick={loadOldMessages} disabled={loadingOldMsgs} className="text-[9px] font-black text-gray-400 uppercase tracking-widest self-center py-6">
+          <Button variant="ghost" onClick={loadOldMessages} disabled={loadingOldMsgs} className="text-[9px] font-black text-gray-400 uppercase tracking-widest self-center py-6 hover:bg-transparent">
             {loadingOldMsgs ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : null}
             Load older messages
           </Button>

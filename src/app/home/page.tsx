@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -121,23 +122,26 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col w-full bg-white select-none min-h-screen">
-      <div className="bg-[#00A2FF] pt-1 pb-3">
-        <div className="px-4 grid grid-cols-2 gap-3 py-3">
+      <div className="bg-[#00A2FF] pt-1 pb-3 relative overflow-hidden">
+        {/* QIVO BRAND STAMP BACKGROUND */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+           <span className="text-[120px] font-black text-white/5 uppercase tracking-tighter select-none rotate-12">QIVO</span>
+        </div>
+
+        <div className="px-4 grid grid-cols-2 gap-3 py-3 relative z-10">
           <button 
             onClick={() => router.push('/mystery-note')} 
-            className="h-28 bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-xl shadow-blue-900/10"
+            className="h-28 bg-white/10 backdrop-blur-md rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-xl"
           >
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full -mr-8 -mt-8" />
+            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <FileText className="w-5 h-5 mb-2 relative z-10" />
             <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10 drop-shadow-sm">Message<br/>Blast</p>
           </button>
           <button 
             onClick={() => router.push('/tasks')} 
-            className="h-28 bg-gradient-to-br from-[#6B21A8] to-[#9333EA] rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-xl shadow-purple-900/10"
+            className="h-28 bg-white/10 backdrop-blur-md rounded-[2rem] p-5 flex flex-col items-start justify-center text-white border border-white/20 active:scale-95 transition-all relative overflow-hidden group shadow-xl"
           >
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full -mr-8 -mt-8" />
+            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <Target className="w-5 h-5 mb-2 relative z-10" />
             <p className="text-[12px] font-black uppercase tracking-widest leading-tight relative z-10 drop-shadow-sm">Task<br/>Center</p>
           </button>
