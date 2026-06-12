@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
@@ -108,11 +109,11 @@ export default function MePage() {
   const isAgent = !!profile?.is_agent
   const isVerified = !!profile?.is_verified
   
-  // Verification Lock: Agency features only for verified Kenyan females
   const isEligibleForAgency = profile?.gender === 'female' && profile?.country === 'Kenya' && isVerified
   const isAgencyMember = profile?.agency_status === 'approved'
   
-  const displayPhoto = profile?.photo_url || "https://picsum.photos/seed/qivo/400/400"
+  // Use metadata fallback to prevent "Picsum blink"
+  const displayPhoto = profile?.photo_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
   const cacheBust = profile?.updated_at ? new Date(profile.updated_at).getTime() : Date.now()
 
   return (
@@ -123,8 +124,12 @@ export default function MePage() {
         <header className="pt-12 pb-8 px-6 flex flex-col items-center text-center">
           <div className="relative mb-4">
             <div className="relative w-28 h-28 rounded-full overflow-hidden bg-white/20 backdrop-blur-xl p-1 shadow-2xl">
-              <div className="w-full h-full rounded-full overflow-hidden bg-gray-100">
-                <Image src={`${displayPhoto}?t=${cacheBust}`} alt={profile?.name || "Me"} fill className="object-cover" sizes="112px" priority />
+              <div className="w-full h-full rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                {displayPhoto ? (
+                  <Image src={`${displayPhoto}?t=${cacheBust}`} alt={profile?.name || "Me"} fill className="object-cover" sizes="112px" priority />
+                ) : (
+                  <Users className="w-10 h-10 text-gray-300" />
+                )}
               </div>
             </div>
             <button 

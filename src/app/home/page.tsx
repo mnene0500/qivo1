@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -119,8 +120,8 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col w-full bg-white select-none min-h-screen">
-      {/* SCROLLABLE TOP PART (Intense Blue) */}
-      <div className="bg-blue-100/70 pt-8 pb-6 px-4">
+      {/* SCROLLABLE TOP PART (Intense Blue - Increased) */}
+      <div className="bg-blue-100 pt-8 pb-6 px-4">
         <div className="grid grid-cols-2 gap-3 relative">
           {/* QIVO STAMP */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[100px] font-black text-blue-300/10 pointer-events-none select-none italic tracking-tighter z-0">
@@ -149,8 +150,8 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* STICKY TAB BAR (Intense Blue) */}
-      <div className="sticky top-0 z-[60] bg-blue-100/70 backdrop-blur-md border-b border-black/5">
+      {/* STICKY TAB BAR (Intense Blue - Increased) */}
+      <div className="sticky top-0 z-[60] bg-blue-100 backdrop-blur-md border-b border-black/5">
         <div className="px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-8">
             {['Recommend', 'Nearby'].map((t) => (
@@ -179,33 +180,30 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* USER GRID */}
-      <main className="px-2 pt-3 pb-24 bg-white">
+      {/* USER GRID (Tightened) */}
+      <main className="px-2 pt-2 pb-24 bg-white">
         {loading && users.length === 0 ? (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {[1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-50 rounded-[1.2rem] animate-pulse" />)}
           </div>
         ) : users.length === 0 ? (
           <div className="py-40 text-center opacity-40 uppercase font-black text-[10px] tracking-widest">No profiles found</div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {users.map((u) => {
               if (!u) return null;
               return (
                 <Card key={u.uid} className="relative overflow-hidden border-none aspect-[4/5] rounded-[1.2rem] shadow-md active:scale-[0.98] transition-all" onClick={() => router.push(`/users/${u.uid}`)}>
                   <Image src={u.photo_url} alt={u.name} fill className="object-cover" sizes="50vw" priority />
                   
-                  {/* OVERLAY GRADIENT */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   
-                  {/* CHAT BADGE */}
                   <div className="absolute top-3 right-3 z-10">
                     <div className="bg-[#00A2FF] text-white text-[12px] font-black uppercase px-3 py-1.5 rounded-full shadow-lg border border-white/20 tracking-widest">
                       CHAT
                     </div>
                   </div>
 
-                  {/* USER INFO */}
                   <div className="absolute bottom-3 left-4 right-4 text-white">
                     <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
                       <h4 className="font-semibold text-[15px] truncate leading-none tracking-tight">{u.name}</h4>
