@@ -19,13 +19,18 @@ export function PushNotificationManager() {
 
     const initPush = async () => {
       try {
+        console.log("[Push Manager]: Initializing...");
+        
         if (Notification.permission === 'default') {
           await Notification.requestPermission();
         }
         
+        console.log("[Push Manager]: Permission Status:", Notification.permission);
         if (Notification.permission !== 'granted') return;
 
         const registration = await navigator.serviceWorker.ready;
+        console.log("[Push Manager]: SW Ready:", registration);
+
         const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
         
         if (!vapidPublicKey) {
@@ -43,6 +48,8 @@ export function PushNotificationManager() {
         }
 
         const subJson = subscription.toJSON();
+        console.log("[Push Manager]: Subscription Obtained:", subJson);
+
         if (subJson.endpoint) {
           await savePushSubscriptionAction(user.id, subJson.endpoint, subJson);
         }

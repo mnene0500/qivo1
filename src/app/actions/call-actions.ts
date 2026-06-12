@@ -7,7 +7,7 @@ import webpush from 'web-push';
 
 /**
  * @fileOverview Hardened Agora Token Generation and Billing Engine.
- * Optimized: Consolidated billing and detailed history logging.
+ * Optimized: Admin free calls, exact billing, and background push notifications.
  */
 
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -102,6 +102,7 @@ export async function startCallAction(chatId: string, callerId: string, receiver
     const cost = type === 'video' ? 150 : 70;
     const { data: user } = await supabase.from('users').select('is_admin, is_coin_seller').eq('uid', callerId).single();
     
+    // ADMINS CALL FOR FREE
     if (!user?.is_admin && !user?.is_coin_seller) {
       const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', callerId).single();
       if ((Number(bal?.coins) || 0) < cost) {
@@ -200,7 +201,11 @@ export async function deductCallCoinsAction(uid: string, type: 'video' | 'voice'
   const supabase = getSupabaseAdmin();
   try {
     const { data: user } = await supabase.from('users').select('is_admin, is_coin_seller, gender, name').eq('uid', uid).single();
-    if (user?.is_admin || user?.is_coin_seller) return { success: true, cost: 0, diamondReward: 0 };
+    
+    // ADMINS AND MERCHANTS CALL FOR FREE
+    if (user?.is_admin || user?.is_coin_seller) {
+      return { success: true, cost: 0, diamondReward: 0 };
+    }
 
     const cost = type === 'video' ? 150 : 70;
     const { data: bal } = await supabase.from('balances').select('coins').eq('user_id', uid).single();
