@@ -114,6 +114,7 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
       else coins = Math.floor(amt * 8.33);
 
       // FIRST TIME BONUS CHECK
+      // amt is the cost in KES. 120 = 1000 pkg, 600 = 5000 pkg
       const { data: previous } = await supabase
         .from('processed_payments')
         .select('id')
@@ -122,6 +123,7 @@ export async function verifyPaymentAction(orderTrackingId: string, merchantRefer
         .limit(1)
         .maybeSingle();
 
+      // Only give bonus if it is the first purchase for THIS specific tier
       if (!previous) {
         if (amt === 120) coins += 50; // 1000 Package
         if (amt === 600) coins += 100; // 5000 Package
