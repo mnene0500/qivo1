@@ -20,7 +20,7 @@ export default function TaskCenterPage() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   const days = [
-    { day: "Day 1", reward: 2 }, { day: "Day 2", reward: 2 }, { day: "Day 3", reward: 5 }, { day: "Day 4", reward: 2 }, { day: "Day 5", reward: 2 }, { day: "Day 6", reward: 2 }, { day: "Day 7", reward: 10 },
+    { day: "Day 1", reward: 5 }, { day: "Day 2", reward: 5 }, { day: "Day 3", reward: 15 }, { day: "Day 4", reward: 15 }, { day: "Day 5", reward: 20 }, { day: "Day 6", reward: 15 }, { day: "Day 7", reward: 30 },
   ]
 
   useEffect(() => {
