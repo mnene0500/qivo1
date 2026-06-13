@@ -13,14 +13,15 @@ import { supabase } from "@/lib/supabase"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 const PACKAGES = [
-  { id: "p1", label: "500", coins: 500, priceKes: 80 },
-  { id: "p2", label: "1000", coins: 1000, priceKes: 120, popular: true, bonus: 50 },
+  { id: "p1", label: "200", coins: 200, priceKes:1},
+  { id: "p2", label: "500", coins: 500, priceKes: 80 },
+  { id: "p3", label: "1000", coins: 1000, priceKes: 120, popular: true, bonus: 50 },
   { id: "p8", label: "2000", coins: 2000, priceKes: 240 },
-  { id: "p3", label: "5000", coins: 5000, priceKes: 600, bonus: 100 },
-  { id: "p4", label: "7000", coins: 7000, priceKes: 800 },
-  { id: "p5", label: "10000", coins: 10000, priceKes: 1000 },
-  { id: "p6", label: "15000", coins: 15000, priceKes: 1500 },
-  { id: "p7", label: "20000", coins: 20000, priceKes: 2000 },
+  { id: "p4", label: "5000", coins: 5000, priceKes: 600, bonus: 100 },
+  { id: "p5", label: "7000", coins: 7000, priceKes: 800 },
+  { id: "p6", label: "10000", coins: 10000, priceKes: 1000 },
+  { id: "p7", label: "15000", coins: 15000, priceKes: 1500 },
+  { id: "p8", label: "20000", coins: 20000, priceKes: 2000 },
 ]
 
 const RATES = {
