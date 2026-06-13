@@ -92,7 +92,7 @@ export default function WelcomePage() {
 
           <div className="pt-6">
             <p className="text-[9px] text-white/30 font-black uppercase tracking-[0.2em] leading-relaxed max-w-[280px] mx-auto">
-              18+ Only. By entering, you agree to our <Link href="/terms" className="text-white/60 underline">Terms</Link> & <Link href="/privacy" className="text-white/60 underline">Privacy</Link>.
+              18+ Only. By continuing, you are agreeing to our <Link href="/terms" className="text-white/60 underline">Terms</Link> & <Link href="/privacy" className="text-white/60 underline">Privacy</Link>.
             </p>
           </div>
         </div>
